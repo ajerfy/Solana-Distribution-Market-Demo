@@ -1,0 +1,8 @@
+[package]
+name = "normal-v1-sdk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+distribution-markets = { path = "../.." }
+normal-v1-program = { path = "../../programs/normal-v1-program" }
