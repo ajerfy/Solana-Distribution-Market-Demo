@@ -4,3 +4,4 @@ target/
 **/.gradle/
 **/build/
 apps/android-demo/local.properties
+apps/android-demo/gradle/gradle-daemon-jvm.properties
