@@ -44,6 +44,11 @@ Exit criteria:
 Primary files:
 - [`/Users/aaditjerfy/distribution-markets/specs/solana-normal-v1.md`](/Users/aaditjerfy/distribution-markets/specs/solana-normal-v1.md)
 - [`/Users/aaditjerfy/distribution-markets/src/solana_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_v1.rs)
+- [`/Users/aaditjerfy/distribution-markets/programs/normal-v1-program`](/Users/aaditjerfy/distribution-markets/programs/normal-v1-program)
+
+Current status:
+- The repo now has a dedicated `normal-v1-program` workspace crate with manual instruction/account packing, token-operation planning, and an integration-style lifecycle test.
+- The remaining Phase 2 gap is swapping the current abstract token-flow model for actual Solana account execution and validator-style tests.
 
 ## Phase 3: Quote and Transaction SDK
 

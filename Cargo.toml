@@ -3,5 +3,9 @@ name = "distribution-markets"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = ["programs/normal-v1-program"]
+resolver = "2"
+
 [dependencies]
 statrs = "0.18"

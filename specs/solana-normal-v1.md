@@ -6,7 +6,11 @@ This v1 spec is intentionally Normal-only. The goal is to ship the smallest Sola
 
 This spec treats the fixed-point Normal engine in [`/Users/aaditjerfy/distribution-markets/src/normal_market.rs`](/Users/aaditjerfy/distribution-markets/src/normal_market.rs) and [`/Users/aaditjerfy/distribution-markets/src/normal_math.rs`](/Users/aaditjerfy/distribution-markets/src/normal_math.rs) as the canonical economic core for v1.
 
-The repo now also includes an instruction-handler scaffold in [`/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs). It is not a deployed Solana program yet, but it gives us a concrete in-memory model for how v1 account transitions should wrap the fixed-point Normal core.
+The repo now also includes:
+- an in-memory instruction-handler scaffold in [`/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs)
+- a dedicated program-facing workspace crate in [`/Users/aaditjerfy/distribution-markets/programs/normal-v1-program`](/Users/aaditjerfy/distribution-markets/programs/normal-v1-program)
+
+The crate is not a deployed Solana program yet, but it now gives us a concrete place for account serialization, instruction packing, token-operation planning, and integration-style lifecycle tests around the fixed-point Normal core.
 
 ## Economic Model
 
@@ -240,5 +244,6 @@ The current codebase now includes:
 - bounded quote-envelope verification helpers for `Trade`
 - Rust account and instruction types in [`/Users/aaditjerfy/distribution-markets/src/solana_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_v1.rs)
 - an in-memory instruction processor scaffold in [`/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs)
+- a program-facing workspace crate with manual packing/unpacking and lifecycle tests in [`/Users/aaditjerfy/distribution-markets/programs/normal-v1-program`](/Users/aaditjerfy/distribution-markets/programs/normal-v1-program)
 
-The next build step after this scaffold is to turn the processor model into a real Solana program crate with account serialization, CPI-safe token movements, and local integration tests against the same Normal-only semantics.
+The next build step after this crate-level scaffold is to replace the current token-operation planning with real Solana account handlers, CPI-safe token movements, and local validator-style integration tests against the same Normal-only semantics.

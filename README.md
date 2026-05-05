@@ -8,6 +8,7 @@ This repo now includes:
 - A fixed-point Normal math bridge and Solidity-parity tests to support eventual Solana porting work.
 - A reusable simulation layer and interactive CLI seeded by the example scenarios.
 - A Normal-only product roadmap and devnet launch checklist for the Solana v1 path.
+- A dedicated workspace crate at [`/Users/your-username/distribution-markets/programs/normal-v1-program`](/Users/your-username/distribution-markets/programs/normal-v1-program) for the Normal-only program-facing scaffold.
 
 ## Dependencies
 
@@ -38,6 +39,12 @@ cargo run --bin simulate -- run normal
 cargo run --bin simulate -- run uniform
 cargo run --bin simulate -- run cauchy
 cargo run --bin simulate -- run student_t
+```
+
+```bash
+cd /Users/your-username/distribution-markets
+source $HOME/.cargo/env
+cargo test --workspace
 ```
 
 ## Product Path

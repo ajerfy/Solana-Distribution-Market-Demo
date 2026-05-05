@@ -54,7 +54,7 @@ pub fn normal_v1_product_milestones() -> Vec<ProductMilestoneV1> {
         ProductMilestoneV1 {
             id: "program-scaffold",
             track: ProductTrack::Program,
-            status: MilestoneStatus::Planned,
+            status: MilestoneStatus::InProgress,
             title: "Scaffold the Solana v1 program",
             goal: "Turn the Normal-only account and instruction spec into a compilable Solana program crate.",
             exit_criteria: &[
@@ -65,6 +65,7 @@ pub fn normal_v1_product_milestones() -> Vec<ProductMilestoneV1> {
             primary_artifacts: &[
                 "/Users/aaditjerfy/distribution-markets/specs/solana-normal-v1.md",
                 "/Users/aaditjerfy/distribution-markets/src/solana_v1.rs",
+                "/Users/aaditjerfy/distribution-markets/programs/normal-v1-program",
             ],
         },
         ProductMilestoneV1 {
@@ -131,6 +132,7 @@ pub fn normal_v1_repo_task_map() -> Vec<RepoTaskMapV1> {
         RepoTaskMapV1 {
             track: ProductTrack::Program,
             next_repo_targets: &[
+                "/Users/aaditjerfy/distribution-markets/programs/normal-v1-program",
                 "/Users/aaditjerfy/distribution-markets/src/solana_v1.rs",
                 "/Users/aaditjerfy/distribution-markets/specs/solana-normal-v1.md",
             ],
