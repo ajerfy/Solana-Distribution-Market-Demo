@@ -9,6 +9,7 @@ pub mod numerical;
 pub mod product_v1;
 pub mod scoring;
 pub mod solana_v1;
+pub mod solana_program_v1;
 pub mod simulation;
 
 pub use distributions::{
@@ -36,6 +37,10 @@ pub use solana_v1::{
     SolanaMarketAccountV1, SolanaNormalPositionAccountV1, SolanaOperationMappingV1,
     SolanaPositionSettlementV1, TradeArgsV1, current_normal_market_to_account,
     normal_v1_operation_mapping,
+};
+pub use solana_program_v1::{
+    InitializeAccountsV1, NormalV1ProgramState, ProgramInstructionEffectV1,
+    initialize_program_state, process_instruction,
 };
 pub use simulation::{
     SimulationReport, SimulationScenario, SimulationStep, builtin_scenarios, find_scenario,

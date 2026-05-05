@@ -16,3 +16,7 @@ pub use crate::solana_v1::{
     SolanaPositionSettlementV1, TradeArgsV1, current_normal_market_to_account,
     normal_v1_operation_mapping,
 };
+pub use crate::solana_program_v1::{
+    InitializeAccountsV1, NormalV1ProgramState, ProgramInstructionEffectV1,
+    initialize_program_state, process_instruction,
+};

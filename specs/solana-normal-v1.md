@@ -6,6 +6,8 @@ This v1 spec is intentionally Normal-only. The goal is to ship the smallest Sola
 
 This spec treats the fixed-point Normal engine in [`/Users/aaditjerfy/distribution-markets/src/normal_market.rs`](/Users/aaditjerfy/distribution-markets/src/normal_market.rs) and [`/Users/aaditjerfy/distribution-markets/src/normal_math.rs`](/Users/aaditjerfy/distribution-markets/src/normal_math.rs) as the canonical economic core for v1.
 
+The repo now also includes an instruction-handler scaffold in [`/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs). It is not a deployed Solana program yet, but it gives us a concrete in-memory model for how v1 account transitions should wrap the fixed-point Normal core.
+
 ## Economic Model
 
 - Outcome family: Normal distributions only, parameterized by `(mu, sigma)`.
@@ -231,10 +233,12 @@ The current fixed-point market engine maps onto Solana instructions as follows:
 - `FixedNormalMarket::resolve` (trade payout branch) -> `SettlePosition`
 - `FixedNormalMarket::resolve` (LP payout branch) -> `SettleLp`
 
-## Immediate Build Target
+## Current Scaffold Status
 
-The next code step after this spec should be to:
-- add a fixed-point `remove_liquidity` path to the Normal engine
-- add quote-envelope verification helpers for the trade instruction
-- implement these account and instruction types in a Solana-facing crate or module
-- carry the current bounded verifier policy directly into program-side trade verification logic
+The current codebase now includes:
+- fixed-point `remove_liquidity` on the active Normal path
+- bounded quote-envelope verification helpers for `Trade`
+- Rust account and instruction types in [`/Users/aaditjerfy/distribution-markets/src/solana_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_v1.rs)
+- an in-memory instruction processor scaffold in [`/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs`](/Users/aaditjerfy/distribution-markets/src/solana_program_v1.rs)
+
+The next build step after this scaffold is to turn the processor model into a real Solana program crate with account serialization, CPI-safe token movements, and local integration tests against the same Normal-only semantics.
