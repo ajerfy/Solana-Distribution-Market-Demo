@@ -47,6 +47,31 @@ pub struct AndroidTradeIntentV1 {
     pub sigma_display: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoMarketSnapshotV1 {
+    pub title: String,
+    pub current_mu_display: String,
+    pub current_sigma_display: String,
+    pub backing_display: String,
+    pub total_trades: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoQuotePresetV1 {
+    pub id: String,
+    pub label: String,
+    pub target_mu_display: String,
+    pub target_sigma_display: String,
+    pub collateral_required_display: String,
+    pub serialized_instruction_hex: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoAppPayloadV1 {
+    pub market: DemoMarketSnapshotV1,
+    pub presets: Vec<DemoQuotePresetV1>,
+}
+
 pub fn seeded_demo_market() -> Result<NormalV1Program, String> {
     let (program, _) = NormalV1Program::initialize(
         ProgramInitializeArgsV1 {
@@ -160,6 +185,144 @@ pub fn demo_market_summary(program: &NormalV1Program) -> String {
     )
 }
 
+pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
+    let program = seeded_demo_market()?;
+    let market = DemoMarketSnapshotV1 {
+        title: "Seeded SOL price market".to_string(),
+        current_mu_display: program
+            .state
+            .market_account
+            .current_distribution
+            .mu
+            .to_string(),
+        current_sigma_display: program
+            .state
+            .market_account
+            .current_distribution
+            .sigma
+            .to_string(),
+        backing_display: program.state.market_account.b.to_string(),
+        total_trades: program.state.market_account.total_trades,
+    };
+
+    let presets = vec![
+        quote_preset(
+            &program,
+            "base",
+            "Base shift to 100 / 10",
+            100.0,
+            10.0,
+        )?,
+        quote_preset(
+            &program,
+            "bullish",
+            "Bullish shift to 105 / 12",
+            105.0,
+            12.0,
+        )?,
+        quote_preset(
+            &program,
+            "tight",
+            "Tighter view at 92 / 8.5",
+            92.0,
+            8.5,
+        )?,
+    ];
+
+    Ok(DemoAppPayloadV1 { market, presets })
+}
+
+pub fn demo_app_payload_json() -> Result<String, String> {
+    let payload = demo_app_payload()?;
+    let mut json = String::new();
+    json.push_str("{\n");
+    json.push_str("  \"market\": {\n");
+    json.push_str(&format!(
+        "    \"title\": \"{}\",\n",
+        escape_json(&payload.market.title)
+    ));
+    json.push_str(&format!(
+        "    \"current_mu_display\": \"{}\",\n",
+        escape_json(&payload.market.current_mu_display)
+    ));
+    json.push_str(&format!(
+        "    \"current_sigma_display\": \"{}\",\n",
+        escape_json(&payload.market.current_sigma_display)
+    ));
+    json.push_str(&format!(
+        "    \"backing_display\": \"{}\",\n",
+        escape_json(&payload.market.backing_display)
+    ));
+    json.push_str(&format!(
+        "    \"total_trades\": {}\n",
+        payload.market.total_trades
+    ));
+    json.push_str("  },\n");
+    json.push_str("  \"presets\": [\n");
+    for (index, preset) in payload.presets.iter().enumerate() {
+        json.push_str("    {\n");
+        json.push_str(&format!("      \"id\": \"{}\",\n", escape_json(&preset.id)));
+        json.push_str(&format!(
+            "      \"label\": \"{}\",\n",
+            escape_json(&preset.label)
+        ));
+        json.push_str(&format!(
+            "      \"target_mu_display\": \"{}\",\n",
+            escape_json(&preset.target_mu_display)
+        ));
+        json.push_str(&format!(
+            "      \"target_sigma_display\": \"{}\",\n",
+            escape_json(&preset.target_sigma_display)
+        ));
+        json.push_str(&format!(
+            "      \"collateral_required_display\": \"{}\",\n",
+            escape_json(&preset.collateral_required_display)
+        ));
+        json.push_str(&format!(
+            "      \"serialized_instruction_hex\": \"{}\"\n",
+            escape_json(&preset.serialized_instruction_hex)
+        ));
+        json.push_str("    }");
+        if index + 1 != payload.presets.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+    json.push_str("  ]\n");
+    json.push_str("}\n");
+    Ok(json)
+}
+
+fn quote_preset(
+    program: &NormalV1Program,
+    id: &str,
+    label: &str,
+    mu: f64,
+    sigma: f64,
+) -> Result<DemoQuotePresetV1, String> {
+    let target_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(mu)?, Fixed::from_f64(sigma)?)?;
+    let quote = build_trade_quote(
+        program,
+        TradeQuoteRequestV1 {
+            trader: [8_u8; 32],
+            market: [4_u8; 32],
+            target_distribution,
+            quote_slot: 2,
+            quote_expiry_slot: 12,
+        },
+    )?;
+    let intent = android_trade_intent(&quote);
+    Ok(DemoQuotePresetV1 {
+        id: id.to_string(),
+        label: label.to_string(),
+        target_mu_display: intent.mu_display,
+        target_sigma_display: intent.sigma_display,
+        collateral_required_display: intent.collateral_required_display,
+        serialized_instruction_hex: intent.serialized_instruction_hex,
+    })
+}
+
 fn encode_hex(bytes: &[u8]) -> String {
     let mut value = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
@@ -167,6 +330,10 @@ fn encode_hex(bytes: &[u8]) -> String {
         value.push(hex_nibble(byte & 0x0f));
     }
     value
+}
+
+fn escape_json(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn hex_nibble(value: u8) -> char {
@@ -180,8 +347,9 @@ fn hex_nibble(value: u8) -> char {
 #[cfg(test)]
 mod tests {
     use super::{
-        TradeQuoteRequestV1, android_trade_intent, build_trade_quote, demo_market_summary,
-        preview_trade_token_operation, seeded_demo_market,
+        TradeQuoteRequestV1, android_trade_intent, build_trade_quote, demo_app_payload,
+        demo_app_payload_json, demo_market_summary, preview_trade_token_operation,
+        seeded_demo_market,
     };
     use distribution_markets::{Fixed, FixedNormalDistribution};
     use normal_v1_program::unpack_instruction;
@@ -253,5 +421,15 @@ mod tests {
         .unwrap();
         let operations = preview_trade_token_operation(&quote);
         assert_eq!(operations.len(), 1);
+    }
+
+    #[test]
+    fn sdk_emits_demo_payload_for_mobile_app() {
+        let payload = demo_app_payload().unwrap();
+        assert_eq!(payload.market.title, "Seeded SOL price market");
+        assert_eq!(payload.presets.len(), 3);
+        let json = demo_app_payload_json().unwrap();
+        assert!(json.contains("\"presets\""));
+        assert!(json.contains("serialized_instruction_hex"));
     }
 }

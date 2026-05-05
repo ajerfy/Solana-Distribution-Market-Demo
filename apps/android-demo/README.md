@@ -10,15 +10,28 @@ This folder is the starting point for the Solana Mobile hackathon app.
 
 ## Current Integration Target
 
-The app should consume the trader-first SDK surface from:
+The app now consumes a generated asset backed by the trader-first SDK surface from:
 - [`/Users/your-username/Solana Distribution Market Demo/crates/normal-v1-sdk/src/lib.rs`](/Users/your-username/Solana%20Distribution%20Market%20Demo/crates/normal-v1-sdk/src/lib.rs)
+- [`/Users/your-username/Solana Distribution Market Demo/apps/android-demo/app/src/main/assets/demo_market.json`](/Users/your-username/Solana%20Distribution%20Market%20Demo/apps/android-demo/app/src/main/assets/demo_market.json)
 
 The Android app does not need LP management for the first hackathon milestone.
 
-## First App Milestone
+## Use It Now
 
-- Render one seeded market
-- Show current `mu`, `sigma`, and collateral preview
-- Accept target `mu` and `sigma`
-- Render the serialized trade intent returned by the SDK or companion service
-- Leave actual signing and submission as the next incremental step if time is tight
+1. Regenerate the demo asset from the SDK:
+
+```bash
+cd "/Users/your-username/Solana Distribution Market Demo"
+source $HOME/.cargo/env
+cargo run -p normal-v1-sdk --bin export_demo_payload -- apps/android-demo/app/src/main/assets/demo_market.json
+```
+
+2. Open [`/Users/your-username/Solana Distribution Market Demo/apps/android-demo`](/Users/your-username/Solana%20Distribution%20Market%20Demo/apps/android-demo) in Android Studio.
+3. Run the `app` target on an emulator or Android device.
+
+## Current App Milestone
+
+- Render one seeded market from a real SDK-generated asset
+- Show preset Normal trade quotes with collateral previews
+- Render serialized trade intents that can later be handed to wallet submission
+- Leave live wallet signing and transaction submission as the next milestone

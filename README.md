@@ -54,3 +54,17 @@ cargo test --workspace
 - The current mobile-track scope freeze lives in [`/Users/your-username/Solana Distribution Market Demo/specs/solana-mobile-hackathon-scope.md`](/Users/your-username/Solana%20Distribution%20Market%20Demo/specs/solana-mobile-hackathon-scope.md).
 - The Normal-only product roadmap lives in [`/Users/your-username/Solana Distribution Market Demo/specs/normal-v1-product-roadmap.md`](/Users/your-username/Solana%20Distribution%20Market%20Demo/specs/normal-v1-product-roadmap.md).
 - The canonical Solana-facing Normal market spec lives in [`/Users/your-username/Solana Distribution Market Demo/specs/solana-normal-v1.md`](/Users/your-username/Solana%20Distribution%20Market%20Demo/specs/solana-normal-v1.md).
+
+## Android Demo
+
+- The Android app scaffold lives in [`/Users/your-username/Solana Distribution Market Demo/apps/android-demo`](/Users/your-username/Solana%20Distribution%20Market%20Demo/apps/android-demo).
+- It currently loads seeded market data and preset trade intents from [`/Users/your-username/Solana Distribution Market Demo/apps/android-demo/app/src/main/assets/demo_market.json`](/Users/your-username/Solana%20Distribution%20Market%20Demo/apps/android-demo/app/src/main/assets/demo_market.json).
+- Regenerate that asset from the real SDK with:
+
+```bash
+cd "/Users/your-username/Solana Distribution Market Demo"
+source $HOME/.cargo/env
+cargo run -p normal-v1-sdk --bin export_demo_payload -- apps/android-demo/app/src/main/assets/demo_market.json
+```
+
+- Then open [`/Users/your-username/Solana Distribution Market Demo/apps/android-demo`](/Users/your-username/Solana%20Distribution%20Market%20Demo/apps/android-demo) in Android Studio and run the `app` target on an emulator or device.
