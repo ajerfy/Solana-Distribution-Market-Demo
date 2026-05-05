@@ -20,3 +20,8 @@ Normal-Only Solana V1 Spec Status
 
 - The current Normal-only Solana v1 market spec now lives in [`/Users/YOUR_USERNAME/distribution-markets/specs/solana-normal-v1.md`](/Users/YOUR_USERNAME/distribution-markets/specs/solana-normal-v1.md), with matching Rust account and instruction types in [`/Users/YOUR_USERNAME/distribution-markets/src/solana_v1.rs`](/Users/YOUR_USERNAME/distribution-markets/src/solana_v1.rs).
 - The fixed-point Normal engine now includes bounded quote verification, fixed-point liquidity removal, stress-tested repeated trade/liquidity behavior, and explicit residual cash tracking at resolution, which is the closest thing in the repo to the deployable v1 core.
+
+Usable Product Path From Here
+
+- The repo now includes a Normal-only product roadmap at [`/Users/aaditjerfy/distribution-markets/specs/normal-v1-product-roadmap.md`](/Users/aaditjerfy/distribution-markets/specs/normal-v1-product-roadmap.md) and a devnet launch checklist at [`/Users/aaditjerfy/distribution-markets/specs/devnet-launch-checklist.md`](/Users/aaditjerfy/distribution-markets/specs/devnet-launch-checklist.md) so we can treat the current fixed-point Normal engine as the single v1 economic source of truth.
+- The next concrete build sequence is to scaffold the Solana program from the Normal-only spec, add an SDK that reproduces bounded quote verification offchain, and only then build the thin operator and trader UI needed for a controlled devnet launch.

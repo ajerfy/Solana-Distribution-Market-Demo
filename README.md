@@ -7,6 +7,7 @@ This repo now includes:
 - A research-oriented multi-distribution market engine for Normal, Uniform, Cauchy, and Student's t markets.
 - A fixed-point Normal math bridge and Solidity-parity tests to support eventual Solana porting work.
 - A reusable simulation layer and interactive CLI seeded by the example scenarios.
+- A Normal-only product roadmap and devnet launch checklist for the Solana v1 path.
 
 ## Dependencies
 
@@ -38,3 +39,9 @@ cargo run --bin simulate -- run uniform
 cargo run --bin simulate -- run cauchy
 cargo run --bin simulate -- run student_t
 ```
+
+## Product Path
+
+- The current product roadmap lives in [`/Users/aaditjerfy/distribution-markets/specs/normal-v1-product-roadmap.md`](/Users/aaditjerfy/distribution-markets/specs/normal-v1-product-roadmap.md).
+- The current devnet launch checklist lives in [`/Users/aaditjerfy/distribution-markets/specs/devnet-launch-checklist.md`](/Users/aaditjerfy/distribution-markets/specs/devnet-launch-checklist.md).
+- The canonical Solana-facing Normal market spec lives in [`/Users/aaditjerfy/distribution-markets/specs/solana-normal-v1.md`](/Users/aaditjerfy/distribution-markets/specs/solana-normal-v1.md).

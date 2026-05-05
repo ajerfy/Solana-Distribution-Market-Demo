@@ -2,6 +2,10 @@ pub use crate::market::{DistributionMarket, Resolution, TradeRecord};
 pub use crate::normal_market::{
     FixedNormalMarket, FixedNormalResolution, FixedNormalTradeQuote, FixedNormalTradeRecord,
 };
+pub use crate::product_v1::{
+    MilestoneStatus, ProductMilestoneV1, ProductTrack, RepoTaskMapV1,
+    normal_v1_product_milestones, normal_v1_repo_task_map,
+};
 pub use crate::scoring::{
     collateral_is_sufficient, trader_payout, trader_position_value, trader_profit_and_loss,
 };
