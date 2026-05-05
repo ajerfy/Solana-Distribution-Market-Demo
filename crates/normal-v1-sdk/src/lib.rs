@@ -70,6 +70,7 @@ pub struct DemoQuotePresetV1 {
 pub struct DemoAppPayloadV1 {
     pub market: DemoMarketSnapshotV1,
     pub presets: Vec<DemoQuotePresetV1>,
+    pub quote_grid: Vec<DemoQuotePresetV1>,
 }
 
 pub fn seeded_demo_market() -> Result<NormalV1Program, String> {
@@ -229,7 +230,13 @@ pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
         )?,
     ];
 
-    Ok(DemoAppPayloadV1 { market, presets })
+    let quote_grid = build_quote_grid(&program)?;
+
+    Ok(DemoAppPayloadV1 {
+        market,
+        presets,
+        quote_grid,
+    })
 }
 
 pub fn demo_app_payload_json() -> Result<String, String> {
@@ -259,7 +266,17 @@ pub fn demo_app_payload_json() -> Result<String, String> {
     ));
     json.push_str("  },\n");
     json.push_str("  \"presets\": [\n");
-    for (index, preset) in payload.presets.iter().enumerate() {
+    push_quote_list_json(&mut json, &payload.presets);
+    json.push_str("  ],\n");
+    json.push_str("  \"quote_grid\": [\n");
+    push_quote_list_json(&mut json, &payload.quote_grid);
+    json.push_str("  ]\n");
+    json.push_str("}\n");
+    Ok(json)
+}
+
+fn push_quote_list_json(json: &mut String, quotes: &[DemoQuotePresetV1]) {
+    for (index, preset) in quotes.iter().enumerate() {
         json.push_str("    {\n");
         json.push_str(&format!("      \"id\": \"{}\",\n", escape_json(&preset.id)));
         json.push_str(&format!(
@@ -283,14 +300,11 @@ pub fn demo_app_payload_json() -> Result<String, String> {
             escape_json(&preset.serialized_instruction_hex)
         ));
         json.push_str("    }");
-        if index + 1 != payload.presets.len() {
+        if index + 1 != quotes.len() {
             json.push(',');
         }
         json.push('\n');
     }
-    json.push_str("  ]\n");
-    json.push_str("}\n");
-    Ok(json)
 }
 
 fn quote_preset(
@@ -321,6 +335,26 @@ fn quote_preset(
         collateral_required_display: intent.collateral_required_display,
         serialized_instruction_hex: intent.serialized_instruction_hex,
     })
+}
+
+fn build_quote_grid(program: &NormalV1Program) -> Result<Vec<DemoQuotePresetV1>, String> {
+    let mu_values = [88.0, 92.0, 95.0, 100.0, 105.0];
+    let sigma_values = [8.5, 10.0, 12.0];
+    let mut quotes = Vec::new();
+
+    for sigma in sigma_values {
+        for mu in mu_values {
+            quotes.push(quote_preset(
+                program,
+                &format!("grid-{mu:.1}-{sigma:.1}"),
+                &format!("Grid quote for mu {mu:.1}, sigma {sigma:.1}"),
+                mu,
+                sigma,
+            )?);
+        }
+    }
+
+    Ok(quotes)
 }
 
 fn encode_hex(bytes: &[u8]) -> String {
@@ -428,8 +462,10 @@ mod tests {
         let payload = demo_app_payload().unwrap();
         assert_eq!(payload.market.title, "Seeded SOL price market");
         assert_eq!(payload.presets.len(), 3);
+        assert_eq!(payload.quote_grid.len(), 15);
         let json = demo_app_payload_json().unwrap();
         assert!(json.contains("\"presets\""));
+        assert!(json.contains("\"quote_grid\""));
         assert!(json.contains("serialized_instruction_hex"));
     }
 }

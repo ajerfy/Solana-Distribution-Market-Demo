@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +42,7 @@ class MainActivity : ComponentActivity() {
 data class DemoPayload(
     val market: DemoMarket,
     val presets: List<DemoPreset>,
+    val quoteGrid: List<DemoPreset>,
 )
 
 data class DemoMarket(
@@ -62,6 +65,9 @@ data class DemoPreset(
 @Composable
 private fun HackathonMarketScreen(payload: DemoPayload) {
     var selectedPreset by remember { mutableStateOf(payload.presets.first()) }
+    var targetMu by remember { mutableStateOf(payload.presets.first().targetMuDisplay) }
+    var targetSigma by remember { mutableStateOf(payload.presets.first().targetSigmaDisplay) }
+    var previewQuote by remember { mutableStateOf(payload.presets.first()) }
 
     LazyColumn(
         modifier = Modifier
@@ -93,7 +99,7 @@ private fun HackathonMarketScreen(payload: DemoPayload) {
 
         item {
             Text(
-                text = "Tap a preset trade quote",
+                text = "Preset trade quotes",
                 style = MaterialTheme.typography.titleMedium,
             )
         }
@@ -102,7 +108,12 @@ private fun HackathonMarketScreen(payload: DemoPayload) {
             PresetCard(
                 preset = preset,
                 selected = preset.id == selectedPreset.id,
-                onSelect = { selectedPreset = preset },
+                onSelect = {
+                    selectedPreset = preset
+                    targetMu = preset.targetMuDisplay
+                    targetSigma = preset.targetSigmaDisplay
+                    previewQuote = preset
+                },
             )
         }
 
@@ -112,17 +123,41 @@ private fun HackathonMarketScreen(payload: DemoPayload) {
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("Selected trade intent", style = MaterialTheme.typography.titleMedium)
-                    Text("Target mu: ${selectedPreset.targetMuDisplay}")
-                    Text("Target sigma: ${selectedPreset.targetSigmaDisplay}")
-                    Text("Collateral preview: ${selectedPreset.collateralRequiredDisplay}")
+                    Text("Interactive quote preview", style = MaterialTheme.typography.titleMedium)
+                    OutlinedTextField(
+                        value = targetMu,
+                        onValueChange = { targetMu = it },
+                        label = { Text("Target mu") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = targetSigma,
+                        onValueChange = { targetSigma = it },
+                        label = { Text("Target sigma") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = {
+                            previewQuote = nearestQuote(
+                                payload.quoteGrid,
+                                targetMu.toDoubleOrNull(),
+                                targetSigma.toDoubleOrNull(),
+                            )
+                        },
+                    ) {
+                        Text("Preview Quote")
+                    }
+                    Text("Nearest available quote: ${previewQuote.label}")
+                    Text("Target mu: ${previewQuote.targetMuDisplay}")
+                    Text("Target sigma: ${previewQuote.targetSigmaDisplay}")
+                    Text("Collateral preview: ${previewQuote.collateralRequiredDisplay}")
                     Text(
                         text = "Serialized instruction",
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    Text(selectedPreset.serializedInstructionHex.take(96) + "...")
+                    Text(previewQuote.serializedInstructionHex.take(96) + "...")
                     Text(
-                        text = "Wallet submission is the next milestone.",
+                        text = "This preview snaps to the nearest SDK-generated quote in the demo grid.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -172,6 +207,7 @@ private fun loadDemoPayload(json: String): DemoPayload {
     val root = JSONObject(json)
     val marketObject = root.getJSONObject("market")
     val presetsArray = root.getJSONArray("presets")
+    val quoteGridArray = root.getJSONArray("quote_grid")
     return DemoPayload(
         market = DemoMarket(
             title = marketObject.getString("title"),
@@ -181,6 +217,7 @@ private fun loadDemoPayload(json: String): DemoPayload {
             totalTrades = marketObject.getLong("total_trades"),
         ),
         presets = presetsArray.toPresetList(),
+        quoteGrid = quoteGridArray.toPresetList(),
     )
 }
 
@@ -200,4 +237,22 @@ private fun JSONArray.toPresetList(): List<DemoPreset> {
         )
     }
     return presets
+}
+
+private fun nearestQuote(
+    quotes: List<DemoPreset>,
+    requestedMu: Double?,
+    requestedSigma: Double?,
+): DemoPreset {
+    if (requestedMu == null || requestedSigma == null) {
+        return quotes.first()
+    }
+
+    return quotes.minByOrNull { quote ->
+        val mu = quote.targetMuDisplay.toDoubleOrNull() ?: 0.0
+        val sigma = quote.targetSigmaDisplay.toDoubleOrNull() ?: 0.0
+        val muDistance = requestedMu - mu
+        val sigmaDistance = requestedSigma - sigma
+        (muDistance * muDistance) + (sigmaDistance * sigmaDistance)
+    } ?: quotes.first()
 }

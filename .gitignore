@@ -1,1 +1,6 @@
 target/
+.idea/
+**/.idea/
+**/.gradle/
+**/build/
+apps/android-demo/local.properties
