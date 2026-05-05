@@ -3,18 +3,28 @@ package com.solanadistributionmarketdemo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,9 +43,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                val context = LocalContext.current
-                val payload = remember { loadDemoPayload(context.assets.open("demo_market.json").bufferedReader().use { it.readText() }) }
-                HackathonMarketScreen(payload)
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    val context = LocalContext.current
+                    val payload = remember {
+                        loadDemoPayload(
+                            context.assets.open("demo_market.json").bufferedReader().use { it.readText() }
+                        )
+                    }
+                    TradeAppScreen(payload)
+                }
             }
         }
     }
@@ -63,143 +84,260 @@ data class DemoPreset(
 )
 
 @Composable
-private fun HackathonMarketScreen(payload: DemoPayload) {
+private fun TradeAppScreen(payload: DemoPayload) {
     var selectedPreset by remember { mutableStateOf(payload.presets.first()) }
     var targetMu by remember { mutableStateOf(payload.presets.first().targetMuDisplay) }
     var targetSigma by remember { mutableStateOf(payload.presets.first().targetSigmaDisplay) }
     var previewQuote by remember { mutableStateOf(payload.presets.first()) }
 
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item {
+        MarketHero(payload.market)
+
+        QuoteBuilderCard(
+            targetMu = targetMu,
+            targetSigma = targetSigma,
+            onMuChange = { targetMu = it },
+            onSigmaChange = { targetSigma = it },
+            onPreview = {
+                previewQuote = nearestQuote(
+                    payload.quoteGrid,
+                    targetMu.toDoubleOrNull(),
+                    targetSigma.toDoubleOrNull(),
+                )
+            },
+        )
+
+        SelectedQuoteCard(previewQuote = previewQuote)
+
+        PresetStrip(
+            presets = payload.presets,
+            selectedId = selectedPreset.id,
+            onSelect = { preset ->
+                selectedPreset = preset
+                targetMu = preset.targetMuDisplay
+                targetSigma = preset.targetSigmaDisplay
+                previewQuote = preset
+            },
+        )
+
+        MarketDepthHint(payload.quoteGrid.size)
+    }
+}
+
+@Composable
+private fun MarketHero(market: DemoMarket) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text(
-                text = "Solana Distribution Market Demo",
+                text = "Trade a forecast",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = market.title,
                 style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
             )
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(payload.market.title, style = MaterialTheme.typography.titleMedium)
-                    Text("Current mu: ${payload.market.currentMuDisplay}")
-                    Text("Current sigma: ${payload.market.currentSigmaDisplay}")
-                    Text("Backing: ${payload.market.backingDisplay}")
-                    Text("Trades so far: ${payload.market.totalTrades}")
-                }
-            }
-        }
-
-        item {
             Text(
-                text = "Preset trade quotes",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Set your own Normal distribution for where you think the outcome lands.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-
-        items(payload.presets, key = { it.id }) { preset ->
-            PresetCard(
-                preset = preset,
-                selected = preset.id == selectedPreset.id,
-                onSelect = {
-                    selectedPreset = preset
-                    targetMu = preset.targetMuDisplay
-                    targetSigma = preset.targetSigmaDisplay
-                    previewQuote = preset
-                },
-            )
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text("Interactive quote preview", style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(
-                        value = targetMu,
-                        onValueChange = { targetMu = it },
-                        label = { Text("Target mu") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = targetSigma,
-                        onValueChange = { targetSigma = it },
-                        label = { Text("Target sigma") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Button(
-                        onClick = {
-                            previewQuote = nearestQuote(
-                                payload.quoteGrid,
-                                targetMu.toDoubleOrNull(),
-                                targetSigma.toDoubleOrNull(),
-                            )
-                        },
-                    ) {
-                        Text("Preview Quote")
-                    }
-                    Text("Nearest available quote: ${previewQuote.label}")
-                    Text("Target mu: ${previewQuote.targetMuDisplay}")
-                    Text("Target sigma: ${previewQuote.targetSigmaDisplay}")
-                    Text("Collateral preview: ${previewQuote.collateralRequiredDisplay}")
-                    Text(
-                        text = "Serialized instruction",
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Text(previewQuote.serializedInstructionHex.take(96) + "...")
-                    Text(
-                        text = "This preview snaps to the nearest SDK-generated quote in the demo grid.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatPill(label = "Market mean", value = market.currentMuDisplay)
+                StatPill(label = "Market sigma", value = market.currentSigmaDisplay)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatPill(label = "Backing", value = market.backingDisplay)
+                StatPill(label = "Trades", value = market.totalTrades.toString())
             }
         }
     }
 }
 
 @Composable
-private fun PresetCard(
-    preset: DemoPreset,
-    selected: Boolean,
-    onSelect: () -> Unit,
-) {
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.secondaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
+private fun StatPill(label: String, value: String) {
+    Column(
+        modifier = Modifier
+            .width(150.dp)
+            .background(
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                RoundedCornerShape(18.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
+}
 
+@Composable
+private fun QuoteBuilderCard(
+    targetMu: String,
+    targetSigma: String,
+    onMuChange: (String) -> Unit,
+    onSigmaChange: (String) -> Unit,
+    onPreview: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onSelect,
+        shape = RoundedCornerShape(24.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(preset.label, style = MaterialTheme.typography.titleSmall)
-            Text("Target mu: ${preset.targetMuDisplay}")
-            Text("Target sigma: ${preset.targetSigmaDisplay}")
-            Text("Collateral: ${preset.collateralRequiredDisplay}")
-            if (selected) {
-                Text(
-                    "Selected",
-                    color = containerColor,
-                    style = MaterialTheme.typography.labelLarge,
+            Text(
+                text = "Build your distribution",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Choose the center of your forecast and how tight or wide you want the distribution to be.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = targetMu,
+                onValueChange = onMuChange,
+                label = { Text("Target mu") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = targetSigma,
+                onValueChange = onSigmaChange,
+                label = { Text("Target sigma") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                onClick = onPreview,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Preview Trade")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectedQuoteCard(previewQuote: DemoPreset) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Trade preview",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatPill(label = "Chosen mean", value = previewQuote.targetMuDisplay)
+                StatPill(label = "Chosen sigma", value = previewQuote.targetSigmaDisplay)
+            }
+            Text(
+                text = "Required collateral: ${previewQuote.collateralRequiredDisplay}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = previewQuote.label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Trade payload preview",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Text(
+                text = previewQuote.serializedInstructionHex.take(110) + "...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = { }) {
+                Text("Wallet submit flow: next milestone")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PresetStrip(
+    presets: List<DemoPreset>,
+    selectedId: String,
+    onSelect: (DemoPreset) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "Quick market views",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            presets.forEach { preset ->
+                AssistChip(
+                    onClick = { onSelect(preset) },
+                    label = {
+                        Text(
+                            if (preset.id == selectedId) {
+                                "${preset.label} • selected"
+                            } else {
+                                preset.label
+                            }
+                        )
+                    },
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MarketDepthHint(quoteCount: Int) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+                RoundedCornerShape(20.dp),
+            )
+            .padding(16.dp),
+    ) {
+        Text(
+            text = "This demo is currently searching across $quoteCount SDK-generated quote points and snapping your entry to the closest available trade.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
     }
 }
 
