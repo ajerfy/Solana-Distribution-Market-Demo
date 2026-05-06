@@ -1644,18 +1644,16 @@ private fun QuoteControls(
             step = 5f,
             onChange = { onSigmaChange(confidencePercentToSigma(it)) },
         )
+        AdvancedSelectionSlider(
+            targetSigma = targetSigma,
+            onSigmaChange = onSigmaChange,
+            onOpenAdvanced = { showAdvancedSigma = true },
+        )
         Text(
             text = "Higher confidence narrows the estimate curve; lower confidence widens it.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(
-            onClick = { showAdvancedSigma = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-        ) {
-            Text("Advanced selection")
-        }
     }
     if (showAdvancedSigma) {
         AdvancedSigmaSheet(
@@ -1663,6 +1661,51 @@ private fun QuoteControls(
             confidence = confidence,
             onSigmaChange = onSigmaChange,
             onDismiss = { showAdvancedSigma = false },
+        )
+    }
+}
+
+@Composable
+private fun AdvancedSelectionSlider(
+    targetSigma: Float,
+    onSigmaChange: (Float) -> Unit,
+    onOpenAdvanced: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Advanced selection", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = {
+                        onSigmaChange((targetSigma - 0.5f).coerceIn(SigmaControlRange.start, SigmaControlRange.endInclusive))
+                    },
+                ) {
+                    Text("-")
+                }
+                TextButton(onClick = onOpenAdvanced) {
+                    Text(
+                        "${"%.1f".format(targetSigma).trimZeros()} sigma",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                OutlinedButton(
+                    onClick = {
+                        onSigmaChange((targetSigma + 0.5f).coerceIn(SigmaControlRange.start, SigmaControlRange.endInclusive))
+                    },
+                ) {
+                    Text("+")
+                }
+            }
+        }
+        Slider(
+            value = targetSigma,
+            onValueChange = onSigmaChange,
+            valueRange = SigmaControlRange,
         )
     }
 }
