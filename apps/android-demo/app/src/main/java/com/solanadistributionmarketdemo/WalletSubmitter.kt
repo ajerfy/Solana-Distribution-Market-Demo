@@ -82,67 +82,84 @@ object WalletSubmitter {
                 walletMessage(describeException(error), memoText.length)
             )
         }
-        return try {
+        // Step 1: ask the wallet to sign — and ONLY sign — and return the bytes.
+        val signOutcome: TransactionResult<ByteArray> = try {
             val walletAdapter = MobileWalletAdapter(
                 connectionIdentity = ConnectionIdentity(
                     identityUri = Uri.parse("https://github.com/ajerfy/Solana-Distribution-Market-Demo"),
-                    // iconUri must be relative to identityUri (per MWA spec). Omitting entirely
-                    // is safer than guessing a relative path; the wallet falls back to no icon.
                     iconUri = Uri.EMPTY,
                     identityName = IDENTITY_NAME,
                 )
             )
-
-            when (
-                val result = walletAdapter.transact(sender) { authResult ->
-                    val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
-                    val transaction = buildMemoTransactionWithBlockhash(walletAddress, memoText, blockhash)
-                    // Wallet signs only — no broadcast. Some wallets (Phantom on Seeker observed)
-                    // hang in their own RPC submission step, never returning control to us.
-                    val signResult = signTransactions(arrayOf(transaction.serialize()))
-                    val signedTxBytes = signResult.signedPayloads.firstOrNull()
-                        ?: throw IllegalStateException(
-                            "The wallet returned no signed payload. Make sure Phantom is on devnet and try again."
-                        )
-                    // Broadcast from the demo app via HttpURLConnection — same path the blockhash
-                    // fetch uses, which is known to work on this device.
-                    val signatureBase58 = sendSignedTransactionWithRetry(signedTxBytes)
-                    bestEffortConfirm(signatureBase58)
-                    signatureBase58
-                }
-            ) {
-                is TransactionResult.Success -> {
-                    val signatureHex = result.payload.ifBlank {
-                        return WalletSubmitResult.Failure(
-                            "The wallet approved the transaction, but no signature came back."
-                        )
-                    }
-                    WalletSubmitResult.Success(
-                        signatureHex = signatureHex,
-                        walletAddress = encodeHex(result.authResult.accounts[0].publicKey),
+            walletAdapter.transact(sender) { authResult ->
+                val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
+                val transaction = buildMemoTransactionWithBlockhash(walletAddress, memoText, blockhash)
+                val signResult = signTransactions(arrayOf(transaction.serialize()))
+                signResult.signedPayloads.firstOrNull()
+                    ?: throw IllegalStateException(
+                        "The wallet returned no signed payload. Make sure Phantom is on devnet and try again."
                     )
-                }
-                is TransactionResult.NoWalletFound -> WalletSubmitResult.NoWalletFound
-                is TransactionResult.Failure -> WalletSubmitResult.Failure(
-                    walletMessage(describeFailure(result.message, result.e), memoText.length)
-                )
             }
         } catch (error: Exception) {
-            WalletSubmitResult.Failure(
-                walletMessage(describeException(error), memoText.length)
+            return WalletSubmitResult.Failure(walletMessage(describeException(error), memoText.length))
+        }
+
+        val signedTxBytes: ByteArray
+        val walletPubkey: ByteArray
+        when (signOutcome) {
+            is TransactionResult.Success -> {
+                signedTxBytes = signOutcome.payload
+                walletPubkey = signOutcome.authResult.accounts[0].publicKey
+            }
+            is TransactionResult.NoWalletFound -> return WalletSubmitResult.NoWalletFound
+            is TransactionResult.Failure -> return WalletSubmitResult.Failure(
+                walletMessage(describeFailure(signOutcome.message, signOutcome.e), memoText.length)
             )
+        }
+
+        // Step 2: broadcast OUTSIDE walletAdapter.transact, with our app fully foregrounded.
+        // Small settle delay because Android sometimes briefly restricts network mid-resume
+        // after a wallet activity hands control back via intent result.
+        delay(250L)
+        return try {
+            val signatureBase58 = sendSignedTransactionWithRetry(signedTxBytes)
+            bestEffortConfirm(signatureBase58)
+            WalletSubmitResult.Success(
+                signatureHex = signatureBase58,
+                walletAddress = encodeHex(walletPubkey),
+            )
+        } catch (error: Exception) {
+            WalletSubmitResult.Failure(walletMessage(describeException(error), memoText.length))
         }
     }
 
-    private suspend fun bestEffortConfirm(signatureHex: String) {
+    private suspend fun bestEffortConfirm(signatureBase58: String) {
+        // Confirmation is best-effort. We use HttpURLConnection (system stack) instead of
+        // SolanaRpcClient + KtorNetworkDriver because Ktor's CIO engine fails DNS on Seeker.
         try {
-            val rpcClient = SolanaRpcClient(DEVNET_RPC_URL, KtorNetworkDriver())
-            rpcClient.confirmTransaction(
-                signatureHex,
-                TransactionOptions(commitment = Commitment.CONFIRMED),
-            )
+            withContext(Dispatchers.IO) { confirmSignatureViaHttpURLConnection(signatureBase58) }
         } catch (_: Exception) {
-            // Confirmation is best-effort: the wallet already returned a signature, the demo can proceed.
+            // Already broadcast; UI shows success with the signature. Confirmation isn't critical.
+        }
+    }
+
+    private fun confirmSignatureViaHttpURLConnection(signatureBase58: String) {
+        val conn = (URL(DEVNET_RPC_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 6_000
+            readTimeout = 6_000
+            doOutput = true
+            useCaches = false
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "application/json")
+        }
+        val body = """{"jsonrpc":"2.0","id":1,"method":"getSignatureStatuses","params":[["$signatureBase58"],{"searchTransactionHistory":true}]}"""
+        try {
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            // Best-effort: don't even read the response body — getting here means the call succeeded.
+            conn.responseCode
+        } finally {
+            conn.disconnect()
         }
     }
 
@@ -370,6 +387,15 @@ private fun walletMessage(message: String, memoLength: Int): String {
 
         normalized.contains("local association", ignoreCase = true) ->
             "Couldn't open a session with the wallet. Force-stop Phantom (Settings → Apps → Phantom → Force Stop) and the demo app, then try again — Phantom often holds a stale MWA session after an interrupted sign attempt."
+
+        normalized.contains("Transaction simulation failed", ignoreCase = true) ||
+            normalized.contains("InsufficientFundsForFee", ignoreCase = true) ||
+            normalized.contains("AccountNotFound", ignoreCase = true) ->
+            "Devnet rejected the memo because this wallet account either doesn't exist on devnet yet or has no SOL to pay the fee. In Phantom: settings → developer → request a devnet airdrop, then retry. ($normalized)"
+
+        normalized.contains("BlockhashNotFound", ignoreCase = true) ||
+            normalized.contains("blockhash", ignoreCase = true) ->
+            "The blockhash expired between fetch and broadcast (the wallet popup took longer than ~60 seconds). Just tap submit again. ($normalized)"
 
         normalized.contains("does not appear to exist on devnet", ignoreCase = true) ||
             normalized.contains("0 devnet SOL", ignoreCase = true) ->
