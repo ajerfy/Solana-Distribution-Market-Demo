@@ -86,7 +86,9 @@ object WalletSubmitter {
             val walletAdapter = MobileWalletAdapter(
                 connectionIdentity = ConnectionIdentity(
                     identityUri = Uri.parse("https://github.com/ajerfy/Solana-Distribution-Market-Demo"),
-                    iconUri = Uri.parse("/favicon.ico"),
+                    // Some wallets validate this URI and refuse to establish a local association
+                    // when it's a bare relative path. Use a fully-qualified HTTPS icon.
+                    iconUri = Uri.parse("https://github.githubassets.com/favicons/favicon.png"),
                     identityName = IDENTITY_NAME,
                 )
             )
@@ -365,6 +367,9 @@ private fun walletMessage(message: String, memoLength: Int): String {
 
         normalized.contains("ActivityNotFound", ignoreCase = true) ->
             "No compatible Solana wallet is connected or installed on this device."
+
+        normalized.contains("local association", ignoreCase = true) ->
+            "Couldn't open a session with the wallet. Force-stop Phantom (Settings → Apps → Phantom → Force Stop) and the demo app, then try again — Phantom often holds a stale MWA session after an interrupted sign attempt."
 
         normalized.contains("does not appear to exist on devnet", ignoreCase = true) ||
             normalized.contains("0 devnet SOL", ignoreCase = true) ->
