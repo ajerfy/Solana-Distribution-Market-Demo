@@ -45,6 +45,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,6 +66,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -294,6 +297,52 @@ private enum class AppTab(val label: String) {
     Indexes("Indexes"),
 }
 
+private data class TutorialCopy(
+    val headline: String,
+    val body: String,
+    val primaryAction: String,
+    val watchItem: String,
+)
+
+private fun AppTab.tutorialCopy(): TutorialCopy {
+    return when (this) {
+        AppTab.Trade -> TutorialCopy(
+            headline = "Make your estimate",
+            body = "Move the curve to show where you think the market should be. The app prices how much risk that opinion adds before you submit anything.",
+            primaryAction = "Adjust mean and sigma, then review collateral, fee, and total debit.",
+            watchItem = "Green means your new estimate wins there. Red means it loses there.",
+        )
+
+        AppTab.Liquidity -> TutorialCopy(
+            headline = "See who backs the market",
+            body = "This screen shows the cash makers put behind trades, what is already locked for traders, and how much buffer remains.",
+            primaryAction = "Use it to understand whether the market is well funded.",
+            watchItem = "Makers earn fees, but their capital is also what pays winning trader claims.",
+        )
+
+        AppTab.Backend -> TutorialCopy(
+            headline = "Follow the program logic",
+            body = "This is the plain-English trace of what the backend checks before accepting a trade.",
+            primaryAction = "Read it as the receipt: quote version, bounds, fee, vault movement, and settlement order.",
+            watchItem = "Trader claims are settled before makers receive leftover value.",
+        )
+
+        AppTab.Positions -> TutorialCopy(
+            headline = "Track your trade state",
+            body = "Positions are the estimates you have submitted or are about to submit. The current demo shows the position preview and wallet result.",
+            primaryAction = "Use this screen to confirm what would be stored for your trade.",
+            watchItem = "Fees are paid to the market; only collateral exposure can come back as payout.",
+        )
+
+        AppTab.Indexes -> TutorialCopy(
+            headline = "Trade a whole narrative",
+            body = "Indexes bundle several related markets into one simple theme, like rates, AI progress, or geopolitical escalation.",
+            primaryAction = "Choose an index, pick long or short, and review the basket quote.",
+            watchItem = "This is separate from the single distribution trade, but it uses the same idea: price an estimate before risking capital.",
+        )
+    }
+}
+
 private enum class RegimeTradeSide(val label: String) {
     Long("Long"),
     Short("Short"),
@@ -305,13 +354,27 @@ private fun EstimaApp(
     walletSender: ActivityResultSender,
 ) {
     var entered by rememberSaveable { mutableStateOf(false) }
+    var terminalTutorialsReady by remember { mutableStateOf(false) }
+
+    LaunchedEffect(entered) {
+        terminalTutorialsReady = false
+        if (entered) {
+            delay(760)
+            terminalTutorialsReady = true
+        }
+    }
+
     Crossfade(
         targetState = entered,
         animationSpec = tween(durationMillis = 700),
         label = "Estima entrance transition",
     ) { hasEntered ->
         if (hasEntered) {
-            TradeAppScreen(payload, walletSender)
+            TradeAppScreen(
+                payload = payload,
+                walletSender = walletSender,
+                tutorialsEnabled = terminalTutorialsReady,
+            )
         } else {
             EstimaEntranceScreen(onEnter = { entered = true })
         }
@@ -460,6 +523,7 @@ private fun EntranceCurveScene(
 private fun TradeAppScreen(
     payload: DemoPayload,
     walletSender: ActivityResultSender,
+    tutorialsEnabled: Boolean = true,
 ) {
     var targetMu by remember { mutableStateOf(payload.presets.first().targetMuDisplay.toFloat()) }
     var targetSigma by remember { mutableStateOf(payload.presets.first().targetSigmaDisplay.toFloat()) }
@@ -467,6 +531,9 @@ private fun TradeAppScreen(
     var selectedRegimeId by remember { mutableStateOf(payload.regimeIndexes.first().id) }
     var selectedRegimeSide by remember { mutableStateOf(RegimeTradeSide.Long) }
     var submitStatus by remember { mutableStateOf<SubmitStatus?>(null) }
+    var tutorialSeenTabs by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var tutorialsSkipped by rememberSaveable { mutableStateOf(false) }
+    val tutorialTab = activeTab.takeUnless { !tutorialsEnabled || tutorialsSkipped || tutorialSeenTabs.contains(it.name) }
     val coroutineScope = rememberCoroutineScope()
     val selectedRegime = payload.regimeIndexes.firstOrNull { it.id == selectedRegimeId }
         ?: payload.regimeIndexes.first()
@@ -613,6 +680,153 @@ private fun TradeAppScreen(
 
                 AppTab.Positions -> PositionsTab(continuousQuote, submitStatus)
             }
+        }
+    }
+
+    if (tutorialTab != null) {
+        TutorialFrame(
+            tab = tutorialTab,
+            onExit = {
+                tutorialSeenTabs = (tutorialSeenTabs + tutorialTab.name).distinct()
+            },
+            onSkipAll = {
+                tutorialsSkipped = true
+                tutorialSeenTabs = AppTab.entries.map { it.name }
+            },
+        )
+    }
+}
+
+@Composable
+private fun TutorialFrame(
+    tab: AppTab,
+    onExit: () -> Unit,
+    onSkipAll: () -> Unit,
+) {
+    val copy = tab.tutorialCopy()
+    val guideIndex = AppTab.entries.indexOf(tab) + 1
+
+    Dialog(onDismissRequest = onExit) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFFFFFFFF),
+            tonalElevation = 8.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFE0F2FE), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                    ) {
+                        Text(
+                            text = "${tab.label} guide",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF0369A1),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Text(
+                        text = "$guideIndex/${AppTab.entries.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = copy.headline,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color(0xFF0F172A),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = copy.body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF475569),
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TutorialInfoRow(
+                        label = "What to do",
+                        text = copy.primaryAction,
+                        color = Color(0xFF0891B2),
+                    )
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                    TutorialInfoRow(
+                        label = "What matters",
+                        text = copy.watchItem,
+                        color = Color(0xFFF59E0B),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onSkipAll) {
+                        Text("Skip all")
+                    }
+                    Button(
+                        onClick = onExit,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF111827),
+                            contentColor = Color.White,
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
+                        Text("Exit")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TutorialInfoRow(
+    label: String,
+    text: String,
+    color: Color,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 5.dp)
+                .size(8.dp)
+                .background(color, RoundedCornerShape(8.dp)),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF0F172A),
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF475569),
+            )
         }
     }
 }
