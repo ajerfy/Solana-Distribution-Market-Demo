@@ -160,6 +160,7 @@ fn process_trade(
         old_distribution,
         new_distribution: args.quote.new_distribution,
         collateral_posted: collateral,
+        k_at_trade: state.core_market.k,
         lp_shares: Fixed::ZERO,
         settled: false,
         payout_claimed: Fixed::ZERO,
@@ -251,11 +252,11 @@ fn process_settle_position(
         .resolved_outcome
         .ok_or_else(|| "market outcome is missing".to_string())?;
 
-    let market_k = state.market_account.k;
+    // Validate and compute payout without mutating any state.
     let (payout, collateral_returned) = {
         let position = state
             .position_accounts
-            .iter_mut()
+            .iter()
             .find(|position| position.id == position_id)
             .ok_or_else(|| "unknown position id".to_string())?;
 
@@ -269,26 +270,29 @@ fn process_settle_position(
             return Err("position already settled".to_string());
         }
 
-        let final_payout = fixed_calculate_f(outcome, position.new_distribution, market_k)?;
-        let initial_payout = fixed_calculate_f(outcome, position.old_distribution, market_k)?;
+        let final_payout = fixed_calculate_f(outcome, position.new_distribution, position.k_at_trade)?;
+        let initial_payout = fixed_calculate_f(outcome, position.old_distribution, position.k_at_trade)?;
         let payout = position.collateral_posted + (final_payout - initial_payout);
         if payout.raw() < 0 {
             return Err("negative payout encountered during settlement".to_string());
         }
 
-        position.settled = true;
-        position.payout_claimed = payout;
-        position.settled_slot = Some(current_slot);
-
         (payout, position.collateral_posted)
     };
 
-    if payout.raw() < 0 {
-        return Err("negative payout encountered during settlement".to_string());
-    }
     if payout.raw() > state.vault_balance.raw() {
         return Err("vault cannot satisfy position settlement".to_string());
     }
+
+    // All validation passed — mutate now.
+    let position = state
+        .position_accounts
+        .iter_mut()
+        .find(|position| position.id == position_id)
+        .unwrap();
+    position.settled = true;
+    position.payout_claimed = payout;
+    position.settled_slot = Some(current_slot);
 
     state.vault_balance = state.vault_balance - payout;
     update_market_status_if_fully_settled(state);
@@ -387,6 +391,7 @@ fn sync_market_account(state: &mut NormalV1ProgramState) {
     state.market_account.current_distribution = state.core_market.current_distribution;
     state.market_account.current_lambda = state.core_market.current_lambda;
     state.market_account.total_lp_shares = state.core_market.total_lp_shares;
+    state.market_account.state_version = state.core_market.state_version;
     state.market_account.total_trades = state
         .position_accounts
         .iter()
@@ -426,6 +431,7 @@ fn upsert_liquidity_position(
         old_distribution: state.core_market.current_distribution,
         new_distribution: state.core_market.current_distribution,
         collateral_posted: Fixed::ZERO,
+        k_at_trade: Fixed::ZERO,
         lp_shares,
         settled: false,
         payout_claimed: Fixed::ZERO,

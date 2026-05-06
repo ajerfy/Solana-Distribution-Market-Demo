@@ -208,6 +208,7 @@ pub fn pack_market_account(account: &SolanaMarketAccountV1) -> Vec<u8> {
     push_fixed(&mut buffer, account.current_lambda);
     push_fixed(&mut buffer, account.total_lp_shares);
     push_u64(&mut buffer, account.total_trades);
+    push_u64(&mut buffer, account.state_version);
     push_option_fixed(&mut buffer, account.resolved_outcome);
     push_u64(&mut buffer, account.created_slot);
     push_option_u64(&mut buffer, account.resolved_slot);
@@ -230,6 +231,7 @@ pub fn unpack_market_account(bytes: &[u8]) -> Result<SolanaMarketAccountV1, Stri
     let current_lambda = cursor.read_fixed()?;
     let total_lp_shares = cursor.read_fixed()?;
     let total_trades = cursor.read_u64()?;
+    let state_version = cursor.read_u64()?;
     let resolved_outcome = cursor.read_option_fixed()?;
     let created_slot = cursor.read_u64()?;
     let resolved_slot = cursor.read_option_u64()?;
@@ -249,6 +251,7 @@ pub fn unpack_market_account(bytes: &[u8]) -> Result<SolanaMarketAccountV1, Stri
         current_lambda,
         total_lp_shares,
         total_trades,
+        state_version,
         resolved_outcome,
         created_slot,
         resolved_slot,
@@ -266,6 +269,7 @@ pub fn pack_position_account(account: &SolanaNormalPositionAccountV1) -> Vec<u8>
     push_distribution(&mut buffer, account.old_distribution);
     push_distribution(&mut buffer, account.new_distribution);
     push_fixed(&mut buffer, account.collateral_posted);
+    push_fixed(&mut buffer, account.k_at_trade);
     push_fixed(&mut buffer, account.lp_shares);
     buffer.push(if account.settled { 1 } else { 0 });
     push_fixed(&mut buffer, account.payout_claimed);
@@ -285,6 +289,7 @@ pub fn unpack_position_account(bytes: &[u8]) -> Result<SolanaNormalPositionAccou
     let old_distribution = cursor.read_distribution()?;
     let new_distribution = cursor.read_distribution()?;
     let collateral_posted = cursor.read_fixed()?;
+    let k_at_trade = cursor.read_fixed()?;
     let lp_shares = cursor.read_fixed()?;
     let settled = cursor.read_u8()? != 0;
     let payout_claimed = cursor.read_fixed()?;
@@ -301,6 +306,7 @@ pub fn unpack_position_account(bytes: &[u8]) -> Result<SolanaNormalPositionAccou
         old_distribution,
         new_distribution,
         collateral_posted,
+        k_at_trade,
         lp_shares,
         settled,
         payout_claimed,

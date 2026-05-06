@@ -12,6 +12,7 @@ pub struct FixedNormalTradeRecord {
     pub old_distribution: FixedNormalDistribution,
     pub new_distribution: FixedNormalDistribution,
     pub collateral: Fixed,
+    pub k_at_trade: Fixed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -39,6 +40,7 @@ pub struct FixedNormalMarket {
     pub lp_shares: HashMap<String, Fixed>,
     pub cash: Fixed,
     pub trades: Vec<FixedNormalTradeRecord>,
+    pub state_version: u64,
 }
 
 impl FixedNormalMarket {
@@ -66,6 +68,7 @@ impl FixedNormalMarket {
             lp_shares,
             cash: b,
             trades: Vec::new(),
+            state_version: 0,
         })
     }
 
@@ -74,7 +77,7 @@ impl FixedNormalMarket {
     }
 
     pub fn market_version(&self) -> u64 {
-        self.trades.len() as u64
+        self.state_version
     }
 
     pub fn quote_trade(
@@ -138,9 +141,11 @@ impl FixedNormalMarket {
             old_distribution: self.current_distribution,
             new_distribution,
             collateral,
+            k_at_trade: self.k,
         });
         self.current_distribution = new_distribution;
         self.current_lambda = new_lambda;
+        self.state_version += 1;
 
         Ok(collateral)
     }
@@ -164,6 +169,7 @@ impl FixedNormalMarket {
         self.cash = self.cash + backing_added;
         *self.lp_shares.entry(lp_id).or_insert(Fixed::ZERO) =
             self.lp_shares.get(&lp_id).copied().unwrap_or(Fixed::ZERO) + new_shares;
+        self.state_version += 1;
         Ok(new_shares)
     }
 
@@ -197,6 +203,7 @@ impl FixedNormalMarket {
             }
         }
 
+        self.state_version += 1;
         Ok(backing_removed)
     }
 
@@ -205,8 +212,8 @@ impl FixedNormalMarket {
         let mut total_trader_payout = Fixed::ZERO;
 
         for trade in &self.trades {
-            let final_payout = fixed_calculate_f(outcome, trade.new_distribution, self.k)?;
-            let initial_payout = fixed_calculate_f(outcome, trade.old_distribution, self.k)?;
+            let final_payout = fixed_calculate_f(outcome, trade.new_distribution, trade.k_at_trade)?;
+            let initial_payout = fixed_calculate_f(outcome, trade.old_distribution, trade.k_at_trade)?;
             let signed_delta = final_payout - initial_payout;
             let payout = trade.collateral + signed_delta;
 
