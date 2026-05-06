@@ -97,7 +97,7 @@ private fun Header(state: AppState) {
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            "Continuous prediction markets on Solana — submit a μ ± σ, win when reality lands inside your curve.",
+            "Pick a guess, set how sure you are, win when reality lands close. Live on Solana devnet.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -173,8 +173,8 @@ private fun MarketRow(market: MarketListing, onClick: () -> Unit, modifier: Modi
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CrowdBlock(label = "CROWD μ", value = "${market.crowdMu.compactDecimal(2)} ${market.unit}", modifier = Modifier.weight(1.2f))
-            CrowdBlock(label = "σ", value = market.crowdSigma.compactDecimal(2), modifier = Modifier.weight(0.8f))
+            CrowdBlock(label = "CROWD GUESS", value = "${market.crowdMu.compactDecimal(2)} ${market.unit}", modifier = Modifier.weight(1.2f))
+            CrowdBlock(label = "± RANGE", value = market.crowdSigma.compactDecimal(2), modifier = Modifier.weight(0.8f))
             CrowdBlock(label = "VOLUME", value = formatVolume(market.volumeUsd), modifier = Modifier.weight(1f))
             CrowdBlock(label = "RESOLVES", value = market.resolvesAt.shorten(), modifier = Modifier.weight(1.2f))
         }

@@ -42,7 +42,7 @@ fun PortfolioScreen(state: AppState) {
     if (state.bets.isEmpty()) {
         EmptyState(
             title = "No bets yet",
-            subtitle = "Pick a market and submit your μ ± σ.",
+            subtitle = "Pick a market, set your guess, place a bet.",
         )
         return
     }
@@ -132,8 +132,8 @@ private fun BetCard(state: AppState, bet: BetRecord, modifier: Modifier = Modifi
             Spacer(Modifier.height(10.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MetricPill("YOUR μ", "${bet.mu.compactDecimal(2)}${market?.unit?.let { " $it" } ?: ""}", accent = DemoColors.AccentYou)
-            MetricPill("σ", bet.sigma.compactDecimal(2))
+            MetricPill("YOUR GUESS", "${bet.mu.compactDecimal(2)}${market?.unit?.let { " $it" } ?: ""}", accent = DemoColors.AccentYou)
+            MetricPill("± RANGE", bet.sigma.compactDecimal(2))
             MetricPill("STAKE", "$${bet.stake.compactDecimal(0)}")
             if (bet.resolved && bet.realizedOutcome != null) {
                 MetricPill("REALIZED", bet.realizedOutcome.compactDecimal(2), accent = DemoColors.AccentWarn)
@@ -262,6 +262,17 @@ fun WalletScreen(state: AppState) {
                 SectionLabel("APPEARANCE")
                 Spacer(Modifier.height(8.dp))
                 ThemeSwitch(state)
+            }
+        }
+        item {
+            Card(modifier = Modifier.padding(horizontal = 20.dp)) {
+                SectionLabel("HELP")
+                Spacer(Modifier.height(8.dp))
+                GhostButton(
+                    label = "Replay intro",
+                    onClick = { state.replayOnboarding() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
         state.lastSubmit.value?.let { status ->

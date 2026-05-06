@@ -141,11 +141,11 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     MetricPill(
-                        label = "CROWD μ",
+                        label = "CROWD GUESS",
                         value = "${market.crowdMu.compactDecimal(2)} ${market.unit}",
                         accent = DemoColors.AccentCrowd,
                     )
-                    MetricPill(label = "σ", value = market.crowdSigma.compactDecimal(2))
+                    MetricPill(label = "± RANGE", value = market.crowdSigma.compactDecimal(2))
                     MetricPill(label = "BETTORS", value = market.bettorCount.toString())
                     MetricPill(label = "VOL", value = formatShortMoney(market.volumeUsd))
                 }
@@ -187,7 +187,7 @@ private fun DistributionSliderCard(
 ) {
     Card(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Tune your curve", color = DemoColors.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Tune your bet", color = DemoColors.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
             Text(
                 "reset",
@@ -198,14 +198,14 @@ private fun DistributionSliderCard(
         }
         Spacer(Modifier.height(2.dp))
         Text(
-            "Drag μ to move the peak, σ to set how confident you are.",
+            "Slide to set your guess and how sure you are.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(10.dp))
 
         SliderRow(
-            label = "μ — your peak",
+            label = "Your guess",
             value = mu,
             range = market.muMin.toFloat()..market.muMax.toFloat(),
             display = "${mu.toDouble().compactDecimal(3)} ${market.unit}",
@@ -216,7 +216,7 @@ private fun DistributionSliderCard(
         )
         Spacer(Modifier.height(10.dp))
         SliderRow(
-            label = "σ — your confidence",
+            label = "How sure",
             value = sigma,
             range = market.sigmaMin.toFloat()..market.sigmaMax.toFloat(),
             display = sigma.toDouble().compactDecimal(3),
@@ -263,7 +263,7 @@ private fun SliderRow(
         ),
     )
     Text(
-        "crowd ${crowd.compactDecimal(2)}${if (unit.isNotEmpty()) " $unit" else ""}",
+        "crowd's ${crowd.compactDecimal(2)}${if (unit.isNotEmpty()) " $unit" else ""}",
         color = DemoColors.TextDim,
         fontFamily = FontFamily.Monospace,
         style = MaterialTheme.typography.labelSmall,
@@ -373,10 +373,10 @@ private fun BetTab(state: AppState, market: MarketListing, yourLatest: com.solan
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                StatRow("Your μ", "${yourLatest.mu.compactDecimal(3)} ${market.unit}", accent = DemoColors.AccentYou)
-                StatRow("Your σ", yourLatest.sigma.compactDecimal(3))
+                StatRow("Your guess", "${yourLatest.mu.compactDecimal(3)} ${market.unit}", accent = DemoColors.AccentYou)
+                StatRow("How sure", yourLatest.sigma.compactDecimal(3))
                 StatRow("Stake", "$${yourLatest.stake.compactDecimal(2)}")
-                StatRow("Collateral locked", yourLatest.collateral.compactDecimal(4))
+                StatRow("Stake locked", yourLatest.collateral.compactDecimal(4))
                 StatRow("Fee", yourLatest.fee.compactDecimal(4))
                 if (yourLatest.txSignatureHex != null) {
                     StatRow("Tx", com.solanadistributionmarketdemo.core.shortHash(yourLatest.txSignatureHex, 6, 6), accent = DemoColors.AccentChain)

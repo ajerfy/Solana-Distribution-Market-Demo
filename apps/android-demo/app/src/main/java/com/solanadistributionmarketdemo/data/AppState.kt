@@ -24,6 +24,7 @@ class AppState(
     val walletAddress: MutableState<String?> = mutableStateOf(null)
     val lastSubmit: MutableState<SubmitStatus?> = mutableStateOf(null)
     val themeMode: MutableState<ThemeMode> = mutableStateOf(themeStore.load())
+    var replayOnboarding: () -> Unit = {}
 
     fun setTheme(mode: ThemeMode) {
         themeMode.value = mode

@@ -125,8 +125,8 @@ fun BetSheet(
             )
 
             ValueRow(
-                left = "Your μ" to "${mu.toDouble().compactDecimal(3)} ${market.unit}",
-                right = "Crowd μ" to "${market.crowdMu.compactDecimal(2)} ${market.unit}",
+                left = "Your guess" to "${mu.toDouble().compactDecimal(3)} ${market.unit}",
+                right = "Crowd guess" to "${market.crowdMu.compactDecimal(2)} ${market.unit}",
             )
             Slider(
                 value = mu,
@@ -135,8 +135,8 @@ fun BetSheet(
                 colors = sliderColors(DemoColors.AccentYou),
             )
             ValueRow(
-                left = "Your σ" to sigma.toDouble().compactDecimal(3),
-                right = "Crowd σ" to market.crowdSigma.compactDecimal(2),
+                left = "How sure" to sigma.toDouble().compactDecimal(3),
+                right = "Crowd's range" to market.crowdSigma.compactDecimal(2),
             )
             Slider(
                 value = sigma,
@@ -157,7 +157,7 @@ fun BetSheet(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                StatRow("Collateral", collateral.compactDecimal(4))
+                StatRow("Stake locked", collateral.compactDecimal(4))
                 StatRow("Fee", fee.compactDecimal(4))
                 CompactDivider()
                 StatRow("Max win", "+$${maxWin.compactDecimal(2)}", accent = DemoColors.AccentLong, strong = true)
