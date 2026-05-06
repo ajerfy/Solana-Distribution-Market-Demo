@@ -7,6 +7,7 @@ pub mod normal_market;
 pub mod normal_math;
 pub mod numerical;
 pub mod product_v1;
+pub mod regime_index;
 pub mod scoring;
 pub mod simulation;
 pub mod solana_program_v1;
@@ -32,6 +33,10 @@ pub use numerical::{MinimumResult, SearchRange, find_global_minimum, verify_mini
 pub use product_v1::{
     MilestoneStatus, ProductMilestoneV1, ProductTrack, RepoTaskMapV1, normal_v1_product_milestones,
     normal_v1_repo_task_map,
+};
+pub use regime_index::{
+    RegimeConstituent, RegimeConstituentSide, RegimeConstituentSnapshot, RegimeConstituentStatus,
+    RegimeIndex, RegimeIndexSnapshot, RegimeTokenSide, RegimeTradeQuote, quote_regime_trade,
 };
 pub use simulation::{
     SimulationReport, SimulationScenario, SimulationStep, builtin_scenarios, find_scenario,

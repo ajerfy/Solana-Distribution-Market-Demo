@@ -24,11 +24,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -113,6 +113,7 @@ data class DemoPayload(
     val market: DemoMarket,
     val presets: List<DemoPreset>,
     val quoteGrid: List<DemoPreset>,
+    val regimeIndexes: List<DemoRegimeIndex>,
 )
 
 data class DemoMarket(
@@ -175,11 +176,64 @@ data class ContinuousQuotePreview(
     val serializedInstructionHex: String,
 )
 
+data class DemoRegimeIndex(
+    val id: String,
+    val symbol: String,
+    val title: String,
+    val thesis: String,
+    val status: String,
+    val levelDisplay: String,
+    val previousLevelDisplay: String,
+    val changeDisplay: String,
+    val rebalanceSlot: Long,
+    val nextRebalanceSlot: Long,
+    val quoteExpirySlot: Long,
+    val constituents: List<DemoRegimeConstituent>,
+    val history: List<DemoRegimeHistoryPoint>,
+    val longQuote: DemoRegimeQuote,
+    val shortQuote: DemoRegimeQuote,
+)
+
+data class DemoRegimeConstituent(
+    val id: String,
+    val label: String,
+    val side: String,
+    val weightBps: Int,
+    val probabilityDisplay: String,
+    val previousProbabilityDisplay: String,
+    val levelContributionDisplay: String,
+    val signedPressureDisplay: String,
+    val status: String,
+    val expirySlot: Long,
+)
+
+data class DemoRegimeHistoryPoint(
+    val slot: Long,
+    val levelDisplay: String,
+)
+
+data class DemoRegimeQuote(
+    val side: String,
+    val sizeDisplay: String,
+    val entryLevelDisplay: String,
+    val tokenPriceDisplay: String,
+    val collateralRequiredDisplay: String,
+    val feePaidDisplay: String,
+    val totalDebitDisplay: String,
+    val memoPayload: String,
+)
+
 private enum class AppTab(val label: String) {
     Trade("Trade"),
+    Indexes("Indexes"),
     Positions("Positions"),
     Market("Market"),
     Maker("Maker"),
+}
+
+private enum class RegimeTradeSide(val label: String) {
+    Long("Long"),
+    Short("Short"),
 }
 
 @Composable
@@ -190,8 +244,12 @@ private fun TradeAppScreen(
     var targetMu by remember { mutableStateOf(payload.presets.first().targetMuDisplay.toFloat()) }
     var targetSigma by remember { mutableStateOf(payload.presets.first().targetSigmaDisplay.toFloat()) }
     var activeTab by remember { mutableStateOf(AppTab.Trade) }
+    var selectedRegimeId by remember { mutableStateOf(payload.regimeIndexes.first().id) }
+    var selectedRegimeSide by remember { mutableStateOf(RegimeTradeSide.Long) }
     var submitStatus by remember { mutableStateOf<SubmitStatus?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val selectedRegime = payload.regimeIndexes.firstOrNull { it.id == selectedRegimeId }
+        ?: payload.regimeIndexes.first()
     val previewQuote = nearestQuote(payload.quoteGrid, targetMu.toDouble(), targetSigma.toDouble())
     val continuousQuote = remember(payload.quoteGrid, targetMu, targetSigma, previewQuote) {
         buildContinuousQuotePreview(
@@ -270,6 +328,51 @@ private fun TradeAppScreen(
                             submitStatus = when (val result = WalletSubmitter.submitTradeMemo(walletSender, continuousQuote)) {
                                 is WalletSubmitResult.Success -> SubmitStatus(
                                     message = "Demo memo submitted. Wallet ${result.walletAddress.take(12)}... signed ${result.signatureHex.take(16)}...",
+                                )
+
+                                is WalletSubmitResult.NoWalletFound -> SubmitStatus(
+                                    message = "No Mobile Wallet Adapter wallet found on this device.",
+                                    isError = true,
+                                )
+
+                                is WalletSubmitResult.Failure -> SubmitStatus(
+                                    message = result.message,
+                                    isError = true,
+                                )
+                            }
+                        }
+                    },
+                )
+
+                AppTab.Indexes -> RegimeIndexesTab(
+                    indexes = payload.regimeIndexes,
+                    selectedIndex = selectedRegime,
+                    selectedSide = selectedRegimeSide,
+                    submitStatus = submitStatus,
+                    onSelectIndex = {
+                        selectedRegimeId = it.id
+                        submitStatus = null
+                    },
+                    onSideChange = {
+                        selectedRegimeSide = it
+                        submitStatus = null
+                    },
+                    onSubmit = {
+                        submitStatus = SubmitStatus(
+                            message = "Opening wallet for regime memo approval...",
+                            isWorking = true,
+                        )
+                        coroutineScope.launch {
+                            val quote = selectedRegime.quoteFor(selectedRegimeSide)
+                            submitStatus = when (
+                                val result = WalletSubmitter.submitRegimeMemo(
+                                    walletSender,
+                                    selectedRegime,
+                                    quote,
+                                )
+                            ) {
+                                is WalletSubmitResult.Success -> SubmitStatus(
+                                    message = "Regime memo submitted. Wallet ${result.walletAddress.take(12)}... signed ${result.signatureHex.take(16)}...",
                                 )
 
                                 is WalletSubmitResult.NoWalletFound -> SubmitStatus(
@@ -392,6 +495,265 @@ private fun TradeTab(
     )
     PresetStrip(payload.presets, previewQuote.id, onPreset)
     QuoteExecutionPanel(continuousQuote, submitStatus, onSubmit)
+}
+
+@Composable
+private fun RegimeIndexesTab(
+    indexes: List<DemoRegimeIndex>,
+    selectedIndex: DemoRegimeIndex,
+    selectedSide: RegimeTradeSide,
+    submitStatus: SubmitStatus?,
+    onSelectIndex: (DemoRegimeIndex) -> Unit,
+    onSideChange: (RegimeTradeSide) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    RegimeSelector(indexes, selectedIndex.id, onSelectIndex)
+    RegimeIndexPanel(selectedIndex)
+    RegimeHistoryPanel(selectedIndex)
+    RegimeConstituentsPanel(selectedIndex)
+    RegimeTradePanel(
+        selectedIndex = selectedIndex,
+        selectedSide = selectedSide,
+        submitStatus = submitStatus,
+        onSideChange = onSideChange,
+        onSubmit = onSubmit,
+    )
+}
+
+@Composable
+private fun RegimeSelector(
+    indexes: List<DemoRegimeIndex>,
+    selectedId: String,
+    onSelect: (DemoRegimeIndex) -> Unit,
+) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        indexes.forEach { index ->
+            FilterChip(
+                selected = index.id == selectedId,
+                onClick = { onSelect(index) },
+                label = { Text(index.symbol, maxLines = 1) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RegimeIndexPanel(index: DemoRegimeIndex) {
+    val change = index.changeDisplay.toDoubleOrNull() ?: 0.0
+    val changeColor = if (change >= 0.0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+    Panel {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(index.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    index.thesis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    index.symbol,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(index.status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            StatCell("Index level", index.levelDisplay.trimZeros(), Modifier.weight(1f))
+            StatCell("24h change", signedDisplay(index.changeDisplay), Modifier.weight(1f))
+        }
+        Text(
+            "Next rebalance slot ${index.nextRebalanceSlot}",
+            style = MaterialTheme.typography.bodySmall,
+            color = changeColor,
+        )
+    }
+}
+
+@Composable
+private fun RegimeHistoryPanel(index: DemoRegimeIndex) {
+    Panel {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Regime level", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "rolls at ${index.nextRebalanceSlot}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        RegimeHistoryCanvas(index.history)
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            LegendDot("Index", MaterialTheme.colorScheme.primary)
+            LegendDot("Rebalance path", MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
+@Composable
+private fun RegimeHistoryCanvas(points: List<DemoRegimeHistoryPoint>) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+            .padding(8.dp),
+    ) {
+        if (points.size < 2) return@Canvas
+        val levels = points.map { it.levelDisplay.toDouble() }
+        val minY = (levels.minOrNull() ?: 0.0).minus(8.0).coerceAtLeast(0.0)
+        val maxY = (levels.maxOrNull() ?: 100.0).plus(8.0).coerceAtMost(100.0)
+        val ySpan = (maxY - minY).coerceAtLeast(1.0)
+        val left = 16f
+        val right = size.width - 12f
+        val top = 12f
+        val bottom = size.height - 16f
+        val width = right - left
+        val height = bottom - top
+
+        fun xOf(index: Int): Float = left + width * index / (points.size - 1).coerceAtLeast(1)
+        fun yOf(level: Double): Float = bottom - (((level - minY) / ySpan) * height).toFloat()
+
+        repeat(3) { gridIndex ->
+            val y = top + height * gridIndex / 2f
+            drawLine(Color(0xFFE5E7EB), Offset(left, y), Offset(right, y), 1f)
+        }
+        points.zipWithNext().forEachIndexed { index, (leftPoint, rightPoint) ->
+            drawLine(
+                color = Color(0xFF0891B2),
+                start = Offset(xOf(index), yOf(leftPoint.levelDisplay.toDouble())),
+                end = Offset(xOf(index + 1), yOf(rightPoint.levelDisplay.toDouble())),
+                strokeWidth = 4f,
+                cap = StrokeCap.Round,
+            )
+        }
+        points.forEachIndexed { index, point ->
+            drawCircle(
+                color = Color(0xFFF59E0B),
+                radius = 4.5f,
+                center = Offset(xOf(index), yOf(point.levelDisplay.toDouble())),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RegimeConstituentsPanel(index: DemoRegimeIndex) {
+    Panel {
+        Text("Constituents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        index.constituents.forEachIndexed { rowIndex, constituent ->
+            if (rowIndex > 0) {
+                HorizontalDivider()
+            }
+            RegimeConstituentRow(constituent)
+        }
+    }
+}
+
+@Composable
+private fun RegimeConstituentRow(constituent: DemoRegimeConstituent) {
+    val sideColor = if (constituent.side == "Short") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(constituent.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "${constituent.side} ${constituent.weightBps.toWeightPercent()}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = sideColor,
+                )
+            }
+            Text(
+                constituent.probabilityDisplay.trimZeros(),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        DenseStats(
+            listOf(
+                "Contribution" to constituent.levelContributionDisplay,
+                "Pressure" to signedDisplay(constituent.signedPressureDisplay),
+                "Expiry" to constituent.expirySlot.toString(),
+                "Status" to constituent.status,
+            )
+        )
+    }
+}
+
+@Composable
+private fun RegimeTradePanel(
+    selectedIndex: DemoRegimeIndex,
+    selectedSide: RegimeTradeSide,
+    submitStatus: SubmitStatus?,
+    onSideChange: (RegimeTradeSide) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    val quote = selectedIndex.quoteFor(selectedSide)
+    var showDetails by remember { mutableStateOf(false) }
+    Panel {
+        Text("Regime token", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            RegimeTradeSide.entries.forEach { side ->
+                FilterChip(
+                    selected = selectedSide == side,
+                    onClick = { onSideChange(side) },
+                    label = { Text(side.label) },
+                )
+            }
+        }
+        QuoteRow("Entry level", quote.entryLevelDisplay)
+        QuoteRow("Token price", quote.tokenPriceDisplay)
+        QuoteRow("Size", quote.sizeDisplay)
+        QuoteRow("Required collateral", quote.collateralRequiredDisplay)
+        QuoteRow("Maker fee", quote.feePaidDisplay)
+        HorizontalDivider()
+        QuoteRow("Total debit", quote.totalDebitDisplay, strong = true)
+        QuoteRow("Quote expiry slot", selectedIndex.quoteExpirySlot.toString())
+        Button(
+            onClick = onSubmit,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = submitStatus?.isWorking != true,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (submitStatus?.isWorking == true) "Waiting on wallet" else "Submit regime memo")
+        }
+        Text(
+            text = "This is a synthetic regime-token intent built from the SDK index payload.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        submitStatus?.let { StatusMessage(it) }
+        OutlinedButton(onClick = { showDetails = !showDetails }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (showDetails) "Hide memo details" else "Show memo details")
+        }
+        if (showDetails) {
+            Text(
+                text = quote.memoPayload,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable
@@ -588,7 +950,7 @@ private fun QuoteExecutionPanel(
             enabled = submitStatus?.isWorking != true,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
         ) {
-            Icon(Icons.Outlined.Send, contentDescription = null, modifier = Modifier.size(17.dp))
+            Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null, modifier = Modifier.size(17.dp))
             Spacer(Modifier.width(8.dp))
             Text(if (submitStatus?.isWorking == true) "Waiting on wallet" else "Submit demo memo")
         }
@@ -748,6 +1110,7 @@ private fun loadDemoPayload(json: String): DemoPayload {
     val marketObject = root.getJSONObject("market")
     val presetsArray = root.getJSONArray("presets")
     val quoteGridArray = root.getJSONArray("quote_grid")
+    val regimeIndexesArray = root.getJSONArray("regime_indexes")
     return DemoPayload(
         market = DemoMarket(
             title = marketObject.getString("title"),
@@ -772,6 +1135,7 @@ private fun loadDemoPayload(json: String): DemoPayload {
         ),
         presets = presetsArray.toPresetList(),
         quoteGrid = quoteGridArray.toPresetList(),
+        regimeIndexes = regimeIndexesArray.toRegimeIndexList(),
     )
 }
 
@@ -812,6 +1176,82 @@ private fun JSONArray.toCurvePoints(): List<DemoCurvePoint> {
         )
     }
     return points
+}
+
+private fun JSONArray.toRegimeIndexList(): List<DemoRegimeIndex> {
+    val indexes = mutableListOf<DemoRegimeIndex>()
+    for (index in 0 until length()) {
+        val item = getJSONObject(index)
+        indexes.add(
+            DemoRegimeIndex(
+                id = item.getString("id"),
+                symbol = item.getString("symbol"),
+                title = item.getString("title"),
+                thesis = item.getString("thesis"),
+                status = item.getString("status"),
+                levelDisplay = item.getString("level_display"),
+                previousLevelDisplay = item.getString("previous_level_display"),
+                changeDisplay = item.getString("change_display"),
+                rebalanceSlot = item.getLong("rebalance_slot"),
+                nextRebalanceSlot = item.getLong("next_rebalance_slot"),
+                quoteExpirySlot = item.getLong("quote_expiry_slot"),
+                constituents = item.getJSONArray("constituents").toRegimeConstituents(),
+                history = item.getJSONArray("history").toRegimeHistory(),
+                longQuote = item.getJSONObject("long_quote").toRegimeQuote(),
+                shortQuote = item.getJSONObject("short_quote").toRegimeQuote(),
+            )
+        )
+    }
+    return indexes
+}
+
+private fun JSONArray.toRegimeConstituents(): List<DemoRegimeConstituent> {
+    val constituents = mutableListOf<DemoRegimeConstituent>()
+    for (index in 0 until length()) {
+        val item = getJSONObject(index)
+        constituents.add(
+            DemoRegimeConstituent(
+                id = item.getString("id"),
+                label = item.getString("label"),
+                side = item.getString("side"),
+                weightBps = item.getInt("weight_bps"),
+                probabilityDisplay = item.getString("probability_display"),
+                previousProbabilityDisplay = item.getString("previous_probability_display"),
+                levelContributionDisplay = item.getString("level_contribution_display"),
+                signedPressureDisplay = item.getString("signed_pressure_display"),
+                status = item.getString("status"),
+                expirySlot = item.getLong("expiry_slot"),
+            )
+        )
+    }
+    return constituents
+}
+
+private fun JSONArray.toRegimeHistory(): List<DemoRegimeHistoryPoint> {
+    val history = mutableListOf<DemoRegimeHistoryPoint>()
+    for (index in 0 until length()) {
+        val item = getJSONObject(index)
+        history.add(
+            DemoRegimeHistoryPoint(
+                slot = item.getLong("slot"),
+                levelDisplay = item.getString("level_display"),
+            )
+        )
+    }
+    return history
+}
+
+private fun JSONObject.toRegimeQuote(): DemoRegimeQuote {
+    return DemoRegimeQuote(
+        side = getString("side"),
+        sizeDisplay = getString("size_display"),
+        entryLevelDisplay = getString("entry_level_display"),
+        tokenPriceDisplay = getString("token_price_display"),
+        collateralRequiredDisplay = getString("collateral_required_display"),
+        feePaidDisplay = getString("fee_paid_display"),
+        totalDebitDisplay = getString("total_debit_display"),
+        memoPayload = getString("memo_payload"),
+    )
 }
 
 private fun nearestQuote(
@@ -1040,6 +1480,21 @@ private const val FIXED_SCALE = 1_000_000_000.0
 private const val FIXED_EPSILON = 0.000000001
 
 fun Double.formattedDecimal(): String = "%.9f".format(this)
+
+private fun DemoRegimeIndex.quoteFor(side: RegimeTradeSide): DemoRegimeQuote {
+    return when (side) {
+        RegimeTradeSide.Long -> longQuote
+        RegimeTradeSide.Short -> shortQuote
+    }
+}
+
+private fun Int.toWeightPercent(): String = "%.1f%%".format(this / 100.0).trimZeros()
+
+private fun signedDisplay(value: String): String {
+    val number = value.toDoubleOrNull() ?: return value
+    val formatted = kotlin.math.abs(number).formattedDecimal().trimZeros()
+    return if (number >= 0.0) "+$formatted" else "-$formatted"
+}
 
 private fun buildContinuousCurvePoints(
     currentMu: Double,

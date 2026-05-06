@@ -5259,5 +5259,310 @@
         }
       ]
     }
+  ],
+  "regime_indexes": [
+    {
+      "id": "hawkish-fed",
+      "symbol": "HAWKFED",
+      "title": "Hawkish Fed",
+      "thesis": "Rate-hike and hot-CPI markets weighted against recession risk.",
+      "status": "Active",
+      "level_display": "64.400000000",
+      "previous_level_display": "58.600000000",
+      "change_display": "5.800000000",
+      "rebalance_slot": 64,
+      "next_rebalance_slot": 96,
+      "quote_expiry_slot": 12,
+      "constituents": [
+        {
+          "id": "fed-hike-next",
+          "label": "Rate hike by next FOMC",
+          "side": "Long",
+          "weight_bps": 4000,
+          "probability_display": "68.000000000",
+          "previous_probability_display": "61.000000000",
+          "level_contribution_display": "27.200000000",
+          "signed_pressure_display": "27.200000000",
+          "status": "Active",
+          "expiry_slot": 128
+        },
+        {
+          "id": "cpi-above-35",
+          "label": "CPI above 3.5%",
+          "side": "Long",
+          "weight_bps": 3500,
+          "probability_display": "57.000000000",
+          "previous_probability_display": "52.000000000",
+          "level_contribution_display": "19.950000000",
+          "signed_pressure_display": "19.950000000",
+          "status": "Active",
+          "expiry_slot": 132
+        },
+        {
+          "id": "recession-q4",
+          "label": "Recession by Q4",
+          "side": "Short",
+          "weight_bps": 2500,
+          "probability_display": "31.000000000",
+          "previous_probability_display": "36.000000000",
+          "level_contribution_display": "17.250000000",
+          "signed_pressure_display": "-7.750000000",
+          "status": "Active",
+          "expiry_slot": 188
+        }
+      ],
+      "history": [
+        {
+          "slot": 16,
+          "level_display": "58.600000000"
+        },
+        {
+          "slot": 24,
+          "level_display": "59.566666668"
+        },
+        {
+          "slot": 32,
+          "level_display": "60.533333331"
+        },
+        {
+          "slot": 40,
+          "level_display": "61.500000000"
+        },
+        {
+          "slot": 48,
+          "level_display": "62.466666668"
+        },
+        {
+          "slot": 56,
+          "level_display": "63.433333331"
+        },
+        {
+          "slot": 64,
+          "level_display": "64.400000000"
+        }
+      ],
+      "long_quote": {
+        "side": "Long",
+        "size_display": "1.000000000",
+        "entry_level_display": "64.400000000",
+        "token_price_display": "0.644000000",
+        "collateral_required_display": "0.644000000",
+        "fee_paid_display": "0.006440000",
+        "total_debit_display": "0.650440000",
+        "memo_payload": "regime-index-demo|symbol=HAWKFED|side=long|size=1.000000000|entry_level=64.400000000|token_price=0.644000000|total_debit=0.650440000"
+      },
+      "short_quote": {
+        "side": "Short",
+        "size_display": "1.000000000",
+        "entry_level_display": "64.400000000",
+        "token_price_display": "0.356000000",
+        "collateral_required_display": "0.356000000",
+        "fee_paid_display": "0.003560000",
+        "total_debit_display": "0.359560000",
+        "memo_payload": "regime-index-demo|symbol=HAWKFED|side=short|size=1.000000000|entry_level=64.400000000|token_price=0.356000000|total_debit=0.359560000"
+      }
+    },
+    {
+      "id": "ai-acceleration",
+      "symbol": "AIFAST",
+      "title": "AI Acceleration",
+      "thesis": "Capability benchmarks and compute spend weighted against AGI-delay markets.",
+      "status": "Active",
+      "level_display": "66.850000000",
+      "previous_level_display": "61.100000000",
+      "change_display": "5.750000000",
+      "rebalance_slot": 64,
+      "next_rebalance_slot": 96,
+      "quote_expiry_slot": 12,
+      "constituents": [
+        {
+          "id": "capability-benchmark",
+          "label": "Frontier benchmark beat",
+          "side": "Long",
+          "weight_bps": 4500,
+          "probability_display": "73.000000000",
+          "previous_probability_display": "66.000000000",
+          "level_contribution_display": "32.850000000",
+          "signed_pressure_display": "32.850000000",
+          "status": "Active",
+          "expiry_slot": 146
+        },
+        {
+          "id": "compute-spend",
+          "label": "Compute spend acceleration",
+          "side": "Long",
+          "weight_bps": 3500,
+          "probability_display": "64.000000000",
+          "previous_probability_display": "60.000000000",
+          "level_contribution_display": "22.400000000",
+          "signed_pressure_display": "22.400000000",
+          "status": "Active",
+          "expiry_slot": 152
+        },
+        {
+          "id": "agi-delay",
+          "label": "AGI delay narrative",
+          "side": "Short",
+          "weight_bps": 2000,
+          "probability_display": "42.000000000",
+          "previous_probability_display": "48.000000000",
+          "level_contribution_display": "11.600000000",
+          "signed_pressure_display": "-8.400000000",
+          "status": "Active",
+          "expiry_slot": 220
+        }
+      ],
+      "history": [
+        {
+          "slot": 16,
+          "level_display": "61.100000000"
+        },
+        {
+          "slot": 24,
+          "level_display": "62.058333335"
+        },
+        {
+          "slot": 32,
+          "level_display": "63.016666664"
+        },
+        {
+          "slot": 40,
+          "level_display": "63.975000000"
+        },
+        {
+          "slot": 48,
+          "level_display": "64.933333335"
+        },
+        {
+          "slot": 56,
+          "level_display": "65.891666664"
+        },
+        {
+          "slot": 64,
+          "level_display": "66.850000000"
+        }
+      ],
+      "long_quote": {
+        "side": "Long",
+        "size_display": "1.000000000",
+        "entry_level_display": "66.850000000",
+        "token_price_display": "0.668500000",
+        "collateral_required_display": "0.668500000",
+        "fee_paid_display": "0.006685000",
+        "total_debit_display": "0.675185000",
+        "memo_payload": "regime-index-demo|symbol=AIFAST|side=long|size=1.000000000|entry_level=66.850000000|token_price=0.668500000|total_debit=0.675185000"
+      },
+      "short_quote": {
+        "side": "Short",
+        "size_display": "1.000000000",
+        "entry_level_display": "66.850000000",
+        "token_price_display": "0.331500000",
+        "collateral_required_display": "0.331500000",
+        "fee_paid_display": "0.003315000",
+        "total_debit_display": "0.334815000",
+        "memo_payload": "regime-index-demo|symbol=AIFAST|side=short|size=1.000000000|entry_level=66.850000000|token_price=0.331500000|total_debit=0.334815000"
+      }
+    },
+    {
+      "id": "escalation",
+      "symbol": "ESCAL8",
+      "title": "Escalation",
+      "thesis": "Conflict and oil shock markets weighted against peace-deal probability.",
+      "status": "Active",
+      "level_display": "52.050000000",
+      "previous_level_display": "47.900000000",
+      "change_display": "4.150000000",
+      "rebalance_slot": 64,
+      "next_rebalance_slot": 96,
+      "quote_expiry_slot": 12,
+      "constituents": [
+        {
+          "id": "conflict-expansion",
+          "label": "Conflict expansion",
+          "side": "Long",
+          "weight_bps": 4500,
+          "probability_display": "46.000000000",
+          "previous_probability_display": "43.000000000",
+          "level_contribution_display": "20.700000000",
+          "signed_pressure_display": "20.700000000",
+          "status": "Active",
+          "expiry_slot": 116
+        },
+        {
+          "id": "oil-above-100",
+          "label": "Oil above 100",
+          "side": "Long",
+          "weight_bps": 2500,
+          "probability_display": "39.000000000",
+          "previous_probability_display": "35.000000000",
+          "level_contribution_display": "9.750000000",
+          "signed_pressure_display": "9.750000000",
+          "status": "Active",
+          "expiry_slot": 124
+        },
+        {
+          "id": "peace-deal",
+          "label": "Peace deal signed",
+          "side": "Short",
+          "weight_bps": 3000,
+          "probability_display": "28.000000000",
+          "previous_probability_display": "34.000000000",
+          "level_contribution_display": "21.600000000",
+          "signed_pressure_display": "-8.400000000",
+          "status": "Active",
+          "expiry_slot": 172
+        }
+      ],
+      "history": [
+        {
+          "slot": 16,
+          "level_display": "47.900000000"
+        },
+        {
+          "slot": 24,
+          "level_display": "48.591666668"
+        },
+        {
+          "slot": 32,
+          "level_display": "49.283333331"
+        },
+        {
+          "slot": 40,
+          "level_display": "49.975000000"
+        },
+        {
+          "slot": 48,
+          "level_display": "50.666666668"
+        },
+        {
+          "slot": 56,
+          "level_display": "51.358333331"
+        },
+        {
+          "slot": 64,
+          "level_display": "52.050000000"
+        }
+      ],
+      "long_quote": {
+        "side": "Long",
+        "size_display": "1.000000000",
+        "entry_level_display": "52.050000000",
+        "token_price_display": "0.520500000",
+        "collateral_required_display": "0.520500000",
+        "fee_paid_display": "0.005205000",
+        "total_debit_display": "0.525705000",
+        "memo_payload": "regime-index-demo|symbol=ESCAL8|side=long|size=1.000000000|entry_level=52.050000000|token_price=0.520500000|total_debit=0.525705000"
+      },
+      "short_quote": {
+        "side": "Short",
+        "size_display": "1.000000000",
+        "entry_level_display": "52.050000000",
+        "token_price_display": "0.479500000",
+        "collateral_required_display": "0.479500000",
+        "fee_paid_display": "0.004795000",
+        "total_debit_display": "0.484295000",
+        "memo_payload": "regime-index-demo|symbol=ESCAL8|side=short|size=1.000000000|entry_level=52.050000000|token_price=0.479500000|total_debit=0.484295000"
+      }
+    }
   ]
 }

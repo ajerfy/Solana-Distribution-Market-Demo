@@ -33,6 +33,24 @@ object WalletSubmitter {
         sender: ActivityResultSender,
         quote: ContinuousQuotePreview,
     ): WalletSubmitResult {
+        return submitMemo(sender, buildMemoText(quote))
+    }
+
+    suspend fun submitRegimeMemo(
+        sender: ActivityResultSender,
+        index: DemoRegimeIndex,
+        quote: DemoRegimeQuote,
+    ): WalletSubmitResult {
+        return submitMemo(
+            sender,
+            "${quote.memoPayload}|index=${index.id}|title=${index.title}",
+        )
+    }
+
+    private suspend fun submitMemo(
+        sender: ActivityResultSender,
+        memoText: String,
+    ): WalletSubmitResult {
         return try {
             val walletAdapter = MobileWalletAdapter(
                 connectionIdentity = ConnectionIdentity(
@@ -45,7 +63,7 @@ object WalletSubmitter {
             when (
                 val result = walletAdapter.transact(sender) { authResult ->
                     val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
-                    val transaction = buildMemoTransaction(walletAddress, buildMemoText(quote))
+                    val transaction = buildMemoTransaction(walletAddress, memoText)
                     signAndSendTransactions(arrayOf(transaction.serialize()))
                 }
             ) {
