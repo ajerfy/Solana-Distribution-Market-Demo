@@ -59,7 +59,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -153,6 +152,15 @@ data class SubmitStatus(
     val isWorking: Boolean = false,
 )
 
+data class ContinuousQuotePreview(
+    val collateralRequired: Double,
+    val feePaid: Double,
+    val totalDebit: Double,
+    val maxTotalDebit: Double,
+    val quoteExpirySlot: Long,
+    val snappedQuote: DemoPreset,
+)
+
 private enum class AppTab(val label: String) {
     Trade("Trade"),
     Positions("Positions"),
@@ -171,6 +179,27 @@ private fun TradeAppScreen(
     var submitStatus by remember { mutableStateOf<SubmitStatus?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val previewQuote = nearestQuote(payload.quoteGrid, targetMu.toDouble(), targetSigma.toDouble())
+    val continuousQuote = remember(payload.quoteGrid, targetMu, targetSigma, previewQuote) {
+        buildContinuousQuotePreview(
+            quotes = payload.quoteGrid,
+            targetMu = targetMu.toDouble(),
+            targetSigma = targetSigma.toDouble(),
+            snappedQuote = previewQuote,
+        )
+    }
+    val continuousCurvePoints = remember(
+        payload.market.currentMuDisplay,
+        payload.market.currentSigmaDisplay,
+        targetMu,
+        targetSigma,
+    ) {
+        buildContinuousCurvePoints(
+            currentMu = payload.market.currentMuDisplay.toDouble(),
+            currentSigma = payload.market.currentSigmaDisplay.toDouble(),
+            proposedMu = targetMu.toDouble(),
+            proposedSigma = targetSigma.toDouble(),
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -201,6 +230,8 @@ private fun TradeAppScreen(
                 AppTab.Trade -> TradeTab(
                     payload = payload,
                     previewQuote = previewQuote,
+                    continuousQuote = continuousQuote,
+                    curvePoints = continuousCurvePoints,
                     targetMu = targetMu,
                     targetSigma = targetSigma,
                     submitStatus = submitStatus,
@@ -325,6 +356,8 @@ private fun StatusBadge(text: String) {
 private fun TradeTab(
     payload: DemoPayload,
     previewQuote: DemoPreset,
+    continuousQuote: ContinuousQuotePreview,
+    curvePoints: List<DemoCurvePoint>,
     targetMu: Float,
     targetSigma: Float,
     submitStatus: SubmitStatus?,
@@ -333,7 +366,11 @@ private fun TradeTab(
     onPreset: (DemoPreset) -> Unit,
     onSubmit: () -> Unit,
 ) {
-    DistributionChartPanel(previewQuote)
+    DistributionChartPanel(
+        targetMu = targetMu,
+        targetSigma = targetSigma,
+        curvePoints = curvePoints,
+    )
     QuoteControls(
         targetMu = targetMu,
         targetSigma = targetSigma,
@@ -341,11 +378,15 @@ private fun TradeTab(
         onSigmaChange = onSigmaChange,
     )
     PresetStrip(payload.presets, previewQuote.id, onPreset)
-    QuoteExecutionPanel(previewQuote, submitStatus, onSubmit)
+    QuoteExecutionPanel(continuousQuote, submitStatus, onSubmit)
 }
 
 @Composable
-private fun DistributionChartPanel(quote: DemoPreset) {
+private fun DistributionChartPanel(
+    targetMu: Float,
+    targetSigma: Float,
+    curvePoints: List<DemoCurvePoint>,
+) {
     Panel {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -361,13 +402,13 @@ private fun DistributionChartPanel(quote: DemoPreset) {
                 )
             }
             Text(
-                "mu ${quote.targetMuDisplay.trimZeros()}  sigma ${quote.targetSigmaDisplay.trimZeros()}",
+                "mu ${"%.1f".format(targetMu).trimZeros()}  sigma ${"%.1f".format(targetSigma).trimZeros()}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
         }
         Spacer(Modifier.height(10.dp))
-        DistributionCanvas(quote.curvePoints)
+        DistributionCanvas(curvePoints)
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             LegendDot("Current", Color(0xFF475569))
             LegendDot("Proposed", Color(0xFF0891B2))
@@ -515,17 +556,18 @@ private fun PresetStrip(
 
 @Composable
 private fun QuoteExecutionPanel(
-    quote: DemoPreset,
+    quote: ContinuousQuotePreview,
     submitStatus: SubmitStatus?,
     onSubmit: () -> Unit,
 ) {
     var showDetails by remember { mutableStateOf(false) }
     Panel {
         Text("Quote", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        QuoteRow("Required collateral", quote.collateralRequiredDisplay)
-        QuoteRow("Maker fee", quote.feePaidDisplay)
+        QuoteRow("Required collateral", quote.collateralRequired.formattedDecimal())
+        QuoteRow("Maker fee", quote.feePaid.formattedDecimal())
         HorizontalDivider()
-        QuoteRow("Total debit", quote.totalDebitDisplay, strong = true)
+        QuoteRow("Total debit", quote.totalDebit.formattedDecimal(), strong = true)
+        QuoteRow("Max total debit", quote.maxTotalDebit.formattedDecimal())
         QuoteRow("Quote expiry slot", quote.quoteExpirySlot.toString())
         Button(
             onClick = onSubmit,
@@ -537,6 +579,11 @@ private fun QuoteExecutionPanel(
             Spacer(Modifier.width(8.dp))
             Text(if (submitStatus?.isWorking == true) "Waiting on wallet" else "Submit demo memo")
         }
+        Text(
+            text = "Submission snaps to nearest executable quote: ${quote.snappedQuote.label}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         submitStatus?.let { status ->
             StatusMessage(status)
         }
@@ -545,7 +592,7 @@ private fun QuoteExecutionPanel(
         }
         if (showDetails) {
             Text(
-                text = quote.serializedInstructionHex.take(180) + "...",
+                text = quote.snappedQuote.serializedInstructionHex.take(180) + "...",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -757,6 +804,137 @@ private fun nearestQuote(
         val sigmaDistance = requestedSigma - sigma
         (muDistance * muDistance) + (sigmaDistance * sigmaDistance)
     } ?: quotes.first()
+}
+
+private fun buildContinuousQuotePreview(
+    quotes: List<DemoPreset>,
+    targetMu: Double,
+    targetSigma: Double,
+    snappedQuote: DemoPreset,
+): ContinuousQuotePreview {
+    return ContinuousQuotePreview(
+        collateralRequired = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
+            it.collateralRequiredDisplay.toDouble()
+        },
+        feePaid = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
+            it.feePaidDisplay.toDouble()
+        },
+        totalDebit = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
+            it.totalDebitDisplay.toDouble()
+        },
+        maxTotalDebit = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
+            it.maxTotalDebitDisplay.toDouble()
+        },
+        quoteExpirySlot = snappedQuote.quoteExpirySlot,
+        snappedQuote = snappedQuote,
+    )
+}
+
+private fun interpolateQuoteMetric(
+    quotes: List<DemoPreset>,
+    targetMu: Double,
+    targetSigma: Double,
+    metric: (DemoPreset) -> Double,
+): Double {
+    val exact = quotes.firstOrNull {
+        it.targetMuDisplay.toDouble() == targetMu && it.targetSigmaDisplay.toDouble() == targetSigma
+    }
+    if (exact != null) return metric(exact)
+
+    val sameSigma = quotes
+        .filter { it.targetSigmaDisplay.toDouble() == targetSigma }
+        .sortedBy { it.targetMuDisplay.toDouble() }
+    interpolateOneDimensional(
+        quotes = sameSigma,
+        target = targetMu,
+        axis = { it.targetMuDisplay.toDouble() },
+        metric = metric,
+    )?.let { return it }
+
+    val sameMu = quotes
+        .filter { it.targetMuDisplay.toDouble() == targetMu }
+        .sortedBy { it.targetSigmaDisplay.toDouble() }
+    interpolateOneDimensional(
+        quotes = sameMu,
+        target = targetSigma,
+        axis = { it.targetSigmaDisplay.toDouble() },
+        metric = metric,
+    )?.let { return it }
+
+    val nearest = quotes
+        .sortedBy {
+            val muDistance = targetMu - it.targetMuDisplay.toDouble()
+            val sigmaDistance = targetSigma - it.targetSigmaDisplay.toDouble()
+            (muDistance * muDistance) + (sigmaDistance * sigmaDistance)
+        }
+        .take(4)
+
+    var weightedTotal = 0.0
+    var weightSum = 0.0
+    nearest.forEach { quote ->
+        val muDistance = targetMu - quote.targetMuDisplay.toDouble()
+        val sigmaDistance = targetSigma - quote.targetSigmaDisplay.toDouble()
+        val distanceSquared = (muDistance * muDistance) + (sigmaDistance * sigmaDistance)
+        val weight = 1.0 / max(distanceSquared, 1e-9)
+        weightedTotal += metric(quote) * weight
+        weightSum += weight
+    }
+
+    return if (weightSum > 0.0) weightedTotal / weightSum else metric(snappedQuoteFallback(quotes))
+}
+
+private fun interpolateOneDimensional(
+    quotes: List<DemoPreset>,
+    target: Double,
+    axis: (DemoPreset) -> Double,
+    metric: (DemoPreset) -> Double,
+): Double? {
+    if (quotes.size < 2) return null
+    val lower = quotes.lastOrNull { axis(it) <= target } ?: quotes.first()
+    val upper = quotes.firstOrNull { axis(it) >= target } ?: quotes.last()
+    val lowerAxis = axis(lower)
+    val upperAxis = axis(upper)
+    if (lowerAxis == upperAxis) return metric(lower)
+    val t = ((target - lowerAxis) / (upperAxis - lowerAxis)).coerceIn(0.0, 1.0)
+    return metric(lower) + (metric(upper) - metric(lower)) * t
+}
+
+private fun snappedQuoteFallback(quotes: List<DemoPreset>): DemoPreset = quotes.first()
+
+private fun Double.formattedDecimal(): String = "%.9f".format(this)
+
+private fun buildContinuousCurvePoints(
+    currentMu: Double,
+    currentSigma: Double,
+    proposedMu: Double,
+    proposedSigma: Double,
+    samples: Int = 61,
+): List<DemoCurvePoint> {
+    val widestSigma = max(currentSigma, proposedSigma)
+    val centerMin = min(currentMu, proposedMu)
+    val centerMax = max(currentMu, proposedMu)
+    val lower = centerMin - widestSigma * 4.0
+    val upper = centerMax + widestSigma * 4.0
+    val step = (upper - lower) / (samples - 1).coerceAtLeast(1)
+
+    return List(samples) { index ->
+        val x = lower + step * index
+        val current = normalPdf(x, currentMu, currentSigma)
+        val proposed = normalPdf(x, proposedMu, proposedSigma)
+        DemoCurvePoint(
+            x = x,
+            current = current,
+            proposed = proposed,
+            edge = proposed - current,
+        )
+    }
+}
+
+private fun normalPdf(x: Double, mu: Double, sigma: Double): Double {
+    val safeSigma = sigma.coerceAtLeast(0.0001)
+    val coefficient = 1.0 / (safeSigma * kotlin.math.sqrt(2.0 * Math.PI))
+    val exponent = -((x - mu) * (x - mu)) / (2.0 * safeSigma * safeSigma)
+    return coefficient * kotlin.math.exp(exponent)
 }
 
 private fun String.trimZeros(): String {
