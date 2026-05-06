@@ -1,7 +1,6 @@
 package com.solanadistributionmarketdemo
 
 import android.net.Uri
-import androidx.activity.ComponentActivity
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import com.solana.mobilewalletadapter.clientlib.ConnectionIdentity
 import com.solana.mobilewalletadapter.clientlib.MobileWalletAdapter
@@ -31,7 +30,7 @@ sealed class WalletSubmitResult {
 
 object WalletSubmitter {
     suspend fun submitTradeMemo(
-        activity: ComponentActivity,
+        sender: ActivityResultSender,
         quote: DemoPreset,
     ): WalletSubmitResult {
         return try {
@@ -42,8 +41,6 @@ object WalletSubmitter {
                     identityName = IDENTITY_NAME,
                 )
             )
-            val sender = ActivityResultSender(activity)
-
             when (
                 val result = walletAdapter.transact(sender) { authResult ->
                     val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)

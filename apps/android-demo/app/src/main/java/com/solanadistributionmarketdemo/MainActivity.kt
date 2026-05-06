@@ -3,6 +3,7 @@ package com.solanadistributionmarketdemo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -40,8 +41,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
+    private lateinit var walletSender: ActivityResultSender
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        walletSender = ActivityResultSender(this)
         setContent {
             MaterialTheme {
                 Surface(
@@ -54,7 +58,7 @@ class MainActivity : ComponentActivity() {
                             context.assets.open("demo_market.json").bufferedReader().use { it.readText() }
                         )
                     }
-                    TradeAppScreen(payload, this@MainActivity)
+                    TradeAppScreen(payload, walletSender)
                 }
             }
         }
@@ -93,7 +97,7 @@ data class SubmitStatus(
 @Composable
 private fun TradeAppScreen(
     payload: DemoPayload,
-    activity: ComponentActivity,
+    walletSender: ActivityResultSender,
 ) {
     var selectedPreset by remember { mutableStateOf(payload.presets.first()) }
     var targetMu by remember { mutableStateOf(payload.presets.first().targetMuDisplay) }
@@ -136,7 +140,7 @@ private fun TradeAppScreen(
                     isWorking = true,
                 )
                 coroutineScope.launch {
-                    submitStatus = when (val result = WalletSubmitter.submitTradeMemo(activity, previewQuote)) {
+                    submitStatus = when (val result = WalletSubmitter.submitTradeMemo(walletSender, previewQuote)) {
                         is WalletSubmitResult.Success -> SubmitStatus(
                             message = "Submitted on devnet. Wallet ${result.walletAddress.take(12)}... signed tx ${result.signatureHex.take(16)}...",
                         )
