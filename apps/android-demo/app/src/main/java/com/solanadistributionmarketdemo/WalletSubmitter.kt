@@ -77,7 +77,6 @@ object WalletSubmitter {
             when (
                 val result = walletAdapter.transact(sender) { authResult ->
                     val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
-                    ensureDevnetBalance(walletAddress)
                     val transaction = buildMemoTransaction(walletAddress, memoText)
                     val sendResult = signAndSendTransactions(arrayOf(transaction.serialize()))
                     val signatureBytes = sendResult.signatures.firstOrNull()
@@ -187,10 +186,7 @@ object WalletSubmitter {
         signerAddress: SolanaPublicKey,
         memoText: String,
     ): Transaction {
-        val rpcClient = SolanaRpcClient(DEVNET_RPC_URL, KtorNetworkDriver())
-        val blockhashResponse = rpcClient.getLatestBlockhash()
-        val blockhash = blockhashResponse.result?.blockhash
-            ?: throw IllegalStateException("Could not fetch a recent blockhash from devnet.")
+        val blockhash = fetchRecentBlockhashWithRetry()
 
         val memoInstruction = TransactionInstruction(
             SolanaPublicKey.from(MEMO_PROGRAM_ID),
@@ -207,18 +203,28 @@ object WalletSubmitter {
         return Transaction(memoMessage)
     }
 
-    private suspend fun ensureDevnetBalance(address: SolanaPublicKey) {
-        val rpcClient = SolanaRpcClient(DEVNET_RPC_URL, KtorNetworkDriver())
-        val balance = rpcClient.getBalance(address, Commitment.CONFIRMED).result
-            ?: throw IllegalStateException(
-                "This wallet does not appear to exist on devnet yet. Request a devnet airdrop in the wallet and try again."
-            )
-
-        if (balance <= 0L) {
-            throw IllegalStateException(
-                "This wallet has 0 devnet SOL. Request a devnet airdrop in the wallet before submitting the demo memo."
-            )
+    private suspend fun fetchRecentBlockhashWithRetry(): String {
+        var lastError: Throwable? = null
+        repeat(3) { attempt ->
+            try {
+                val rpcClient = SolanaRpcClient(DEVNET_RPC_URL, KtorNetworkDriver())
+                val response = rpcClient.getLatestBlockhash()
+                response.result?.blockhash?.let { return it }
+                lastError = IllegalStateException(
+                    response.error?.message ?: "Devnet RPC returned no blockhash."
+                )
+            } catch (error: java.nio.channels.UnresolvedAddressException) {
+                lastError = error
+                kotlinx.coroutines.delay(150L * (attempt + 1))
+            } catch (error: java.net.ConnectException) {
+                lastError = error
+                kotlinx.coroutines.delay(150L * (attempt + 1))
+            } catch (error: java.net.SocketTimeoutException) {
+                lastError = error
+                kotlinx.coroutines.delay(150L * (attempt + 1))
+            }
         }
+        throw lastError ?: IllegalStateException("Could not fetch a recent blockhash from devnet.")
     }
 }
 
@@ -227,6 +233,14 @@ private fun walletMessage(message: String, memoLength: Int): String {
     return when {
         normalized.equals("null", ignoreCase = true) ->
             "The wallet returned no error details and the demo memo was not confirmed. We attempted a short $memoLength-byte devnet memo. Try opening the wallet first, then retry. If it persists, the wallet likely signed nothing or dropped the send handoff."
+
+        normalized.contains("UnresolvedAddressException", ignoreCase = true) ||
+            normalized.contains("UnknownHostException", ignoreCase = true) ->
+            "Couldn't reach api.devnet.solana.com — the device looks offline or its DNS isn't resolving. Check that wifi or cellular data is on, then retry."
+
+        normalized.contains("ConnectException", ignoreCase = true) ||
+            normalized.contains("SocketTimeoutException", ignoreCase = true) ->
+            "Network call to devnet timed out. Check connectivity and retry; devnet RPC is sometimes briefly unreachable."
 
         normalized.contains("LifecycleOwner", ignoreCase = true) ||
             normalized.contains("register before", ignoreCase = true) ->
