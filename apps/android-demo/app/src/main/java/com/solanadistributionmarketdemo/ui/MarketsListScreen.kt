@@ -160,6 +160,7 @@ private fun MarketRow(market: MarketListing, onClick: () -> Unit, modifier: Modi
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (market.isOnChain) TagPill("ON-CHAIN", color = DemoColors.AccentChain, filled = true)
+                    MarketTypeBadge(market.marketType)
                     Text(market.category.label.uppercase(), color = DemoColors.TextDim, style = MaterialTheme.typography.labelSmall)
                 }
                 Text(market.title, color = DemoColors.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -177,6 +178,18 @@ private fun MarketRow(market: MarketListing, onClick: () -> Unit, modifier: Modi
             CrowdBlock(label = "VOLUME", value = formatVolume(market.volumeUsd), modifier = Modifier.weight(1f))
             CrowdBlock(label = "RESOLVES", value = market.resolvesAt.shorten(), modifier = Modifier.weight(1.2f))
         }
+    }
+}
+
+@Composable
+private fun MarketTypeBadge(type: com.solanadistributionmarketdemo.data.MarketType) {
+    when (type) {
+        com.solanadistributionmarketdemo.data.MarketType.Estimation ->
+            TagPill("ESTIMATE", color = DemoColors.AccentCrowd)
+        com.solanadistributionmarketdemo.data.MarketType.RegimeIndex ->
+            TagPill("THEME", color = DemoColors.AccentLong)
+        com.solanadistributionmarketdemo.data.MarketType.Perp ->
+            TagPill("PERP", color = DemoColors.AccentWarn)
     }
 }
 

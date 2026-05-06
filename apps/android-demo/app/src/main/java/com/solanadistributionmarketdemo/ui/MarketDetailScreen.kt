@@ -126,11 +126,14 @@ fun MarketDetailScreen(state: AppState, market: MarketListing) {
         BottomBetCta(
             modifier = Modifier.align(Alignment.BottomCenter),
             onPlace = {
-                BetSheetPrefill.muOverride = previewMu.toDouble()
-                BetSheetPrefill.sigmaOverride = previewSigma.toDouble()
-                state.showBetSheet.value = true
+                if (market.marketType == com.solanadistributionmarketdemo.data.MarketType.Estimation) {
+                    BetSheetPrefill.muOverride = previewMu.toDouble()
+                    BetSheetPrefill.sigmaOverride = previewSigma.toDouble()
+                    state.showBetSheet.value = true
+                }
             },
             isOnChain = market.isOnChain,
+            marketType = market.marketType,
         )
     }
 }
@@ -443,7 +446,12 @@ private fun RulesTab(market: MarketListing) {
 }
 
 @Composable
-private fun BottomBetCta(modifier: Modifier = Modifier, onPlace: () -> Unit, isOnChain: Boolean) {
+private fun BottomBetCta(
+    modifier: Modifier = Modifier,
+    onPlace: () -> Unit,
+    isOnChain: Boolean,
+    marketType: com.solanadistributionmarketdemo.data.MarketType,
+) {
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -454,11 +462,22 @@ private fun BottomBetCta(modifier: Modifier = Modifier, onPlace: () -> Unit, isO
             )
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        PrimaryButton(
-            label = if (isOnChain) "Place bet  ·  sign on devnet" else "Place bet",
-            onClick = onPlace,
-            accent = DemoColors.AccentYou,
-        )
+        when (marketType) {
+            com.solanadistributionmarketdemo.data.MarketType.Estimation ->
+                PrimaryButton(
+                    label = if (isOnChain) "Place bet  ·  sign on devnet" else "Place bet",
+                    onClick = onPlace,
+                    accent = DemoColors.AccentYou,
+                )
+            com.solanadistributionmarketdemo.data.MarketType.RegimeIndex,
+            com.solanadistributionmarketdemo.data.MarketType.Perp ->
+                PrimaryButton(
+                    label = "Long / short flow coming next",
+                    onClick = {},
+                    enabled = false,
+                    accent = DemoColors.SurfaceMuted,
+                )
+        }
     }
 }
 
