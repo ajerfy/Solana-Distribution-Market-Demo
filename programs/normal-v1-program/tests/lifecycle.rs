@@ -53,6 +53,34 @@ fn full_program_lifecycle_survives_serialized_instruction_flow() {
     .unwrap();
     assert_eq!(init_execution.token_operations.len(), 2);
 
+    let add_liquidity_instruction = SolanaInstructionV1::ManageLiquidity {
+        action: LiquidityAction::Add,
+        owner: initializer,
+        amount_or_shares: fixed(5.0),
+    };
+    let add_execution = program
+        .execute_serialized(
+            initializer,
+            2,
+            &pack_instruction(&add_liquidity_instruction),
+        )
+        .unwrap();
+    assert_eq!(add_execution.token_operations.len(), 2);
+
+    let remove_liquidity_instruction = SolanaInstructionV1::ManageLiquidity {
+        action: LiquidityAction::Remove,
+        owner: initializer,
+        amount_or_shares: fixed(0.1),
+    };
+    let remove_execution = program
+        .execute_serialized(
+            initializer,
+            3,
+            &pack_instruction(&remove_liquidity_instruction),
+        )
+        .unwrap();
+    assert_eq!(remove_execution.token_operations.len(), 2);
+
     let quote = program
         .state
         .core_market
@@ -64,7 +92,11 @@ fn full_program_lifecycle_survives_serialized_instruction_flow() {
             expected_market_version: quote.market_version,
             new_distribution: quote.new_distribution,
             collateral_required: quote.collateral_quote.collateral_required,
-            max_slippage_collateral: quote.collateral_quote.collateral_required,
+            fee_paid: quote.collateral_quote.fee_paid,
+            total_debit: quote.collateral_quote.total_debit,
+            max_total_debit: quote.collateral_quote.total_debit,
+            taker_fee_bps: quote.taker_fee_bps,
+            min_taker_fee: quote.min_taker_fee,
             search_lower_bound: quote.collateral_quote.lower_bound,
             search_upper_bound: quote.collateral_quote.upper_bound,
             coarse_samples: quote.collateral_quote.coarse_samples,
@@ -74,35 +106,15 @@ fn full_program_lifecycle_survives_serialized_instruction_flow() {
         },
     });
     let trade_execution = program
-        .execute_serialized(trader, 3, &pack_instruction(&trade_instruction))
+        .execute_serialized(trader, 4, &pack_instruction(&trade_instruction))
         .unwrap();
     assert_eq!(
         trade_execution.token_operations,
         vec![ProgramTokenOperationV1::TransferToVault {
             owner: trader,
-            amount: quote.collateral_quote.collateral_required,
+            amount: quote.collateral_quote.total_debit,
         }]
     );
-
-    let add_liquidity_instruction = SolanaInstructionV1::ManageLiquidity {
-        action: LiquidityAction::Add,
-        owner: initializer,
-        amount_or_shares: fixed(5.0),
-    };
-    let add_execution = program
-        .execute_serialized(initializer, 4, &pack_instruction(&add_liquidity_instruction))
-        .unwrap();
-    assert_eq!(add_execution.token_operations.len(), 2);
-
-    let remove_liquidity_instruction = SolanaInstructionV1::ManageLiquidity {
-        action: LiquidityAction::Remove,
-        owner: initializer,
-        amount_or_shares: fixed(0.1),
-    };
-    let remove_execution = program
-        .execute_serialized(initializer, 5, &pack_instruction(&remove_liquidity_instruction))
-        .unwrap();
-    assert_eq!(remove_execution.token_operations.len(), 2);
 
     program
         .execute_serialized(

@@ -2,17 +2,22 @@ use crate::fixed_point::Fixed;
 use crate::normal_math::{
     FixedCollateralQuote, FixedNormalDistribution, fixed_calculate_f, fixed_calculate_lambda,
     fixed_calculate_minimum_sigma, fixed_calculate_value_from_lambda,
-    fixed_required_collateral_quote,
+    fixed_required_collateral_quote_with_fee,
 };
 use std::collections::HashMap;
+
+const NOOP_EPSILON_RAW: i128 = 1_000;
+const DEFAULT_TAKER_FEE_BPS: u32 = 100;
+const DEFAULT_MAX_OPEN_TRADES: u64 = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FixedNormalTradeRecord {
     pub id: usize,
     pub old_distribution: FixedNormalDistribution,
     pub new_distribution: FixedNormalDistribution,
-    pub collateral: Fixed,
     pub k_at_trade: Fixed,
+    pub collateral: Fixed,
+    pub fee_paid: Fixed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,6 +25,34 @@ pub struct FixedNormalTradeQuote {
     pub market_version: u64,
     pub new_distribution: FixedNormalDistribution,
     pub collateral_quote: FixedCollateralQuote,
+    pub taker_fee_bps: u32,
+    pub min_taker_fee: Fixed,
+    pub max_total_debit: Fixed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedNormalMarketConfig {
+    pub taker_fee_bps: u32,
+    pub min_taker_fee: Fixed,
+    pub max_collateral_per_trade: Fixed,
+    pub max_open_trades: u64,
+    pub min_sigma: Fixed,
+    pub max_sigma: Fixed,
+    pub expiry_slot: u64,
+}
+
+impl FixedNormalMarketConfig {
+    pub fn devnet_default() -> Result<Self, String> {
+        Ok(Self {
+            taker_fee_bps: DEFAULT_TAKER_FEE_BPS,
+            min_taker_fee: Fixed::from_f64(0.001)?,
+            max_collateral_per_trade: Fixed::from_f64(10.0)?,
+            max_open_trades: DEFAULT_MAX_OPEN_TRADES,
+            min_sigma: Fixed::from_f64(0.000_001)?,
+            max_sigma: Fixed::from_f64(1_000.0)?,
+            expiry_slot: 1_000_000,
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,11 +67,13 @@ pub struct FixedNormalResolution {
 pub struct FixedNormalMarket {
     pub b: Fixed,
     pub k: Fixed,
+    pub config: FixedNormalMarketConfig,
     pub current_distribution: FixedNormalDistribution,
     pub current_lambda: Fixed,
     pub total_lp_shares: Fixed,
     pub lp_shares: HashMap<String, Fixed>,
     pub cash: Fixed,
+    pub fees_accrued: Fixed,
     pub trades: Vec<FixedNormalTradeRecord>,
     pub state_version: u64,
 }
@@ -49,9 +84,25 @@ impl FixedNormalMarket {
         k: Fixed,
         initial_distribution: FixedNormalDistribution,
     ) -> Result<Self, String> {
+        Self::new_with_config(
+            b,
+            k,
+            initial_distribution,
+            FixedNormalMarketConfig::devnet_default()?,
+        )
+    }
+
+    pub fn new_with_config(
+        b: Fixed,
+        k: Fixed,
+        initial_distribution: FixedNormalDistribution,
+        config: FixedNormalMarketConfig,
+    ) -> Result<Self, String> {
         if b.raw() <= 0 || k.raw() <= 0 {
             return Err("b and k must be positive".to_string());
         }
+        validate_market_config(&config)?;
+        validate_sigma_bounds(initial_distribution.sigma, &config)?;
 
         let current_lambda = fixed_calculate_lambda(initial_distribution.sigma, k)?;
         validate_fixed_solvency(b, current_lambda, initial_distribution)?;
@@ -62,11 +113,13 @@ impl FixedNormalMarket {
         Ok(Self {
             b,
             k,
+            config,
             current_distribution: initial_distribution,
             current_lambda,
             total_lp_shares: Fixed::ONE,
             lp_shares,
             cash: b,
+            fees_accrued: Fixed::ZERO,
             trades: Vec::new(),
             state_version: 0,
         })
@@ -84,7 +137,8 @@ impl FixedNormalMarket {
         &self,
         new_distribution: FixedNormalDistribution,
     ) -> Result<FixedNormalTradeQuote, String> {
-        let min_sigma = self.minimum_sigma()?;
+        self.validate_trade_shape(new_distribution)?;
+        let min_sigma = self.minimum_sigma()?.max(self.config.min_sigma);
         if new_distribution.sigma.raw() < min_sigma.raw() {
             return Err(format!(
                 "normal sigma violates solvency bound: sigma={} < sigma_min={}",
@@ -94,13 +148,24 @@ impl FixedNormalMarket {
 
         let new_lambda = fixed_calculate_lambda(new_distribution.sigma, self.k)?;
         validate_fixed_solvency(self.b, new_lambda, new_distribution)?;
-        let collateral_quote =
-            fixed_required_collateral_quote(self.current_distribution, new_distribution, self.k)?;
+        let collateral_quote = fixed_required_collateral_quote_with_fee(
+            self.current_distribution,
+            new_distribution,
+            self.k,
+            self.config.taker_fee_bps,
+            self.config.min_taker_fee,
+        )?;
+        if collateral_quote.collateral_required.raw() > self.config.max_collateral_per_trade.raw() {
+            return Err("trade collateral exceeds market cap".to_string());
+        }
 
         Ok(FixedNormalTradeQuote {
             market_version: self.market_version(),
             new_distribution,
             collateral_quote,
+            taker_fee_bps: self.config.taker_fee_bps,
+            min_taker_fee: self.config.min_taker_fee,
+            max_total_debit: collateral_quote.total_debit,
         })
     }
 
@@ -116,10 +181,25 @@ impl FixedNormalMarket {
         {
             return Err("trade quote search metadata does not match verifier policy".to_string());
         }
+        if quote.taker_fee_bps != self.config.taker_fee_bps
+            || quote.min_taker_fee != self.config.min_taker_fee
+        {
+            return Err("trade quote fee policy does not match market policy".to_string());
+        }
         if regenerated.collateral_quote.collateral_required.raw()
             > quote.collateral_quote.collateral_required.raw()
         {
             return Err("provided trade quote understates required collateral".to_string());
+        }
+        if regenerated.collateral_quote.fee_paid.raw() > quote.collateral_quote.fee_paid.raw() {
+            return Err("provided trade quote understates taker fee".to_string());
+        }
+        if regenerated.collateral_quote.total_debit.raw() > quote.collateral_quote.total_debit.raw()
+        {
+            return Err("provided trade quote understates total debit".to_string());
+        }
+        if quote.collateral_quote.total_debit.raw() > quote.max_total_debit.raw() {
+            return Err("trade quote exceeds max total debit".to_string());
         }
         Ok(())
     }
@@ -131,17 +211,23 @@ impl FixedNormalMarket {
 
     pub fn trade_with_quote(&mut self, quote: FixedNormalTradeQuote) -> Result<Fixed, String> {
         self.verify_trade_quote(&quote)?;
+        if self.trades.len() as u64 >= self.config.max_open_trades {
+            return Err("market has reached the open trade cap".to_string());
+        }
         let new_distribution = quote.new_distribution;
         let new_lambda = fixed_calculate_lambda(new_distribution.sigma, self.k)?;
         let collateral = quote.collateral_quote.collateral_required;
+        let fee_paid = quote.collateral_quote.fee_paid;
         let trade_id = self.trades.len();
-        self.cash = self.cash + collateral;
+        self.cash = self.cash + quote.collateral_quote.total_debit;
+        self.fees_accrued = self.fees_accrued + fee_paid;
         self.trades.push(FixedNormalTradeRecord {
             id: trade_id,
             old_distribution: self.current_distribution,
             new_distribution,
-            collateral,
             k_at_trade: self.k,
+            collateral,
+            fee_paid,
         });
         self.current_distribution = new_distribution;
         self.current_lambda = new_lambda;
@@ -155,6 +241,9 @@ impl FixedNormalMarket {
         lp_id: impl Into<String>,
         proportion: Fixed,
     ) -> Result<Fixed, String> {
+        if !self.trades.is_empty() {
+            return Err("liquidity additions are disabled after the first trade".to_string());
+        }
         if proportion.raw() <= 0 {
             return Err("liquidity proportion must be positive".to_string());
         }
@@ -174,6 +263,9 @@ impl FixedNormalMarket {
     }
 
     pub fn remove_liquidity(&mut self, lp_id: &str, shares: Fixed) -> Result<Fixed, String> {
+        if !self.trades.is_empty() {
+            return Err("liquidity removals are disabled after the first trade".to_string());
+        }
         if shares.raw() <= 0 {
             return Err("liquidity shares to remove must be positive".to_string());
         }
@@ -212,8 +304,10 @@ impl FixedNormalMarket {
         let mut total_trader_payout = Fixed::ZERO;
 
         for trade in &self.trades {
-            let final_payout = fixed_calculate_f(outcome, trade.new_distribution, trade.k_at_trade)?;
-            let initial_payout = fixed_calculate_f(outcome, trade.old_distribution, trade.k_at_trade)?;
+            let final_payout =
+                fixed_calculate_f(outcome, trade.new_distribution, trade.k_at_trade)?;
+            let initial_payout =
+                fixed_calculate_f(outcome, trade.old_distribution, trade.k_at_trade)?;
             let signed_delta = final_payout - initial_payout;
             let payout = trade.collateral + signed_delta;
 
@@ -249,6 +343,53 @@ impl FixedNormalMarket {
             cash_remaining: remaining_for_lps - distributed_lp_total,
         })
     }
+
+    fn validate_trade_shape(
+        &self,
+        new_distribution: FixedNormalDistribution,
+    ) -> Result<(), String> {
+        if (new_distribution.mu - self.current_distribution.mu)
+            .abs()
+            .raw()
+            <= NOOP_EPSILON_RAW
+            && (new_distribution.sigma - self.current_distribution.sigma)
+                .abs()
+                .raw()
+                <= NOOP_EPSILON_RAW
+        {
+            return Err("trade does not materially change the market distribution".to_string());
+        }
+        validate_sigma_bounds(new_distribution.sigma, &self.config)
+    }
+}
+
+fn validate_market_config(config: &FixedNormalMarketConfig) -> Result<(), String> {
+    if config.taker_fee_bps > 10_000 {
+        return Err("taker fee bps cannot exceed 10000".to_string());
+    }
+    if config.min_taker_fee.raw() < 0 {
+        return Err("minimum taker fee cannot be negative".to_string());
+    }
+    if config.max_collateral_per_trade.raw() <= 0 {
+        return Err("max collateral per trade must be positive".to_string());
+    }
+    if config.max_open_trades == 0 {
+        return Err("max open trades must be positive".to_string());
+    }
+    if config.min_sigma.raw() <= 0 || config.max_sigma.raw() <= config.min_sigma.raw() {
+        return Err("sigma caps must be positive and ordered".to_string());
+    }
+    Ok(())
+}
+
+fn validate_sigma_bounds(sigma: Fixed, config: &FixedNormalMarketConfig) -> Result<(), String> {
+    if sigma.raw() < config.min_sigma.raw() {
+        return Err("normal sigma is below the market minimum".to_string());
+    }
+    if sigma.raw() > config.max_sigma.raw() {
+        return Err("normal sigma is above the market maximum".to_string());
+    }
+    Ok(())
 }
 
 fn validate_fixed_solvency(

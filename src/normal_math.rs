@@ -16,6 +16,8 @@ pub struct FixedSearchBounds {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FixedCollateralQuote {
     pub collateral_required: Fixed,
+    pub fee_paid: Fixed,
+    pub total_debit: Fixed,
     pub lower_bound: Fixed,
     pub upper_bound: Fixed,
     pub coarse_samples: u32,
@@ -67,11 +69,21 @@ pub fn fixed_required_collateral_quote(
     to: FixedNormalDistribution,
     k: Fixed,
 ) -> Result<FixedCollateralQuote, String> {
+    fixed_required_collateral_quote_with_fee(from, to, k, 0, Fixed::ZERO)
+}
+
+pub fn fixed_required_collateral_quote_with_fee(
+    from: FixedNormalDistribution,
+    to: FixedNormalDistribution,
+    k: Fixed,
+    taker_fee_bps: u32,
+    min_taker_fee: Fixed,
+) -> Result<FixedCollateralQuote, String> {
     let old_lambda = fixed_calculate_lambda(from.sigma, k)?;
     let new_lambda = fixed_calculate_lambda(to.sigma, k)?;
     let bounds = fixed_collateral_search_bounds(from, to);
     let coarse_samples = 4096_u32;
-    let coarse = maximum_absolute_difference_with_argmax(
+    let coarse = maximum_directional_loss_with_argmax(
         from,
         old_lambda,
         to,
@@ -84,7 +96,7 @@ pub fn fixed_required_collateral_quote(
     let refine_lower = (coarse.argmax - coarse_step).max(bounds.lower);
     let refine_upper = (coarse.argmax + coarse_step).min(bounds.upper);
     let refine_samples = 4096_u32;
-    let refine = maximum_absolute_difference_with_argmax(
+    let refine = maximum_directional_loss_with_argmax(
         from,
         old_lambda,
         to,
@@ -95,21 +107,29 @@ pub fn fixed_required_collateral_quote(
     )?;
 
     let conservative_padding = Fixed::from_raw(1);
-    let collateral_required = coarse
-        .value
-        .max(refine.value)
-        .max(endpoint_maximum_absolute_difference(
-            from,
-            old_lambda,
-            to,
-            new_lambda,
-            bounds.lower,
-            bounds.upper,
-        )?)
-        + conservative_padding;
+    let collateral_required =
+        coarse
+            .value
+            .max(refine.value)
+            .max(endpoint_maximum_directional_loss(
+                from,
+                old_lambda,
+                to,
+                new_lambda,
+                bounds.lower,
+                bounds.upper,
+            )?)
+            + conservative_padding;
+    let fee_paid = (collateral_required
+        .mul_int(taker_fee_bps as i128)
+        .div_int(10_000))
+    .max(min_taker_fee);
+    let total_debit = collateral_required + fee_paid;
 
     Ok(FixedCollateralQuote {
         collateral_required,
+        fee_paid,
+        total_debit,
         lower_bound: bounds.lower,
         upper_bound: bounds.upper,
         coarse_samples,
@@ -139,13 +159,8 @@ pub fn fixed_collateral_search_bounds(
     let sigma = from.sigma.max(to.sigma);
     let tail = span + sigma.mul_int(8);
 
-    let (lower, upper) = if from.mu.raw() < to.mu.raw() {
-        (to.mu, to.mu + tail)
-    } else if from.mu.raw() > to.mu.raw() {
-        (to.mu - tail, to.mu)
-    } else {
-        (to.mu - sigma.mul_int(8), to.mu + sigma.mul_int(8))
-    };
+    let lower = from.mu.min(to.mu) - tail;
+    let upper = from.mu.max(to.mu) + tail;
 
     FixedSearchBounds { lower, upper }
 }
@@ -156,7 +171,7 @@ struct FixedArgmaxResult {
     value: Fixed,
 }
 
-fn maximum_absolute_difference_with_argmax(
+fn maximum_directional_loss_with_argmax(
     from: FixedNormalDistribution,
     from_lambda: Fixed,
     to: FixedNormalDistribution,
@@ -174,17 +189,20 @@ fn maximum_absolute_difference_with_argmax(
         let x = lower + (range * Fixed::from_raw(step as i128 * Fixed::SCALE)) / step_scale;
         let old_value = fixed_calculate_value_from_lambda(x, from, from_lambda)?;
         let new_value = fixed_calculate_value_from_lambda(x, to, to_lambda)?;
-        let value = (new_value - old_value).abs();
+        let value = (old_value - new_value).max(Fixed::ZERO);
         if value.raw() > best.raw() {
             best = value;
             argmax = x;
         }
     }
 
-    Ok(FixedArgmaxResult { argmax, value: best })
+    Ok(FixedArgmaxResult {
+        argmax,
+        value: best,
+    })
 }
 
-fn endpoint_maximum_absolute_difference(
+fn endpoint_maximum_directional_loss(
     from: FixedNormalDistribution,
     from_lambda: Fixed,
     to: FixedNormalDistribution,
@@ -197,7 +215,7 @@ fn endpoint_maximum_absolute_difference(
     let upper_old = fixed_calculate_value_from_lambda(upper, from, from_lambda)?;
     let upper_new = fixed_calculate_value_from_lambda(upper, to, to_lambda)?;
 
-    Ok((lower_new - lower_old)
-        .abs()
-        .max((upper_new - upper_old).abs()))
+    Ok((lower_old - lower_new)
+        .max(Fixed::ZERO)
+        .max((upper_old - upper_new).max(Fixed::ZERO)))
 }

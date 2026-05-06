@@ -64,13 +64,13 @@ pub fn builtin_scenarios() -> Vec<SimulationScenario> {
             initial_distribution: SupportedDistribution::normal(95.0, 10.0)
                 .expect("valid normal scenario"),
             steps: vec![
-                SimulationStep::Trade {
-                    distribution: SupportedDistribution::normal(100.0, 10.0)
-                        .expect("valid normal scenario"),
-                },
                 SimulationStep::AddLiquidity {
                     lp_id: "lp_2".to_string(),
                     proportion: 0.5,
+                },
+                SimulationStep::Trade {
+                    distribution: SupportedDistribution::normal(100.0, 10.0)
+                        .expect("valid normal scenario"),
                 },
             ],
             outcome: 107.6,
@@ -261,19 +261,6 @@ pub fn render_report(report: &SimulationReport) -> String {
     output.push_str(&format!("  lambda: {:.6}\n", report.initial_lambda));
     output.push_str(&format!("  max f(x): {:.6}\n\n", report.initial_max_value));
 
-    for trade in &report.trades {
-        output.push_str("Trader move\n");
-        output.push_str(&format!(
-            "  new distribution: {}\n",
-            trade.distribution_label
-        ));
-        output.push_str(&format!("  required collateral: {:.6}\n", trade.collateral));
-        output.push_str(&format!(
-            "  market cash after trade: {:.6}\n\n",
-            trade.market_cash_after_trade
-        ));
-    }
-
     for event in &report.liquidity_events {
         output.push_str("Liquidity addition\n");
         output.push_str(&format!("  LP id: {}\n", event.lp_id));
@@ -285,6 +272,19 @@ pub fn render_report(report: &SimulationReport) -> String {
         output.push_str(&format!("  new backing (b): {:.6}\n", event.new_backing));
         output.push_str(&format!("  new invariant (k): {:.6}\n", event.new_k));
         output.push_str(&format!("  scaled lambda: {:.6}\n\n", event.scaled_lambda));
+    }
+
+    for trade in &report.trades {
+        output.push_str("Trader move\n");
+        output.push_str(&format!(
+            "  new distribution: {}\n",
+            trade.distribution_label
+        ));
+        output.push_str(&format!("  required collateral: {:.6}\n", trade.collateral));
+        output.push_str(&format!(
+            "  market cash after trade: {:.6}\n\n",
+            trade.market_cash_after_trade
+        ));
     }
 
     output.push_str("Resolution\n");
@@ -356,11 +356,9 @@ mod tests {
         assert!(scenarios.iter().any(|scenario| scenario.slug == "normal"));
         assert!(scenarios.iter().any(|scenario| scenario.slug == "uniform"));
         assert!(scenarios.iter().any(|scenario| scenario.slug == "cauchy"));
-        assert!(
-            scenarios
-                .iter()
-                .any(|scenario| scenario.slug == "student_t")
-        );
+        assert!(scenarios
+            .iter()
+            .any(|scenario| scenario.slug == "student_t"));
     }
 
     #[test]

@@ -41,6 +41,7 @@ object WalletSubmitter {
                     identityName = IDENTITY_NAME,
                 )
             )
+
             when (
                 val result = walletAdapter.transact(sender) { authResult ->
                     val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
@@ -64,12 +65,12 @@ object WalletSubmitter {
                 is TransactionResult.NoWalletFound -> WalletSubmitResult.NoWalletFound
                 is TransactionResult.Failure -> {
                     WalletSubmitResult.Failure(
-                        result.e.message ?: "Wallet submission failed."
+                        walletMessage(result.message.ifBlank { result.e.message ?: "Wallet submission failed." })
                     )
                 }
             }
         } catch (error: Exception) {
-            WalletSubmitResult.Failure(error.message ?: "Wallet submission failed.")
+            WalletSubmitResult.Failure(walletMessage(error.message ?: "Wallet submission failed."))
         }
     }
 
@@ -109,6 +110,19 @@ object WalletSubmitter {
             .build()
 
         return Transaction(memoMessage)
+    }
+}
+
+private fun walletMessage(message: String): String {
+    return when {
+        message.contains("LifecycleOwner", ignoreCase = true) ||
+            message.contains("register before", ignoreCase = true) ->
+            "Wallet connection is not ready. Restart the app and try again, or install/open a compatible Solana wallet."
+
+        message.contains("ActivityNotFound", ignoreCase = true) ->
+            "No compatible Solana wallet is connected or installed on this device."
+
+        else -> message
     }
 }
 
