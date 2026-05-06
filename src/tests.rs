@@ -267,7 +267,7 @@ fn fixed_normal_minimum_sigma_and_maximum_k_round_trip() {
 }
 
 #[test]
-fn fixed_normal_required_collateral_matches_solidity_reference_case() {
+fn fixed_normal_required_collateral_matches_directional_loss_case() {
     let from = FixedNormalDistribution::new(
         Fixed::from_f64(1.5).unwrap(),
         Fixed::from_f64(0.45).unwrap(),
@@ -277,7 +277,7 @@ fn fixed_normal_required_collateral_matches_solidity_reference_case() {
         FixedNormalDistribution::new(Fixed::from_f64(1.9).unwrap(), Fixed::from_f64(0.4).unwrap())
             .unwrap();
     let collateral = fixed_required_collateral(from, to, Fixed::from_f64(2.0).unwrap()).unwrap();
-    assert_close(collateral.to_f64(), 1.175948, 5e-3);
+    assert_close(collateral.to_f64(), 1.286528, 5e-3);
 }
 
 #[test]
@@ -369,6 +369,9 @@ fn fixed_normal_market_resolves_consistently() {
     )
     .unwrap();
     market
+        .add_liquidity("lp_2", Fixed::from_f64(0.5).unwrap())
+        .unwrap();
+    market
         .trade(
             FixedNormalDistribution::new(
                 Fixed::from_f64(100.0).unwrap(),
@@ -376,9 +379,6 @@ fn fixed_normal_market_resolves_consistently() {
             )
             .unwrap(),
         )
-        .unwrap();
-    market
-        .add_liquidity("lp_2", Fixed::from_f64(0.5).unwrap())
         .unwrap();
 
     let resolution = market.resolve(Fixed::from_f64(107.6).unwrap()).unwrap();
@@ -422,6 +422,74 @@ fn fixed_normal_quote_verifier_accepts_fresh_quote_and_rejects_stale_quote() {
 
     market.trade_with_quote(fresh_quote.clone()).unwrap();
     assert!(market.verify_trade_quote(&fresh_quote).is_err());
+}
+
+#[test]
+fn fixed_normal_trade_charges_fee_and_rejects_post_trade_liquidity() {
+    let mut market = FixedNormalMarket::new(
+        Fixed::from_f64(50.0).unwrap(),
+        Fixed::from_f64(21.05026039569057).unwrap(),
+        FixedNormalDistribution::new(
+            Fixed::from_f64(95.0).unwrap(),
+            Fixed::from_f64(10.0).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let quote = market
+        .quote_trade(
+            FixedNormalDistribution::new(
+                Fixed::from_f64(100.0).unwrap(),
+                Fixed::from_f64(10.0).unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+    assert!(quote.collateral_quote.fee_paid.raw() > 0);
+    assert_eq!(
+        quote.collateral_quote.total_debit,
+        quote.collateral_quote.collateral_required + quote.collateral_quote.fee_paid
+    );
+    market.trade_with_quote(quote).unwrap();
+    assert!(market.fees_accrued.raw() > 0);
+    assert!(
+        market
+            .add_liquidity("late_lp", Fixed::from_f64(0.1).unwrap())
+            .unwrap_err()
+            .contains("disabled")
+    );
+    assert!(
+        market
+            .remove_liquidity("genesis_lp", Fixed::from_f64(0.1).unwrap())
+            .unwrap_err()
+            .contains("disabled")
+    );
+}
+
+#[test]
+fn fixed_normal_quote_rejects_noop_distribution() {
+    let market = FixedNormalMarket::new(
+        Fixed::from_f64(50.0).unwrap(),
+        Fixed::from_f64(21.05026039569057).unwrap(),
+        FixedNormalDistribution::new(
+            Fixed::from_f64(95.0).unwrap(),
+            Fixed::from_f64(10.0).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let error = market
+        .quote_trade(
+            FixedNormalDistribution::new(
+                Fixed::from_f64(95.0).unwrap(),
+                Fixed::from_f64(10.0).unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap_err();
+    assert!(error.contains("materially"));
 }
 
 #[test]
@@ -509,18 +577,13 @@ fn fixed_normal_market_accepts_sigma_near_floor() {
     let market = FixedNormalMarket::new(
         Fixed::from_f64(10.0).unwrap(),
         Fixed::from_f64(5.0).unwrap(),
-        FixedNormalDistribution::new(
-            Fixed::from_f64(0.0).unwrap(),
-            Fixed::from_f64(1.5).unwrap(),
-        )
-        .unwrap(),
+        FixedNormalDistribution::new(Fixed::from_f64(0.0).unwrap(), Fixed::from_f64(1.5).unwrap())
+            .unwrap(),
     )
     .unwrap();
     let sigma = market.minimum_sigma().unwrap() + Fixed::from_f64(0.001).unwrap();
     let quote = market
-        .quote_trade(
-            FixedNormalDistribution::new(Fixed::from_f64(0.5).unwrap(), sigma).unwrap(),
-        )
+        .quote_trade(FixedNormalDistribution::new(Fixed::from_f64(0.5).unwrap(), sigma).unwrap())
         .unwrap();
 
     assert!(quote.collateral_quote.collateral_required.raw() >= 0);
@@ -567,6 +630,11 @@ fn fixed_normal_market_full_resolution_conservation_under_stress() {
     )
     .unwrap();
 
+    let minted = market
+        .add_liquidity("lp_2", Fixed::from_f64(0.30).unwrap())
+        .unwrap();
+    market.remove_liquidity("lp_2", minted.div_int(3)).unwrap();
+
     for target in [97.5, 100.0, 102.0, 98.0] {
         market
             .trade(
@@ -578,10 +646,6 @@ fn fixed_normal_market_full_resolution_conservation_under_stress() {
             )
             .unwrap();
     }
-    let minted = market
-        .add_liquidity("lp_2", Fixed::from_f64(0.30).unwrap())
-        .unwrap();
-    market.remove_liquidity("lp_2", minted.div_int(3)).unwrap();
 
     let resolution = market.resolve(Fixed::from_f64(101.25).unwrap()).unwrap();
     let trader_total: i128 = resolution
@@ -589,7 +653,11 @@ fn fixed_normal_market_full_resolution_conservation_under_stress() {
         .iter()
         .map(|(_, payout)| payout.raw())
         .sum();
-    let lp_total: i128 = resolution.lp_payouts.values().map(|value| value.raw()).sum();
+    let lp_total: i128 = resolution
+        .lp_payouts
+        .values()
+        .map(|value| value.raw())
+        .sum();
 
     assert_eq!(
         trader_total + lp_total + resolution.cash_remaining.raw(),
@@ -609,7 +677,9 @@ fn fixed_normal_collateral_quote_exposes_bounded_verifier_metadata() {
         Fixed::from_f64(10.0).unwrap(),
     )
     .unwrap();
-    let quote = fixed_required_collateral_quote(from, to, Fixed::from_f64(21.05026039569057).unwrap()).unwrap();
+    let quote =
+        fixed_required_collateral_quote(from, to, Fixed::from_f64(21.05026039569057).unwrap())
+            .unwrap();
 
     assert!(quote.collateral_required.raw() > 0);
     assert!(quote.upper_bound.raw() > quote.lower_bound.raw());

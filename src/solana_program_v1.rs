@@ -140,11 +140,21 @@ fn process_trade(
     args: TradeArgsV1,
 ) -> Result<ProgramInstructionEffectV1, String> {
     ensure_active_market(state)?;
+    if current_slot > state.market_account.expiry_slot {
+        return Err("market has passed its trade expiry slot".to_string());
+    }
     if current_slot > args.quote.quote_expiry_slot {
         return Err("trade quote has expired".to_string());
     }
+    if args.quote.market != state.market_account.market_authority {
+        return Err("trade quote market does not match account".to_string());
+    }
+    if args.quote.total_debit.raw() > args.quote.max_total_debit.raw() {
+        return Err("trade quote exceeds max total debit".to_string());
+    }
 
     let old_distribution = state.core_market.current_distribution;
+    let k_at_trade = state.core_market.k;
     let quote = fixed_quote_from_envelope(&args.quote);
     let collateral = state.core_market.trade_with_quote(quote)?;
     state.vault_balance = state.core_market.cash;
@@ -159,7 +169,9 @@ fn process_trade(
         id: position_id,
         old_distribution,
         new_distribution: args.quote.new_distribution,
+        k_at_trade,
         collateral_posted: collateral,
+        fee_paid: args.quote.fee_paid,
         lp_shares: Fixed::ZERO,
         settled: false,
         payout_claimed: Fixed::ZERO,
@@ -181,12 +193,17 @@ fn process_add_liquidity(
     current_slot: u64,
 ) -> Result<ProgramInstructionEffectV1, String> {
     ensure_active_market(state)?;
+    if state.market_account.total_trades > 0 {
+        return Err("liquidity additions are disabled after the first trade".to_string());
+    }
     if amount_added.raw() <= 0 {
         return Err("liquidity amount must be positive".to_string());
     }
 
     let proportion = amount_added / state.core_market.b;
-    let minted = state.core_market.add_liquidity(owner_key_string(owner), proportion)?;
+    let minted = state
+        .core_market
+        .add_liquidity(owner_key_string(owner), proportion)?;
     state.vault_balance = state.core_market.cash;
     upsert_liquidity_position(state, owner, current_slot)?;
     sync_market_account(state);
@@ -205,6 +222,9 @@ fn process_remove_liquidity(
     current_slot: u64,
 ) -> Result<ProgramInstructionEffectV1, String> {
     ensure_active_market(state)?;
+    if state.market_account.total_trades > 0 {
+        return Err("liquidity removals are disabled after the first trade".to_string());
+    }
     let backing_removed = state
         .core_market
         .remove_liquidity(&owner_key_string(owner), shares)?;
@@ -251,7 +271,6 @@ fn process_settle_position(
         .resolved_outcome
         .ok_or_else(|| "market outcome is missing".to_string())?;
 
-    let market_k = state.market_account.k;
     let (payout, collateral_returned) = {
         let position = state
             .position_accounts
@@ -269,8 +288,10 @@ fn process_settle_position(
             return Err("position already settled".to_string());
         }
 
-        let final_payout = fixed_calculate_f(outcome, position.new_distribution, market_k)?;
-        let initial_payout = fixed_calculate_f(outcome, position.old_distribution, market_k)?;
+        let final_payout =
+            fixed_calculate_f(outcome, position.new_distribution, position.k_at_trade)?;
+        let initial_payout =
+            fixed_calculate_f(outcome, position.old_distribution, position.k_at_trade)?;
         let payout = position.collateral_posted + (final_payout - initial_payout);
         if payout.raw() < 0 {
             return Err("negative payout encountered during settlement".to_string());
@@ -308,6 +329,13 @@ fn process_settle_lp(
     current_slot: u64,
 ) -> Result<ProgramInstructionEffectV1, String> {
     ensure_resolved_market(state)?;
+    if state
+        .position_accounts
+        .iter()
+        .any(|position| position.side == NormalPositionSide::Trade && !position.settled)
+    {
+        return Err("all trader positions must settle before LP settlement".to_string());
+    }
     if state.settled_lp_owners.contains(&owner) {
         return Err("lp owner already settled".to_string());
     }
@@ -373,17 +401,31 @@ fn fixed_quote_from_envelope(quote: &QuoteEnvelopeV1) -> FixedNormalTradeQuote {
         new_distribution: quote.new_distribution,
         collateral_quote: crate::normal_math::FixedCollateralQuote {
             collateral_required: quote.collateral_required,
+            fee_paid: quote.fee_paid,
+            total_debit: quote.total_debit,
             lower_bound: quote.search_lower_bound,
             upper_bound: quote.search_upper_bound,
             coarse_samples: quote.coarse_samples,
             refine_samples: quote.refine_samples,
         },
+        taker_fee_bps: quote.taker_fee_bps,
+        min_taker_fee: quote.min_taker_fee,
+        max_total_debit: quote.max_total_debit,
     }
 }
 
 fn sync_market_account(state: &mut NormalV1ProgramState) {
     state.market_account.b = state.core_market.b;
     state.market_account.k = state.core_market.k;
+    state.market_account.taker_fee_bps = state.core_market.config.taker_fee_bps;
+    state.market_account.min_taker_fee = state.core_market.config.min_taker_fee;
+    state.market_account.fees_accrued = state.core_market.fees_accrued;
+    state.market_account.max_collateral_per_trade =
+        state.core_market.config.max_collateral_per_trade;
+    state.market_account.max_open_trades = state.core_market.config.max_open_trades;
+    state.market_account.min_sigma = state.core_market.config.min_sigma;
+    state.market_account.max_sigma = state.core_market.config.max_sigma;
+    state.market_account.expiry_slot = state.core_market.config.expiry_slot;
     state.market_account.current_distribution = state.core_market.current_distribution;
     state.market_account.current_lambda = state.core_market.current_lambda;
     state.market_account.total_lp_shares = state.core_market.total_lp_shares;
@@ -413,6 +455,7 @@ fn upsert_liquidity_position(
     {
         position.lp_shares = lp_shares;
         position.new_distribution = state.core_market.current_distribution;
+        position.k_at_trade = state.core_market.k;
         return Ok(());
     }
 
@@ -425,7 +468,9 @@ fn upsert_liquidity_position(
         id: state.position_accounts.len() as u64,
         old_distribution: state.core_market.current_distribution,
         new_distribution: state.core_market.current_distribution,
+        k_at_trade: state.core_market.k,
         collateral_posted: Fixed::ZERO,
+        fee_paid: Fixed::ZERO,
         lp_shares,
         settled: false,
         payout_claimed: Fixed::ZERO,
@@ -503,8 +548,8 @@ mod tests {
     use crate::fixed_point::Fixed;
     use crate::normal_math::FixedNormalDistribution;
     use crate::solana_v1::{
-        LiquidityAction, OracleConfigV1, QuoteEnvelopeV1, ResolveMarketArgsV1,
-        SettleLpArgsV1, SettlePositionArgsV1, SolanaInstructionV1, TradeArgsV1,
+        LiquidityAction, OracleConfigV1, QuoteEnvelopeV1, ResolveMarketArgsV1, SettleLpArgsV1,
+        SettlePositionArgsV1, SolanaInstructionV1, TradeArgsV1,
     };
 
     fn normal_distribution(mu: f64, sigma: f64) -> FixedNormalDistribution {
@@ -545,7 +590,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(state.market_account.status, crate::solana_v1::MarketStatus::Active);
+        assert_eq!(
+            state.market_account.status,
+            crate::solana_v1::MarketStatus::Active
+        );
         assert_eq!(state.market_account.created_slot, 42);
         assert_eq!(state.vault_balance, Fixed::from_f64(50.0).unwrap());
         assert_eq!(state.position_accounts.len(), 1);
@@ -562,7 +610,10 @@ mod tests {
             1,
         )
         .unwrap();
-        let quoted = state.core_market.quote_trade(normal_distribution(100.0, 10.0)).unwrap();
+        let quoted = state
+            .core_market
+            .quote_trade(normal_distribution(100.0, 10.0))
+            .unwrap();
 
         let result = process_instruction(
             &mut state,
@@ -574,7 +625,11 @@ mod tests {
                     expected_market_version: quoted.market_version,
                     new_distribution: quoted.new_distribution,
                     collateral_required: quoted.collateral_quote.collateral_required,
-                    max_slippage_collateral: quoted.collateral_quote.collateral_required,
+                    fee_paid: quoted.collateral_quote.fee_paid,
+                    total_debit: quoted.collateral_quote.total_debit,
+                    max_total_debit: quoted.collateral_quote.total_debit,
+                    taker_fee_bps: quoted.taker_fee_bps,
+                    min_taker_fee: quoted.min_taker_fee,
                     search_lower_bound: quoted.collateral_quote.lower_bound,
                     search_upper_bound: quoted.collateral_quote.upper_bound,
                     coarse_samples: quoted.collateral_quote.coarse_samples,
@@ -610,7 +665,22 @@ mod tests {
         )
         .unwrap();
 
-        let quoted = state.core_market.quote_trade(normal_distribution(100.0, 10.0)).unwrap();
+        process_instruction(
+            &mut state,
+            initializer,
+            4,
+            SolanaInstructionV1::ManageLiquidity {
+                action: LiquidityAction::Add,
+                owner: initializer,
+                amount_or_shares: Fixed::from_f64(5.0).unwrap(),
+            },
+        )
+        .unwrap();
+
+        let quoted = state
+            .core_market
+            .quote_trade(normal_distribution(100.0, 10.0))
+            .unwrap();
         process_instruction(
             &mut state,
             trader,
@@ -621,7 +691,11 @@ mod tests {
                     expected_market_version: quoted.market_version,
                     new_distribution: quoted.new_distribution,
                     collateral_required: quoted.collateral_quote.collateral_required,
-                    max_slippage_collateral: quoted.collateral_quote.collateral_required,
+                    fee_paid: quoted.collateral_quote.fee_paid,
+                    total_debit: quoted.collateral_quote.total_debit,
+                    max_total_debit: quoted.collateral_quote.total_debit,
+                    taker_fee_bps: quoted.taker_fee_bps,
+                    min_taker_fee: quoted.min_taker_fee,
                     search_lower_bound: quoted.collateral_quote.lower_bound,
                     search_upper_bound: quoted.collateral_quote.upper_bound,
                     coarse_samples: quoted.collateral_quote.coarse_samples,
@@ -630,18 +704,6 @@ mod tests {
                     quote_expiry_slot: 10,
                 },
             }),
-        )
-        .unwrap();
-
-        process_instruction(
-            &mut state,
-            initializer,
-            6,
-            SolanaInstructionV1::ManageLiquidity {
-                action: LiquidityAction::Add,
-                owner: initializer,
-                amount_or_shares: Fixed::from_f64(5.0).unwrap(),
-            },
         )
         .unwrap();
 
@@ -675,7 +737,10 @@ mod tests {
             SolanaInstructionV1::SettleLp(SettleLpArgsV1 { owner: initializer }),
         )
         .unwrap();
-        assert!(matches!(lp_result, ProgramInstructionEffectV1::LpSettled { .. }));
+        assert!(matches!(
+            lp_result,
+            ProgramInstructionEffectV1::LpSettled { .. }
+        ));
         assert!(state.vault_balance.raw() >= 0);
     }
 
@@ -690,7 +755,10 @@ mod tests {
             1,
         )
         .unwrap();
-        let quoted = state.core_market.quote_trade(normal_distribution(100.0, 10.0)).unwrap();
+        let quoted = state
+            .core_market
+            .quote_trade(normal_distribution(100.0, 10.0))
+            .unwrap();
 
         let error = process_instruction(
             &mut state,
@@ -702,7 +770,11 @@ mod tests {
                     expected_market_version: quoted.market_version,
                     new_distribution: quoted.new_distribution,
                     collateral_required: quoted.collateral_quote.collateral_required,
-                    max_slippage_collateral: quoted.collateral_quote.collateral_required,
+                    fee_paid: quoted.collateral_quote.fee_paid,
+                    total_debit: quoted.collateral_quote.total_debit,
+                    max_total_debit: quoted.collateral_quote.total_debit,
+                    taker_fee_bps: quoted.taker_fee_bps,
+                    min_taker_fee: quoted.min_taker_fee,
                     search_lower_bound: quoted.collateral_quote.lower_bound,
                     search_upper_bound: quoted.collateral_quote.upper_bound,
                     coarse_samples: quoted.collateral_quote.coarse_samples,

@@ -41,6 +41,14 @@ pub struct SolanaMarketAccountV1 {
     pub oracle_config: OracleConfigV1,
     pub b: Fixed,
     pub k: Fixed,
+    pub taker_fee_bps: u32,
+    pub min_taker_fee: Fixed,
+    pub fees_accrued: Fixed,
+    pub max_collateral_per_trade: Fixed,
+    pub max_open_trades: u64,
+    pub min_sigma: Fixed,
+    pub max_sigma: Fixed,
+    pub expiry_slot: u64,
     pub current_distribution: FixedNormalDistribution,
     pub current_lambda: Fixed,
     pub total_lp_shares: Fixed,
@@ -60,7 +68,9 @@ pub struct SolanaNormalPositionAccountV1 {
     pub id: u64,
     pub old_distribution: FixedNormalDistribution,
     pub new_distribution: FixedNormalDistribution,
+    pub k_at_trade: Fixed,
     pub collateral_posted: Fixed,
+    pub fee_paid: Fixed,
     pub lp_shares: Fixed,
     pub settled: bool,
     pub payout_claimed: Fixed,
@@ -74,7 +84,11 @@ pub struct QuoteEnvelopeV1 {
     pub expected_market_version: u64,
     pub new_distribution: FixedNormalDistribution,
     pub collateral_required: Fixed,
-    pub max_slippage_collateral: Fixed,
+    pub fee_paid: Fixed,
+    pub total_debit: Fixed,
+    pub max_total_debit: Fixed,
+    pub taker_fee_bps: u32,
+    pub min_taker_fee: Fixed,
     pub search_lower_bound: Fixed,
     pub search_upper_bound: Fixed,
     pub coarse_samples: u32,
@@ -157,6 +171,14 @@ pub fn current_normal_market_to_account(
         oracle_config,
         b: market.b,
         k: market.k,
+        taker_fee_bps: market.config.taker_fee_bps,
+        min_taker_fee: market.config.min_taker_fee,
+        fees_accrued: market.fees_accrued,
+        max_collateral_per_trade: market.config.max_collateral_per_trade,
+        max_open_trades: market.config.max_open_trades,
+        min_sigma: market.config.min_sigma,
+        max_sigma: market.config.max_sigma,
+        expiry_slot: market.config.expiry_slot,
         current_distribution: market.current_distribution,
         current_lambda: market.current_lambda,
         total_lp_shares: market.total_lp_shares,
@@ -216,7 +238,10 @@ pub fn normal_v1_operation_mapping() -> Vec<SolanaOperationMappingV1> {
 
 #[cfg(test)]
 mod tests {
-    use super::{LiquidityAction, MarketStatus, OracleConfigV1, SolanaInstructionV1, normal_v1_operation_mapping};
+    use super::{
+        LiquidityAction, MarketStatus, OracleConfigV1, SolanaInstructionV1,
+        normal_v1_operation_mapping,
+    };
     use crate::fixed_point::Fixed;
     use crate::normal_math::FixedNormalDistribution;
 
@@ -224,13 +249,41 @@ mod tests {
     fn normal_v1_mapping_covers_core_market_operations() {
         let mapping = normal_v1_operation_mapping();
         assert_eq!(mapping.len(), 7);
-        assert!(mapping.iter().any(|entry| entry.solana_instruction == "InitializeMarket"));
-        assert!(mapping.iter().any(|entry| entry.solana_instruction == "Trade"));
-        assert!(mapping.iter().any(|entry| entry.solana_instruction == "ManageLiquidity(Add)"));
-        assert!(mapping.iter().any(|entry| entry.solana_instruction == "ManageLiquidity(Remove)"));
-        assert!(mapping.iter().any(|entry| entry.solana_instruction == "ResolveMarket"));
-        assert!(mapping.iter().any(|entry| entry.solana_instruction == "SettlePosition"));
-        assert!(mapping.iter().any(|entry| entry.solana_instruction == "SettleLp"));
+        assert!(
+            mapping
+                .iter()
+                .any(|entry| entry.solana_instruction == "InitializeMarket")
+        );
+        assert!(
+            mapping
+                .iter()
+                .any(|entry| entry.solana_instruction == "Trade")
+        );
+        assert!(
+            mapping
+                .iter()
+                .any(|entry| entry.solana_instruction == "ManageLiquidity(Add)")
+        );
+        assert!(
+            mapping
+                .iter()
+                .any(|entry| entry.solana_instruction == "ManageLiquidity(Remove)")
+        );
+        assert!(
+            mapping
+                .iter()
+                .any(|entry| entry.solana_instruction == "ResolveMarket")
+        );
+        assert!(
+            mapping
+                .iter()
+                .any(|entry| entry.solana_instruction == "SettlePosition")
+        );
+        assert!(
+            mapping
+                .iter()
+                .any(|entry| entry.solana_instruction == "SettleLp")
+        );
     }
 
     #[test]
@@ -251,7 +304,11 @@ mod tests {
         };
 
         match instruction {
-            SolanaInstructionV1::InitializeMarket { initial_b, initial_k, .. } => {
+            SolanaInstructionV1::InitializeMarket {
+                initial_b,
+                initial_k,
+                ..
+            } => {
                 assert_eq!(initial_b, Fixed::from_f64(50.0).unwrap());
                 assert_eq!(initial_k, Fixed::from_f64(21.05026039569057).unwrap());
             }

@@ -1,7 +1,6 @@
 package com.solanadistributionmarketdemo
 
 import android.net.Uri
-import androidx.activity.ComponentActivity
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import com.solana.mobilewalletadapter.clientlib.ConnectionIdentity
 import com.solana.mobilewalletadapter.clientlib.MobileWalletAdapter
@@ -31,7 +30,7 @@ sealed class WalletSubmitResult {
 
 object WalletSubmitter {
     suspend fun submitTradeMemo(
-        activity: ComponentActivity,
+        sender: ActivityResultSender,
         quote: DemoPreset,
     ): WalletSubmitResult {
         return try {
@@ -42,7 +41,6 @@ object WalletSubmitter {
                     identityName = IDENTITY_NAME,
                 )
             )
-            val sender = ActivityResultSender(activity)
 
             when (
                 val result = walletAdapter.transact(sender) { authResult ->
@@ -67,12 +65,12 @@ object WalletSubmitter {
                 is TransactionResult.NoWalletFound -> WalletSubmitResult.NoWalletFound
                 is TransactionResult.Failure -> {
                     WalletSubmitResult.Failure(
-                        result.e.message ?: "Wallet submission failed."
+                        walletMessage(result.message.ifBlank { result.e.message ?: "Wallet submission failed." })
                     )
                 }
             }
         } catch (error: Exception) {
-            WalletSubmitResult.Failure(error.message ?: "Wallet submission failed.")
+            WalletSubmitResult.Failure(walletMessage(error.message ?: "Wallet submission failed."))
         }
     }
 
@@ -112,6 +110,19 @@ object WalletSubmitter {
             .build()
 
         return Transaction(memoMessage)
+    }
+}
+
+private fun walletMessage(message: String): String {
+    return when {
+        message.contains("LifecycleOwner", ignoreCase = true) ||
+            message.contains("register before", ignoreCase = true) ->
+            "Wallet connection is not ready. Restart the app and try again, or install/open a compatible Solana wallet."
+
+        message.contains("ActivityNotFound", ignoreCase = true) ->
+            "No compatible Solana wallet is connected or installed on this device."
+
+        else -> message
     }
 }
 

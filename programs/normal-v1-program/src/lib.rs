@@ -204,6 +204,14 @@ pub fn pack_market_account(account: &SolanaMarketAccountV1) -> Vec<u8> {
     push_oracle_config(&mut buffer, &account.oracle_config);
     push_fixed(&mut buffer, account.b);
     push_fixed(&mut buffer, account.k);
+    push_u32(&mut buffer, account.taker_fee_bps);
+    push_fixed(&mut buffer, account.min_taker_fee);
+    push_fixed(&mut buffer, account.fees_accrued);
+    push_fixed(&mut buffer, account.max_collateral_per_trade);
+    push_u64(&mut buffer, account.max_open_trades);
+    push_fixed(&mut buffer, account.min_sigma);
+    push_fixed(&mut buffer, account.max_sigma);
+    push_u64(&mut buffer, account.expiry_slot);
     push_distribution(&mut buffer, account.current_distribution);
     push_fixed(&mut buffer, account.current_lambda);
     push_fixed(&mut buffer, account.total_lp_shares);
@@ -226,6 +234,14 @@ pub fn unpack_market_account(bytes: &[u8]) -> Result<SolanaMarketAccountV1, Stri
     let oracle_config = cursor.read_oracle_config()?;
     let b = cursor.read_fixed()?;
     let k = cursor.read_fixed()?;
+    let taker_fee_bps = cursor.read_u32()?;
+    let min_taker_fee = cursor.read_fixed()?;
+    let fees_accrued = cursor.read_fixed()?;
+    let max_collateral_per_trade = cursor.read_fixed()?;
+    let max_open_trades = cursor.read_u64()?;
+    let min_sigma = cursor.read_fixed()?;
+    let max_sigma = cursor.read_fixed()?;
+    let expiry_slot = cursor.read_u64()?;
     let current_distribution = cursor.read_distribution()?;
     let current_lambda = cursor.read_fixed()?;
     let total_lp_shares = cursor.read_fixed()?;
@@ -245,6 +261,14 @@ pub fn unpack_market_account(bytes: &[u8]) -> Result<SolanaMarketAccountV1, Stri
         oracle_config,
         b,
         k,
+        taker_fee_bps,
+        min_taker_fee,
+        fees_accrued,
+        max_collateral_per_trade,
+        max_open_trades,
+        min_sigma,
+        max_sigma,
+        expiry_slot,
         current_distribution,
         current_lambda,
         total_lp_shares,
@@ -265,7 +289,9 @@ pub fn pack_position_account(account: &SolanaNormalPositionAccountV1) -> Vec<u8>
     push_u64(&mut buffer, account.id);
     push_distribution(&mut buffer, account.old_distribution);
     push_distribution(&mut buffer, account.new_distribution);
+    push_fixed(&mut buffer, account.k_at_trade);
     push_fixed(&mut buffer, account.collateral_posted);
+    push_fixed(&mut buffer, account.fee_paid);
     push_fixed(&mut buffer, account.lp_shares);
     buffer.push(if account.settled { 1 } else { 0 });
     push_fixed(&mut buffer, account.payout_claimed);
@@ -284,7 +310,9 @@ pub fn unpack_position_account(bytes: &[u8]) -> Result<SolanaNormalPositionAccou
     let id = cursor.read_u64()?;
     let old_distribution = cursor.read_distribution()?;
     let new_distribution = cursor.read_distribution()?;
+    let k_at_trade = cursor.read_fixed()?;
     let collateral_posted = cursor.read_fixed()?;
+    let fee_paid = cursor.read_fixed()?;
     let lp_shares = cursor.read_fixed()?;
     let settled = cursor.read_u8()? != 0;
     let payout_claimed = cursor.read_fixed()?;
@@ -300,7 +328,9 @@ pub fn unpack_position_account(bytes: &[u8]) -> Result<SolanaNormalPositionAccou
         id,
         old_distribution,
         new_distribution,
+        k_at_trade,
         collateral_posted,
+        fee_paid,
         lp_shares,
         settled,
         payout_claimed,
@@ -320,14 +350,15 @@ fn planned_token_operations(
         }
         SolanaInstructionV1::Trade(args) => Ok(vec![ProgramTokenOperationV1::TransferToVault {
             owner: signer,
-            amount: args.quote.collateral_required,
+            amount: args.quote.total_debit,
         }]),
         SolanaInstructionV1::ManageLiquidity {
             action: distribution_markets::LiquidityAction::Add,
             owner,
             amount_or_shares,
         } => {
-            let minted = state.core_market.total_lp_shares * (*amount_or_shares / state.core_market.b);
+            let minted =
+                state.core_market.total_lp_shares * (*amount_or_shares / state.core_market.b);
             Ok(vec![
                 ProgramTokenOperationV1::TransferToVault {
                     owner: *owner,
@@ -344,7 +375,8 @@ fn planned_token_operations(
             owner,
             amount_or_shares,
         } => {
-            let backing_removed = state.core_market.b * (*amount_or_shares / state.core_market.total_lp_shares);
+            let backing_removed =
+                state.core_market.b * (*amount_or_shares / state.core_market.total_lp_shares);
             Ok(vec![
                 ProgramTokenOperationV1::BurnLpShares {
                     owner: *owner,
@@ -396,7 +428,11 @@ fn push_quote_envelope(buffer: &mut Vec<u8>, quote: &QuoteEnvelopeV1) {
     push_u64(buffer, quote.expected_market_version);
     push_distribution(buffer, quote.new_distribution);
     push_fixed(buffer, quote.collateral_required);
-    push_fixed(buffer, quote.max_slippage_collateral);
+    push_fixed(buffer, quote.fee_paid);
+    push_fixed(buffer, quote.total_debit);
+    push_fixed(buffer, quote.max_total_debit);
+    push_u32(buffer, quote.taker_fee_bps);
+    push_fixed(buffer, quote.min_taker_fee);
     push_fixed(buffer, quote.search_lower_bound);
     push_fixed(buffer, quote.search_upper_bound);
     push_u32(buffer, quote.coarse_samples);
@@ -538,7 +574,11 @@ impl<'a> Cursor<'a> {
             expected_market_version: self.read_u64()?,
             new_distribution: self.read_distribution()?,
             collateral_required: self.read_fixed()?,
-            max_slippage_collateral: self.read_fixed()?,
+            fee_paid: self.read_fixed()?,
+            total_debit: self.read_fixed()?,
+            max_total_debit: self.read_fixed()?,
+            taker_fee_bps: self.read_u32()?,
+            min_taker_fee: self.read_fixed()?,
             search_lower_bound: self.read_fixed()?,
             search_upper_bound: self.read_fixed()?,
             coarse_samples: self.read_u32()?,
@@ -634,7 +674,11 @@ mod tests {
             expected_market_version: 3,
             new_distribution: distribution(100.0, 10.0),
             collateral_required: fixed(1.2),
-            max_slippage_collateral: fixed(1.3),
+            fee_paid: fixed(0.012),
+            total_debit: fixed(1.212),
+            max_total_debit: fixed(1.3),
+            taker_fee_bps: 100,
+            min_taker_fee: fixed(0.001),
             search_lower_bound: fixed(60.0),
             search_upper_bound: fixed(140.0),
             coarse_samples: 64,
