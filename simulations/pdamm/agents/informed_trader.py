@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 
@@ -49,48 +49,56 @@ class InformedTrader:
     # Public API
     # ------------------------------------------------------------------
 
-    def step(self, amm: GaussianMixtureAMM) -> Optional[dict]:
+    def step(self, market: Union[GaussianMixtureAMM, "PerpMarket"]) -> Optional[dict]:  # type: ignore[name-defined]
         """
-        Attempt one trade.  Returns the quote dict if a trade was made,
-        None if the edge was too small or the trade was refused.
+        Attempt one trade against either a bare AMM or a PerpMarket.
+        Returns the quote dict if a trade was made, None otherwise.
         """
+        from ..amm.perp_market import PerpMarket  # local import to avoid circular dep
+
+        amm = market.amm if isinstance(market, PerpMarket) else market
         target_params = self._compute_target(amm)
         if target_params is None:
             return None
 
-        # Dry-run quote to check edge and size
         quote = amm.quote_trade(target_params)
         collateral = quote["collateral"]
 
         if collateral < 1e-9:
-            return None  # nothing to do
+            return None
 
         max_collateral = amm.b * self.max_fraction_of_b
         if collateral > max_collateral:
-            # Try a smaller step toward posterior
             target_params = self._scale_step(amm, max_collateral)
             if target_params is None:
                 return None
             quote = amm.quote_trade(target_params)
 
         try:
-            record = amm.execute_trade(
-                trader_id=self.trader_id,
-                new_params=target_params,
-                max_total_debit=quote["total_debit"] * 1.05,  # 5% slippage tolerance
-            )
+            if isinstance(market, PerpMarket):
+                market.open_trade(
+                    trader_id=self.trader_id,
+                    new_params=target_params,
+                    max_total_debit=quote["total_debit"] * 1.05,
+                )
+            else:
+                market.execute_trade(
+                    trader_id=self.trader_id,
+                    new_params=target_params,
+                    max_total_debit=quote["total_debit"] * 1.05,
+                )
         except ValueError:
             return None
 
         self.trades_executed += 1
-        self.total_collateral_posted += record.collateral
+        self.total_collateral_posted += quote["collateral"]
         return quote
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _compute_target(self, amm: GaussianMixtureAMM) -> Optional[GaussianMixtureParams]:
+    def _compute_target(self, amm: "GaussianMixtureAMM") -> Optional[GaussianMixtureParams]:  # type: ignore[name-defined]
         """
         Interpolate between the current AMM params and the posterior by
         step_fraction, keeping the result within the solvency envelope.
@@ -99,7 +107,7 @@ class InformedTrader:
 
     def _scale_step(
         self,
-        amm: GaussianMixtureAMM,
+        amm: "GaussianMixtureAMM",  # type: ignore[name-defined]
         max_collateral: float,
     ) -> Optional[GaussianMixtureParams]:
         """
