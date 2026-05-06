@@ -1,8 +1,10 @@
 use distribution_markets::{
-    Fixed, FixedNormalDistribution, FixedNormalTradeQuote, InitializeAccountsV1, OracleConfigV1,
-    QuoteEnvelopeV1, RegimeConstituent, RegimeConstituentSide, RegimeConstituentStatus,
-    RegimeIndex, RegimeIndexSnapshot, RegimeTokenSide, RegimeTradeQuote, SolanaInstructionV1,
-    TradeArgsV1, fixed_calculate_f, quote_regime_trade,
+    Fixed, FixedNormalDistribution, FixedNormalLiquiditySnapshot, FixedNormalQuoteTrace,
+    FixedNormalRiskGridPoint, FixedNormalSettlementWaterfallPreview, FixedNormalTradeQuote,
+    InitializeAccountsV1, OracleConfigV1, QuoteEnvelopeV1, RegimeConstituent,
+    RegimeConstituentSide, RegimeConstituentStatus, RegimeIndex, RegimeIndexSnapshot,
+    RegimeTokenSide, RegimeTradeQuote, SolanaInstructionV1, TradeArgsV1, fixed_calculate_f,
+    quote_regime_trade,
 };
 use normal_v1_program::{
     NormalV1Program, ProgramInitializeArgsV1, ProgramTokenOperationV1, pack_instruction,
@@ -106,6 +108,62 @@ pub struct DemoQuotePresetV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoLiquiditySnapshotV1 {
+    pub maker_deposit_display: String,
+    pub vault_cash_display: String,
+    pub accrued_fees_display: String,
+    pub current_k_display: String,
+    pub total_lp_shares_display: String,
+    pub locked_trader_collateral_display: String,
+    pub worst_case_trader_liability_display: String,
+    pub available_maker_buffer_display: String,
+    pub open_trades: u64,
+    pub max_open_trades: u64,
+    pub lp_controls_status: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoQuoteTraceV1 {
+    pub market_version: u64,
+    pub old_mu_display: String,
+    pub old_sigma_display: String,
+    pub new_mu_display: String,
+    pub new_sigma_display: String,
+    pub k_display: String,
+    pub search_lower_bound_display: String,
+    pub search_upper_bound_display: String,
+    pub max_loss_outcome_display: String,
+    pub max_directional_loss_display: String,
+    pub collateral_required_display: String,
+    pub fee_paid_display: String,
+    pub total_debit_display: String,
+    pub vault_cash_before_display: String,
+    pub vault_cash_after_display: String,
+    pub locked_collateral_before_display: String,
+    pub locked_collateral_after_display: String,
+    pub worst_case_liability_before_display: String,
+    pub worst_case_liability_after_display: String,
+    pub maker_buffer_before_display: String,
+    pub maker_buffer_after_display: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoRiskGridPointV1 {
+    pub outcome_display: String,
+    pub trader_liability_display: String,
+    pub lp_residual_after_traders_display: String,
+    pub maker_buffer_display: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoSettlementWaterfallV1 {
+    pub outcome_display: String,
+    pub trader_claims_display: String,
+    pub lp_residual_claim_display: String,
+    pub protocol_dust_display: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DemoRegimeConstituentV1 {
     pub id: String,
     pub label: String,
@@ -159,6 +217,11 @@ pub struct DemoRegimeIndexV1 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DemoAppPayloadV1 {
     pub market: DemoMarketSnapshotV1,
+    pub liquidity: DemoLiquiditySnapshotV1,
+    pub preview_liquidity: DemoLiquiditySnapshotV1,
+    pub backend_trace: DemoQuoteTraceV1,
+    pub risk_grid: Vec<DemoRiskGridPointV1>,
+    pub settlement_waterfall: DemoSettlementWaterfallV1,
     pub presets: Vec<DemoQuotePresetV1>,
     pub quote_grid: Vec<DemoQuotePresetV1>,
     pub regime_indexes: Vec<DemoRegimeIndexV1>,
@@ -289,6 +352,13 @@ pub fn demo_market_summary(program: &NormalV1Program) -> String {
 
 pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
     let program = seeded_demo_market()?;
+    let trace_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(100.0)?, Fixed::from_f64(10.0)?)?;
+    let backend_trace = program.state.core_market.quote_trace(trace_distribution)?;
+    let mut preview_market = program.state.core_market.clone();
+    let preview_quote = preview_market.quote_trade(trace_distribution)?;
+    preview_market.trade_with_quote(preview_quote)?;
+
     let market = DemoMarketSnapshotV1 {
         title: "Seeded SOL price market".to_string(),
         status: format!("{:?}", program.state.market_account.status),
@@ -320,6 +390,17 @@ pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
         coarse_samples: 4096,
         refine_samples: 4096,
     };
+    let liquidity = demo_liquidity_snapshot(program.state.core_market.liquidity_snapshot()?);
+    let preview_liquidity = demo_liquidity_snapshot(preview_market.liquidity_snapshot()?);
+    let backend_trace = demo_quote_trace(backend_trace);
+    let risk_grid = preview_market
+        .risk_grid(25)?
+        .into_iter()
+        .map(demo_risk_grid_point)
+        .collect();
+    let settlement_waterfall = demo_settlement_waterfall(
+        preview_market.settlement_waterfall_preview(Fixed::from_f64(107.6)?)?,
+    );
 
     let presets = vec![
         quote_preset(&program, "base", "Base shift to 100 / 10", 100.0, 10.0)?,
@@ -338,6 +419,11 @@ pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
 
     Ok(DemoAppPayloadV1 {
         market,
+        liquidity,
+        preview_liquidity,
+        backend_trace,
+        risk_grid,
+        settlement_waterfall,
         presets,
         quote_grid,
         regime_indexes,
@@ -426,6 +512,21 @@ pub fn demo_app_payload_json() -> Result<String, String> {
         payload.market.refine_samples
     ));
     json.push_str("  },\n");
+    json.push_str("  \"liquidity\": ");
+    push_liquidity_snapshot_json(&mut json, &payload.liquidity);
+    json.push_str(",\n");
+    json.push_str("  \"preview_liquidity\": ");
+    push_liquidity_snapshot_json(&mut json, &payload.preview_liquidity);
+    json.push_str(",\n");
+    json.push_str("  \"backend_trace\": ");
+    push_quote_trace_json(&mut json, &payload.backend_trace);
+    json.push_str(",\n");
+    json.push_str("  \"risk_grid\": [\n");
+    push_risk_grid_json(&mut json, &payload.risk_grid);
+    json.push_str("  ],\n");
+    json.push_str("  \"settlement_waterfall\": ");
+    push_settlement_waterfall_json(&mut json, &payload.settlement_waterfall);
+    json.push_str(",\n");
     json.push_str("  \"presets\": [\n");
     push_quote_list_json(&mut json, &payload.presets);
     json.push_str("  ],\n");
@@ -515,6 +616,189 @@ fn push_curve_points_json(json: &mut String, points: &[DemoCurvePointV1]) {
         }
         json.push('\n');
     }
+}
+
+fn push_liquidity_snapshot_json(json: &mut String, snapshot: &DemoLiquiditySnapshotV1) {
+    json.push_str("{\n");
+    json.push_str(&format!(
+        "    \"maker_deposit_display\": \"{}\",\n",
+        escape_json(&snapshot.maker_deposit_display)
+    ));
+    json.push_str(&format!(
+        "    \"vault_cash_display\": \"{}\",\n",
+        escape_json(&snapshot.vault_cash_display)
+    ));
+    json.push_str(&format!(
+        "    \"accrued_fees_display\": \"{}\",\n",
+        escape_json(&snapshot.accrued_fees_display)
+    ));
+    json.push_str(&format!(
+        "    \"current_k_display\": \"{}\",\n",
+        escape_json(&snapshot.current_k_display)
+    ));
+    json.push_str(&format!(
+        "    \"total_lp_shares_display\": \"{}\",\n",
+        escape_json(&snapshot.total_lp_shares_display)
+    ));
+    json.push_str(&format!(
+        "    \"locked_trader_collateral_display\": \"{}\",\n",
+        escape_json(&snapshot.locked_trader_collateral_display)
+    ));
+    json.push_str(&format!(
+        "    \"worst_case_trader_liability_display\": \"{}\",\n",
+        escape_json(&snapshot.worst_case_trader_liability_display)
+    ));
+    json.push_str(&format!(
+        "    \"available_maker_buffer_display\": \"{}\",\n",
+        escape_json(&snapshot.available_maker_buffer_display)
+    ));
+    json.push_str(&format!("    \"open_trades\": {},\n", snapshot.open_trades));
+    json.push_str(&format!(
+        "    \"max_open_trades\": {},\n",
+        snapshot.max_open_trades
+    ));
+    json.push_str(&format!(
+        "    \"lp_controls_status\": \"{}\"\n",
+        escape_json(&snapshot.lp_controls_status)
+    ));
+    json.push_str("  }");
+}
+
+fn push_quote_trace_json(json: &mut String, trace: &DemoQuoteTraceV1) {
+    json.push_str("{\n");
+    json.push_str(&format!(
+        "    \"market_version\": {},\n",
+        trace.market_version
+    ));
+    json.push_str(&format!(
+        "    \"old_mu_display\": \"{}\",\n",
+        escape_json(&trace.old_mu_display)
+    ));
+    json.push_str(&format!(
+        "    \"old_sigma_display\": \"{}\",\n",
+        escape_json(&trace.old_sigma_display)
+    ));
+    json.push_str(&format!(
+        "    \"new_mu_display\": \"{}\",\n",
+        escape_json(&trace.new_mu_display)
+    ));
+    json.push_str(&format!(
+        "    \"new_sigma_display\": \"{}\",\n",
+        escape_json(&trace.new_sigma_display)
+    ));
+    json.push_str(&format!(
+        "    \"k_display\": \"{}\",\n",
+        escape_json(&trace.k_display)
+    ));
+    json.push_str(&format!(
+        "    \"search_lower_bound_display\": \"{}\",\n",
+        escape_json(&trace.search_lower_bound_display)
+    ));
+    json.push_str(&format!(
+        "    \"search_upper_bound_display\": \"{}\",\n",
+        escape_json(&trace.search_upper_bound_display)
+    ));
+    json.push_str(&format!(
+        "    \"max_loss_outcome_display\": \"{}\",\n",
+        escape_json(&trace.max_loss_outcome_display)
+    ));
+    json.push_str(&format!(
+        "    \"max_directional_loss_display\": \"{}\",\n",
+        escape_json(&trace.max_directional_loss_display)
+    ));
+    json.push_str(&format!(
+        "    \"collateral_required_display\": \"{}\",\n",
+        escape_json(&trace.collateral_required_display)
+    ));
+    json.push_str(&format!(
+        "    \"fee_paid_display\": \"{}\",\n",
+        escape_json(&trace.fee_paid_display)
+    ));
+    json.push_str(&format!(
+        "    \"total_debit_display\": \"{}\",\n",
+        escape_json(&trace.total_debit_display)
+    ));
+    json.push_str(&format!(
+        "    \"vault_cash_before_display\": \"{}\",\n",
+        escape_json(&trace.vault_cash_before_display)
+    ));
+    json.push_str(&format!(
+        "    \"vault_cash_after_display\": \"{}\",\n",
+        escape_json(&trace.vault_cash_after_display)
+    ));
+    json.push_str(&format!(
+        "    \"locked_collateral_before_display\": \"{}\",\n",
+        escape_json(&trace.locked_collateral_before_display)
+    ));
+    json.push_str(&format!(
+        "    \"locked_collateral_after_display\": \"{}\",\n",
+        escape_json(&trace.locked_collateral_after_display)
+    ));
+    json.push_str(&format!(
+        "    \"worst_case_liability_before_display\": \"{}\",\n",
+        escape_json(&trace.worst_case_liability_before_display)
+    ));
+    json.push_str(&format!(
+        "    \"worst_case_liability_after_display\": \"{}\",\n",
+        escape_json(&trace.worst_case_liability_after_display)
+    ));
+    json.push_str(&format!(
+        "    \"maker_buffer_before_display\": \"{}\",\n",
+        escape_json(&trace.maker_buffer_before_display)
+    ));
+    json.push_str(&format!(
+        "    \"maker_buffer_after_display\": \"{}\"\n",
+        escape_json(&trace.maker_buffer_after_display)
+    ));
+    json.push_str("  }");
+}
+
+fn push_risk_grid_json(json: &mut String, points: &[DemoRiskGridPointV1]) {
+    for (index, point) in points.iter().enumerate() {
+        json.push_str("    {\n");
+        json.push_str(&format!(
+            "      \"outcome_display\": \"{}\",\n",
+            escape_json(&point.outcome_display)
+        ));
+        json.push_str(&format!(
+            "      \"trader_liability_display\": \"{}\",\n",
+            escape_json(&point.trader_liability_display)
+        ));
+        json.push_str(&format!(
+            "      \"lp_residual_after_traders_display\": \"{}\",\n",
+            escape_json(&point.lp_residual_after_traders_display)
+        ));
+        json.push_str(&format!(
+            "      \"maker_buffer_display\": \"{}\"\n",
+            escape_json(&point.maker_buffer_display)
+        ));
+        json.push_str("    }");
+        if index + 1 != points.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+}
+
+fn push_settlement_waterfall_json(json: &mut String, waterfall: &DemoSettlementWaterfallV1) {
+    json.push_str("{\n");
+    json.push_str(&format!(
+        "    \"outcome_display\": \"{}\",\n",
+        escape_json(&waterfall.outcome_display)
+    ));
+    json.push_str(&format!(
+        "    \"trader_claims_display\": \"{}\",\n",
+        escape_json(&waterfall.trader_claims_display)
+    ));
+    json.push_str(&format!(
+        "    \"lp_residual_claim_display\": \"{}\",\n",
+        escape_json(&waterfall.lp_residual_claim_display)
+    ));
+    json.push_str(&format!(
+        "    \"protocol_dust_display\": \"{}\"\n",
+        escape_json(&waterfall.protocol_dust_display)
+    ));
+    json.push_str("  }");
 }
 
 fn push_regime_indexes_json(json: &mut String, indexes: &[DemoRegimeIndexV1]) {
@@ -771,6 +1055,72 @@ fn build_curve_points(
     }
 
     Ok(points)
+}
+
+fn demo_liquidity_snapshot(snapshot: FixedNormalLiquiditySnapshot) -> DemoLiquiditySnapshotV1 {
+    DemoLiquiditySnapshotV1 {
+        maker_deposit_display: snapshot.maker_deposit.to_string(),
+        vault_cash_display: snapshot.vault_cash.to_string(),
+        accrued_fees_display: snapshot.accrued_fees.to_string(),
+        current_k_display: snapshot.current_k.to_string(),
+        total_lp_shares_display: snapshot.total_lp_shares.to_string(),
+        locked_trader_collateral_display: snapshot.locked_trader_collateral.to_string(),
+        worst_case_trader_liability_display: snapshot.worst_case_trader_liability.to_string(),
+        available_maker_buffer_display: snapshot.available_maker_buffer.to_string(),
+        open_trades: snapshot.open_trades,
+        max_open_trades: snapshot.max_open_trades,
+        lp_controls_status: if snapshot.lp_add_remove_locked {
+            "Locked after first trade".to_string()
+        } else {
+            "Open before first trade".to_string()
+        },
+    }
+}
+
+fn demo_quote_trace(trace: FixedNormalQuoteTrace) -> DemoQuoteTraceV1 {
+    DemoQuoteTraceV1 {
+        market_version: trace.market_version,
+        old_mu_display: trace.old_distribution.mu.to_string(),
+        old_sigma_display: trace.old_distribution.sigma.to_string(),
+        new_mu_display: trace.new_distribution.mu.to_string(),
+        new_sigma_display: trace.new_distribution.sigma.to_string(),
+        k_display: trace.k.to_string(),
+        search_lower_bound_display: trace.search_lower_bound.to_string(),
+        search_upper_bound_display: trace.search_upper_bound.to_string(),
+        max_loss_outcome_display: trace.max_loss_outcome.to_string(),
+        max_directional_loss_display: trace.max_directional_loss.to_string(),
+        collateral_required_display: trace.collateral_required.to_string(),
+        fee_paid_display: trace.fee_paid.to_string(),
+        total_debit_display: trace.total_debit.to_string(),
+        vault_cash_before_display: trace.vault_cash_before.to_string(),
+        vault_cash_after_display: trace.vault_cash_after.to_string(),
+        locked_collateral_before_display: trace.locked_collateral_before.to_string(),
+        locked_collateral_after_display: trace.locked_collateral_after.to_string(),
+        worst_case_liability_before_display: trace.worst_case_liability_before.to_string(),
+        worst_case_liability_after_display: trace.worst_case_liability_after.to_string(),
+        maker_buffer_before_display: trace.maker_buffer_before.to_string(),
+        maker_buffer_after_display: trace.maker_buffer_after.to_string(),
+    }
+}
+
+fn demo_risk_grid_point(point: FixedNormalRiskGridPoint) -> DemoRiskGridPointV1 {
+    DemoRiskGridPointV1 {
+        outcome_display: point.outcome.to_string(),
+        trader_liability_display: point.trader_liability.to_string(),
+        lp_residual_after_traders_display: point.lp_residual_after_traders.to_string(),
+        maker_buffer_display: point.maker_buffer.to_string(),
+    }
+}
+
+fn demo_settlement_waterfall(
+    waterfall: FixedNormalSettlementWaterfallPreview,
+) -> DemoSettlementWaterfallV1 {
+    DemoSettlementWaterfallV1 {
+        outcome_display: waterfall.outcome.to_string(),
+        trader_claims_display: waterfall.trader_claims.to_string(),
+        lp_residual_claim_display: waterfall.lp_residual_claim.to_string(),
+        protocol_dust_display: waterfall.protocol_dust.to_string(),
+    }
 }
 
 fn demo_regime_indexes() -> Result<Vec<DemoRegimeIndexV1>, String> {
@@ -1159,10 +1509,16 @@ mod tests {
         assert_eq!(payload.regime_indexes.len(), 3);
         assert_eq!(payload.regime_indexes[0].symbol, "HAWKFED");
         assert_eq!(payload.regime_indexes[0].constituents.len(), 3);
+        assert_eq!(payload.liquidity.open_trades, 0);
+        assert_eq!(payload.preview_liquidity.open_trades, 1);
+        assert_eq!(payload.risk_grid.len(), 25);
         let json = demo_app_payload_json().unwrap();
         assert!(json.contains("\"presets\""));
         assert!(json.contains("\"quote_grid\""));
         assert!(json.contains("\"regime_indexes\""));
+        assert!(json.contains("\"liquidity\""));
+        assert!(json.contains("\"backend_trace\""));
+        assert!(json.contains("\"settlement_waterfall\""));
         assert!(json.contains("\"long_quote\""));
         assert!(json.contains("\"curve_points\""));
         assert!(json.contains("\"total_debit_display\""));

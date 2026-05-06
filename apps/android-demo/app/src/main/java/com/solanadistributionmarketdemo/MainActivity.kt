@@ -109,6 +109,11 @@ class MainActivity : ComponentActivity() {
 
 data class DemoPayload(
     val market: DemoMarket,
+    val liquidity: DemoLiquiditySnapshot,
+    val previewLiquidity: DemoLiquiditySnapshot,
+    val backendTrace: DemoQuoteTrace,
+    val riskGrid: List<DemoRiskGridPoint>,
+    val settlementWaterfall: DemoSettlementWaterfall,
     val presets: List<DemoPreset>,
     val quoteGrid: List<DemoPreset>,
     val regimeIndexes: List<DemoRegimeIndex>,
@@ -174,6 +179,58 @@ data class ContinuousQuotePreview(
     val serializedInstructionHex: String,
 )
 
+data class DemoLiquiditySnapshot(
+    val makerDepositDisplay: String,
+    val vaultCashDisplay: String,
+    val accruedFeesDisplay: String,
+    val currentKDisplay: String,
+    val totalLpSharesDisplay: String,
+    val lockedTraderCollateralDisplay: String,
+    val worstCaseTraderLiabilityDisplay: String,
+    val availableMakerBufferDisplay: String,
+    val openTrades: Long,
+    val maxOpenTrades: Long,
+    val lpControlsStatus: String,
+)
+
+data class DemoQuoteTrace(
+    val marketVersion: Long,
+    val oldMuDisplay: String,
+    val oldSigmaDisplay: String,
+    val newMuDisplay: String,
+    val newSigmaDisplay: String,
+    val kDisplay: String,
+    val searchLowerBoundDisplay: String,
+    val searchUpperBoundDisplay: String,
+    val maxLossOutcomeDisplay: String,
+    val maxDirectionalLossDisplay: String,
+    val collateralRequiredDisplay: String,
+    val feePaidDisplay: String,
+    val totalDebitDisplay: String,
+    val vaultCashBeforeDisplay: String,
+    val vaultCashAfterDisplay: String,
+    val lockedCollateralBeforeDisplay: String,
+    val lockedCollateralAfterDisplay: String,
+    val worstCaseLiabilityBeforeDisplay: String,
+    val worstCaseLiabilityAfterDisplay: String,
+    val makerBufferBeforeDisplay: String,
+    val makerBufferAfterDisplay: String,
+)
+
+data class DemoRiskGridPoint(
+    val outcomeDisplay: String,
+    val traderLiabilityDisplay: String,
+    val lpResidualAfterTradersDisplay: String,
+    val makerBufferDisplay: String,
+)
+
+data class DemoSettlementWaterfall(
+    val outcomeDisplay: String,
+    val traderClaimsDisplay: String,
+    val lpResidualClaimDisplay: String,
+    val protocolDustDisplay: String,
+)
+
 data class DemoRegimeIndex(
     val id: String,
     val symbol: String,
@@ -223,10 +280,10 @@ data class DemoRegimeQuote(
 
 private enum class AppTab(val label: String) {
     Trade("Trade"),
-    Indexes("Indexes"),
+    Liquidity("Liquidity"),
+    Backend("Backend"),
     Positions("Positions"),
-    Market("Market"),
-    Maker("Maker"),
+    Indexes("Indexes"),
 }
 
 private enum class RegimeTradeSide(val label: String) {
@@ -330,6 +387,19 @@ private fun TradeAppScreen(
                     },
                 )
 
+                AppTab.Liquidity -> LiquidityTab(
+                    current = payload.liquidity,
+                    preview = payload.previewLiquidity,
+                    waterfall = payload.settlementWaterfall,
+                    riskGrid = payload.riskGrid,
+                )
+
+                AppTab.Backend -> BackendTab(
+                    market = payload.market,
+                    trace = payload.backendTrace,
+                    quote = continuousQuote,
+                )
+
                 AppTab.Indexes -> RegimeIndexesTab(
                     indexes = payload.regimeIndexes,
                     selectedIndex = selectedRegime,
@@ -376,8 +446,6 @@ private fun TradeAppScreen(
                 )
 
                 AppTab.Positions -> PositionsTab(continuousQuote, submitStatus)
-                AppTab.Market -> MarketTab(payload.market)
-                AppTab.Maker -> MakerTab(payload.market)
             }
         }
     }
@@ -510,7 +578,291 @@ private fun TradeTab(
         onSigmaChange = onSigmaChange,
     )
     PresetStrip(payload.presets, previewQuote.id, onPreset)
+    TradeRiskStrip(payload.market, continuousQuote)
     QuoteExecutionPanel(continuousQuote, submitStatus, onSubmit)
+}
+
+@Composable
+private fun TradeRiskStrip(
+    market: DemoMarket,
+    quote: ContinuousQuotePreview,
+) {
+    val backing = market.backingDisplay.toDouble()
+    val vaultAfter = backing + quote.totalDebit
+    val makerBufferAfter = vaultAfter - quote.collateralRequired
+    Panel {
+        Text("Liquidity after this quote", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        DenseStats(
+            listOf(
+                "Vault cash" to vaultAfter.formattedDecimal(),
+                "Locked collateral" to quote.collateralRequired.formattedDecimal(),
+                "Maker fee" to quote.feePaid.formattedDecimal(),
+                "Worst liability" to quote.collateralRequired.formattedDecimal(),
+                "Maker buffer" to makerBufferAfter.formattedDecimal(),
+                "LP controls" to "Locked after trade",
+            )
+        )
+    }
+}
+
+@Composable
+private fun LiquidityTab(
+    current: DemoLiquiditySnapshot,
+    preview: DemoLiquiditySnapshot,
+    waterfall: DemoSettlementWaterfall,
+    riskGrid: List<DemoRiskGridPoint>,
+) {
+    LiquidityOverviewPanel(current, preview)
+    RiskGridPanel(riskGrid)
+    SettlementWaterfallPanel(waterfall)
+}
+
+@Composable
+private fun LiquidityOverviewPanel(
+    current: DemoLiquiditySnapshot,
+    preview: DemoLiquiditySnapshot,
+) {
+    Panel {
+        Text("Liquidity engine", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        DenseStats(
+            listOf(
+                "Maker deposit" to current.makerDepositDisplay,
+                "Vault cash" to current.vaultCashDisplay,
+                "LP shares" to current.totalLpSharesDisplay,
+                "Current k" to current.currentKDisplay,
+                "Open trades" to "${current.openTrades}/${current.maxOpenTrades}",
+                "LP controls" to current.lpControlsStatus,
+            )
+        )
+        HorizontalDivider()
+        Text("Preview after base trade", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        DenseStats(
+            listOf(
+                "Vault cash" to preview.vaultCashDisplay,
+                "Locked collateral" to preview.lockedTraderCollateralDisplay,
+                "Accrued fees" to preview.accruedFeesDisplay,
+                "Worst liability" to preview.worstCaseTraderLiabilityDisplay,
+                "Maker buffer" to preview.availableMakerBufferDisplay,
+                "LP controls" to preview.lpControlsStatus,
+            )
+        )
+    }
+}
+
+@Composable
+private fun RiskGridPanel(riskGrid: List<DemoRiskGridPoint>) {
+    Panel {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Outcome risk grid", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("${riskGrid.size} samples", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        RiskGridCanvas(riskGrid)
+        riskGrid.maxByOrNull { it.traderLiabilityDisplay.toDoubleOrNull() ?: 0.0 }?.let { worst ->
+            DenseStats(
+                listOf(
+                    "Worst sampled outcome" to worst.outcomeDisplay,
+                    "Trader liability" to worst.traderLiabilityDisplay,
+                    "LP residual" to worst.lpResidualAfterTradersDisplay,
+                    "Maker buffer" to worst.makerBufferDisplay,
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun RiskGridCanvas(points: List<DemoRiskGridPoint>) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+            .padding(8.dp),
+    ) {
+        if (points.size < 2) return@Canvas
+        val liabilities = points.map { it.traderLiabilityDisplay.toDouble() }
+        val residuals = points.map { it.lpResidualAfterTradersDisplay.toDouble() }
+        val maxY = max(liabilities.maxOrNull() ?: 1.0, residuals.maxOrNull() ?: 1.0).coerceAtLeast(1.0) * 1.10
+        val left = 16f
+        val right = size.width - 12f
+        val top = 12f
+        val bottom = size.height - 16f
+        val width = right - left
+        val height = bottom - top
+
+        fun xOf(index: Int): Float = left + width * index / (points.size - 1).coerceAtLeast(1)
+        fun yOf(value: Double): Float = bottom - ((value / maxY) * height).toFloat()
+
+        repeat(3) { gridIndex ->
+            val y = top + height * gridIndex / 2f
+            drawLine(Color(0xFFE5E7EB), Offset(left, y), Offset(right, y), 1f)
+        }
+        points.zipWithNext().forEachIndexed { index, (leftPoint, rightPoint) ->
+            drawLine(
+                color = Color(0xFFF59E0B),
+                start = Offset(xOf(index), yOf(leftPoint.traderLiabilityDisplay.toDouble())),
+                end = Offset(xOf(index + 1), yOf(rightPoint.traderLiabilityDisplay.toDouble())),
+                strokeWidth = 4f,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = Color(0xFF10B981),
+                start = Offset(xOf(index), yOf(leftPoint.lpResidualAfterTradersDisplay.toDouble())),
+                end = Offset(xOf(index + 1), yOf(rightPoint.lpResidualAfterTradersDisplay.toDouble())),
+                strokeWidth = 3f,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettlementWaterfallPanel(waterfall: DemoSettlementWaterfall) {
+    Panel {
+        Text("Settlement waterfall", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Preview outcome ${waterfall.outcomeDisplay.trimZeros()}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        WaterfallStep("1", "Trader claims", waterfall.traderClaimsDisplay, Color(0xFFF59E0B))
+        WaterfallStep("2", "Protocol dust", waterfall.protocolDustDisplay, Color(0xFF64748B))
+        WaterfallStep("3", "LP residual claim", waterfall.lpResidualClaimDisplay, Color(0xFF10B981))
+    }
+}
+
+@Composable
+private fun WaterfallStep(
+    index: String,
+    label: String,
+    value: String,
+    color: Color,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .background(color.copy(alpha = 0.18f), RoundedCornerShape(99.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(index, color = color, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        }
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Text(value.trimZeros(), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun BackendTab(
+    market: DemoMarket,
+    trace: DemoQuoteTrace,
+    quote: ContinuousQuotePreview,
+) {
+    BackendAccountsPanel(market, trace)
+    BackendQuoteTracePanel(trace, quote)
+    BackendTimelinePanel()
+}
+
+@Composable
+private fun BackendAccountsPanel(
+    market: DemoMarket,
+    trace: DemoQuoteTrace,
+) {
+    Panel {
+        Text("Program state", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        DenseStats(
+            listOf(
+                "Market account" to market.marketIdHex.take(10),
+                "State version" to market.stateVersion.toString(),
+                "Quote version" to trace.marketVersion.toString(),
+                "Oracle feed" to "Devnet demo",
+                "Current mu" to market.currentMuDisplay,
+                "Current sigma" to market.currentSigmaDisplay,
+            )
+        )
+    }
+}
+
+@Composable
+private fun BackendQuoteTracePanel(
+    trace: DemoQuoteTrace,
+    quote: ContinuousQuotePreview,
+) {
+    Panel {
+        Text("Quote computation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        DenseStats(
+            listOf(
+                "Old mu/sigma" to "${trace.oldMuDisplay.trimZeros()} / ${trace.oldSigmaDisplay.trimZeros()}",
+                "New mu/sigma" to "${quote.targetMu.formattedDecimal().trimZeros()} / ${quote.targetSigma.formattedDecimal().trimZeros()}",
+                "Max-loss outcome" to trace.maxLossOutcomeDisplay,
+                "Directional loss" to trace.maxDirectionalLossDisplay,
+                "Collateral" to quote.collateralRequired.formattedDecimal(),
+                "Fee" to quote.feePaid.formattedDecimal(),
+                "Total debit" to quote.totalDebit.formattedDecimal(),
+                "Search range" to "${trace.searchLowerBoundDisplay.trimZeros()} to ${trace.searchUpperBoundDisplay.trimZeros()}",
+            )
+        )
+        HorizontalDivider()
+        DenseStats(
+            listOf(
+                "Vault before" to trace.vaultCashBeforeDisplay,
+                "Vault after" to (trace.vaultCashBeforeDisplay.toDouble() + quote.totalDebit).formattedDecimal(),
+                "Liability before" to trace.worstCaseLiabilityBeforeDisplay,
+                "Liability after" to trace.worstCaseLiabilityAfterDisplay,
+            )
+        )
+    }
+}
+
+@Composable
+private fun BackendTimelinePanel() {
+    Panel {
+        Text("Instruction path", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        listOf(
+            "Initialize" to "Seed market PDA, vault, LP shares, and Normal distribution.",
+            "Quote" to "Client computes directional max-loss, fee, total debit, and version bounds.",
+            "Trade" to "Program recomputes quote, moves total debit to vault, stores trade-time exposure.",
+            "Resolve" to "Oracle writes the scalar outcome after expiry.",
+            "Settle trader" to "Trader claims settle before LP residual is available.",
+            "Settle LP" to "LPs claim remaining vault cash after trader settlements.",
+        ).forEachIndexed { index, (title, body) ->
+            TimelineRow((index + 1).toString(), title, body)
+        }
+    }
+}
+
+@Composable
+private fun TimelineRow(
+    index: String,
+    title: String,
+    body: String,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(99.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(index, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 @Composable
@@ -1124,6 +1476,11 @@ private fun Panel(content: @Composable ColumnScope.() -> Unit) {
 private fun loadDemoPayload(json: String): DemoPayload {
     val root = JSONObject(json)
     val marketObject = root.getJSONObject("market")
+    val liquidityObject = root.getJSONObject("liquidity")
+    val previewLiquidityObject = root.getJSONObject("preview_liquidity")
+    val backendTraceObject = root.getJSONObject("backend_trace")
+    val riskGridArray = root.getJSONArray("risk_grid")
+    val settlementWaterfallObject = root.getJSONObject("settlement_waterfall")
     val presetsArray = root.getJSONArray("presets")
     val quoteGridArray = root.getJSONArray("quote_grid")
     val regimeIndexesArray = root.getJSONArray("regime_indexes")
@@ -1149,9 +1506,81 @@ private fun loadDemoPayload(json: String): DemoPayload {
             coarseSamples = marketObject.getInt("coarse_samples"),
             refineSamples = marketObject.getInt("refine_samples"),
         ),
+        liquidity = liquidityObject.toLiquiditySnapshot(),
+        previewLiquidity = previewLiquidityObject.toLiquiditySnapshot(),
+        backendTrace = backendTraceObject.toQuoteTrace(),
+        riskGrid = riskGridArray.toRiskGrid(),
+        settlementWaterfall = settlementWaterfallObject.toSettlementWaterfall(),
         presets = presetsArray.toPresetList(),
         quoteGrid = quoteGridArray.toPresetList(),
         regimeIndexes = regimeIndexesArray.toRegimeIndexList(),
+    )
+}
+
+private fun JSONObject.toLiquiditySnapshot(): DemoLiquiditySnapshot {
+    return DemoLiquiditySnapshot(
+        makerDepositDisplay = getString("maker_deposit_display"),
+        vaultCashDisplay = getString("vault_cash_display"),
+        accruedFeesDisplay = getString("accrued_fees_display"),
+        currentKDisplay = getString("current_k_display"),
+        totalLpSharesDisplay = getString("total_lp_shares_display"),
+        lockedTraderCollateralDisplay = getString("locked_trader_collateral_display"),
+        worstCaseTraderLiabilityDisplay = getString("worst_case_trader_liability_display"),
+        availableMakerBufferDisplay = getString("available_maker_buffer_display"),
+        openTrades = getLong("open_trades"),
+        maxOpenTrades = getLong("max_open_trades"),
+        lpControlsStatus = getString("lp_controls_status"),
+    )
+}
+
+private fun JSONObject.toQuoteTrace(): DemoQuoteTrace {
+    return DemoQuoteTrace(
+        marketVersion = getLong("market_version"),
+        oldMuDisplay = getString("old_mu_display"),
+        oldSigmaDisplay = getString("old_sigma_display"),
+        newMuDisplay = getString("new_mu_display"),
+        newSigmaDisplay = getString("new_sigma_display"),
+        kDisplay = getString("k_display"),
+        searchLowerBoundDisplay = getString("search_lower_bound_display"),
+        searchUpperBoundDisplay = getString("search_upper_bound_display"),
+        maxLossOutcomeDisplay = getString("max_loss_outcome_display"),
+        maxDirectionalLossDisplay = getString("max_directional_loss_display"),
+        collateralRequiredDisplay = getString("collateral_required_display"),
+        feePaidDisplay = getString("fee_paid_display"),
+        totalDebitDisplay = getString("total_debit_display"),
+        vaultCashBeforeDisplay = getString("vault_cash_before_display"),
+        vaultCashAfterDisplay = getString("vault_cash_after_display"),
+        lockedCollateralBeforeDisplay = getString("locked_collateral_before_display"),
+        lockedCollateralAfterDisplay = getString("locked_collateral_after_display"),
+        worstCaseLiabilityBeforeDisplay = getString("worst_case_liability_before_display"),
+        worstCaseLiabilityAfterDisplay = getString("worst_case_liability_after_display"),
+        makerBufferBeforeDisplay = getString("maker_buffer_before_display"),
+        makerBufferAfterDisplay = getString("maker_buffer_after_display"),
+    )
+}
+
+private fun JSONArray.toRiskGrid(): List<DemoRiskGridPoint> {
+    val points = mutableListOf<DemoRiskGridPoint>()
+    for (index in 0 until length()) {
+        val item = getJSONObject(index)
+        points.add(
+            DemoRiskGridPoint(
+                outcomeDisplay = item.getString("outcome_display"),
+                traderLiabilityDisplay = item.getString("trader_liability_display"),
+                lpResidualAfterTradersDisplay = item.getString("lp_residual_after_traders_display"),
+                makerBufferDisplay = item.getString("maker_buffer_display"),
+            )
+        )
+    }
+    return points
+}
+
+private fun JSONObject.toSettlementWaterfall(): DemoSettlementWaterfall {
+    return DemoSettlementWaterfall(
+        outcomeDisplay = getString("outcome_display"),
+        traderClaimsDisplay = getString("trader_claims_display"),
+        lpResidualClaimDisplay = getString("lp_residual_claim_display"),
+        protocolDustDisplay = getString("protocol_dust_display"),
     )
 }
 

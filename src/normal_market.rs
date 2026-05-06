@@ -2,7 +2,7 @@ use crate::fixed_point::Fixed;
 use crate::normal_math::{
     FixedCollateralQuote, FixedNormalDistribution, fixed_calculate_f, fixed_calculate_lambda,
     fixed_calculate_minimum_sigma, fixed_calculate_value_from_lambda,
-    fixed_required_collateral_quote_with_fee,
+    fixed_collateral_search_bounds, fixed_required_collateral_quote_with_fee,
 };
 use std::collections::HashMap;
 
@@ -61,6 +61,60 @@ pub struct FixedNormalResolution {
     pub trader_payouts: Vec<(usize, Fixed)>,
     pub lp_payouts: HashMap<String, Fixed>,
     pub cash_remaining: Fixed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedNormalLiquiditySnapshot {
+    pub maker_deposit: Fixed,
+    pub vault_cash: Fixed,
+    pub accrued_fees: Fixed,
+    pub current_k: Fixed,
+    pub total_lp_shares: Fixed,
+    pub locked_trader_collateral: Fixed,
+    pub worst_case_trader_liability: Fixed,
+    pub available_maker_buffer: Fixed,
+    pub open_trades: u64,
+    pub max_open_trades: u64,
+    pub lp_add_remove_locked: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedNormalQuoteTrace {
+    pub market_version: u64,
+    pub old_distribution: FixedNormalDistribution,
+    pub new_distribution: FixedNormalDistribution,
+    pub k: Fixed,
+    pub search_lower_bound: Fixed,
+    pub search_upper_bound: Fixed,
+    pub max_loss_outcome: Fixed,
+    pub max_directional_loss: Fixed,
+    pub collateral_required: Fixed,
+    pub fee_paid: Fixed,
+    pub total_debit: Fixed,
+    pub vault_cash_before: Fixed,
+    pub vault_cash_after: Fixed,
+    pub locked_collateral_before: Fixed,
+    pub locked_collateral_after: Fixed,
+    pub worst_case_liability_before: Fixed,
+    pub worst_case_liability_after: Fixed,
+    pub maker_buffer_before: Fixed,
+    pub maker_buffer_after: Fixed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedNormalRiskGridPoint {
+    pub outcome: Fixed,
+    pub trader_liability: Fixed,
+    pub lp_residual_after_traders: Fixed,
+    pub maker_buffer: Fixed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedNormalSettlementWaterfallPreview {
+    pub outcome: Fixed,
+    pub trader_claims: Fixed,
+    pub lp_residual_claim: Fixed,
+    pub protocol_dust: Fixed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -131,6 +185,111 @@ impl FixedNormalMarket {
 
     pub fn market_version(&self) -> u64 {
         self.state_version
+    }
+
+    pub fn liquidity_snapshot(&self) -> Result<FixedNormalLiquiditySnapshot, String> {
+        let locked_trader_collateral = self.locked_trader_collateral();
+        let worst_case_trader_liability = self.worst_case_trader_liability(64)?;
+
+        Ok(FixedNormalLiquiditySnapshot {
+            maker_deposit: self.b,
+            vault_cash: self.cash,
+            accrued_fees: self.fees_accrued,
+            current_k: self.k,
+            total_lp_shares: self.total_lp_shares,
+            locked_trader_collateral,
+            worst_case_trader_liability,
+            available_maker_buffer: self.cash - worst_case_trader_liability,
+            open_trades: self.trades.len() as u64,
+            max_open_trades: self.config.max_open_trades,
+            lp_add_remove_locked: !self.trades.is_empty(),
+        })
+    }
+
+    pub fn quote_trace(
+        &self,
+        new_distribution: FixedNormalDistribution,
+    ) -> Result<FixedNormalQuoteTrace, String> {
+        let quote = self.quote_trade(new_distribution)?;
+        let before = self.liquidity_snapshot()?;
+        let max_loss = self.maximum_directional_loss_point(
+            self.current_distribution,
+            quote.new_distribution,
+            quote.collateral_quote.lower_bound,
+            quote.collateral_quote.upper_bound,
+            quote.collateral_quote.coarse_samples.max(1) as usize,
+        )?;
+
+        let mut after_market = self.clone();
+        after_market.trade_with_quote(quote.clone())?;
+        let after = after_market.liquidity_snapshot()?;
+
+        Ok(FixedNormalQuoteTrace {
+            market_version: quote.market_version,
+            old_distribution: self.current_distribution,
+            new_distribution: quote.new_distribution,
+            k: self.k,
+            search_lower_bound: quote.collateral_quote.lower_bound,
+            search_upper_bound: quote.collateral_quote.upper_bound,
+            max_loss_outcome: max_loss.0,
+            max_directional_loss: max_loss.1,
+            collateral_required: quote.collateral_quote.collateral_required,
+            fee_paid: quote.collateral_quote.fee_paid,
+            total_debit: quote.collateral_quote.total_debit,
+            vault_cash_before: before.vault_cash,
+            vault_cash_after: after.vault_cash,
+            locked_collateral_before: before.locked_trader_collateral,
+            locked_collateral_after: after.locked_trader_collateral,
+            worst_case_liability_before: before.worst_case_trader_liability,
+            worst_case_liability_after: after.worst_case_trader_liability,
+            maker_buffer_before: before.available_maker_buffer,
+            maker_buffer_after: after.available_maker_buffer,
+        })
+    }
+
+    pub fn risk_grid(&self, samples: usize) -> Result<Vec<FixedNormalRiskGridPoint>, String> {
+        let bounds = self.risk_search_bounds();
+        let safe_samples = samples.max(2);
+        let range = bounds.1 - bounds.0;
+        let denominator = Fixed::from_raw((safe_samples - 1) as i128 * Fixed::SCALE);
+        let mut points = Vec::with_capacity(safe_samples);
+
+        for step in 0..safe_samples {
+            let outcome =
+                bounds.0 + (range * Fixed::from_raw(step as i128 * Fixed::SCALE)) / denominator;
+            let trader_liability = self.total_trader_payout_at(outcome)?;
+            let lp_residual_after_traders = self.cash - trader_liability;
+            points.push(FixedNormalRiskGridPoint {
+                outcome,
+                trader_liability,
+                lp_residual_after_traders,
+                maker_buffer: lp_residual_after_traders,
+            });
+        }
+
+        Ok(points)
+    }
+
+    pub fn settlement_waterfall_preview(
+        &self,
+        outcome: Fixed,
+    ) -> Result<FixedNormalSettlementWaterfallPreview, String> {
+        let resolution = self.resolve(outcome)?;
+        let trader_claims = resolution
+            .trader_payouts
+            .iter()
+            .fold(Fixed::ZERO, |total, (_, payout)| total + *payout);
+        let lp_residual_claim = resolution
+            .lp_payouts
+            .values()
+            .fold(Fixed::ZERO, |total, payout| total + *payout);
+
+        Ok(FixedNormalSettlementWaterfallPreview {
+            outcome,
+            trader_claims,
+            lp_residual_claim,
+            protocol_dust: resolution.cash_remaining,
+        })
     }
 
     pub fn quote_trade(
@@ -360,6 +519,85 @@ impl FixedNormalMarket {
             return Err("trade does not materially change the market distribution".to_string());
         }
         validate_sigma_bounds(new_distribution.sigma, &self.config)
+    }
+
+    fn locked_trader_collateral(&self) -> Fixed {
+        self.trades
+            .iter()
+            .fold(Fixed::ZERO, |total, trade| total + trade.collateral)
+    }
+
+    fn worst_case_trader_liability(&self, samples: usize) -> Result<Fixed, String> {
+        Ok(self
+            .risk_grid(samples)?
+            .into_iter()
+            .map(|point| point.trader_liability)
+            .max()
+            .unwrap_or(Fixed::ZERO))
+    }
+
+    fn total_trader_payout_at(&self, outcome: Fixed) -> Result<Fixed, String> {
+        let mut total = Fixed::ZERO;
+        for trade in &self.trades {
+            let new_value = fixed_calculate_f(outcome, trade.new_distribution, trade.k_at_trade)?;
+            let old_value = fixed_calculate_f(outcome, trade.old_distribution, trade.k_at_trade)?;
+            let payout = trade.collateral + (new_value - old_value);
+            total = total + payout.max(Fixed::ZERO);
+        }
+        Ok(total)
+    }
+
+    fn risk_search_bounds(&self) -> (Fixed, Fixed) {
+        let mut lower = self.current_distribution.mu - self.current_distribution.sigma.mul_int(8);
+        let mut upper = self.current_distribution.mu + self.current_distribution.sigma.mul_int(8);
+
+        for trade in &self.trades {
+            for distribution in [trade.old_distribution, trade.new_distribution] {
+                let tail = distribution.sigma.mul_int(8);
+                lower = lower.min(distribution.mu - tail);
+                upper = upper.max(distribution.mu + tail);
+            }
+        }
+
+        if self.trades.is_empty() {
+            let bounds = fixed_collateral_search_bounds(
+                self.current_distribution,
+                self.current_distribution,
+            );
+            lower = lower.min(bounds.lower);
+            upper = upper.max(bounds.upper);
+        }
+
+        (lower, upper)
+    }
+
+    fn maximum_directional_loss_point(
+        &self,
+        old_distribution: FixedNormalDistribution,
+        new_distribution: FixedNormalDistribution,
+        lower: Fixed,
+        upper: Fixed,
+        samples: usize,
+    ) -> Result<(Fixed, Fixed), String> {
+        let safe_samples = samples.max(1);
+        let range = upper - lower;
+        let denominator = Fixed::from_raw(safe_samples as i128 * Fixed::SCALE);
+        let mut best_outcome = lower;
+        let mut best_loss = Fixed::ZERO;
+
+        for step in 0..=safe_samples {
+            let outcome =
+                lower + (range * Fixed::from_raw(step as i128 * Fixed::SCALE)) / denominator;
+            let old_value = fixed_calculate_f(outcome, old_distribution, self.k)?;
+            let new_value = fixed_calculate_f(outcome, new_distribution, self.k)?;
+            let loss = (old_value - new_value).max(Fixed::ZERO);
+            if loss.raw() > best_loss.raw() {
+                best_loss = loss;
+                best_outcome = outcome;
+            }
+        }
+
+        Ok((best_outcome, best_loss))
     }
 }
 

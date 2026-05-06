@@ -20,8 +20,9 @@ pub use distributions::{
 pub use fixed_point::Fixed;
 pub use market::{DistributionMarket, Resolution, TradeRecord};
 pub use normal_market::{
-    FixedNormalMarket, FixedNormalMarketConfig, FixedNormalResolution, FixedNormalTradeQuote,
-    FixedNormalTradeRecord,
+    FixedNormalLiquiditySnapshot, FixedNormalMarket, FixedNormalMarketConfig,
+    FixedNormalQuoteTrace, FixedNormalResolution, FixedNormalRiskGridPoint,
+    FixedNormalSettlementWaterfallPreview, FixedNormalTradeQuote, FixedNormalTradeRecord,
 };
 pub use normal_math::{
     FixedCollateralQuote, FixedNormalDistribution, FixedSearchBounds, fixed_calculate_f,

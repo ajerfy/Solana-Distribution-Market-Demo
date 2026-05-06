@@ -1,7 +1,8 @@
 pub use crate::market::{DistributionMarket, Resolution, TradeRecord};
 pub use crate::normal_market::{
-    FixedNormalMarket, FixedNormalMarketConfig, FixedNormalResolution, FixedNormalTradeQuote,
-    FixedNormalTradeRecord,
+    FixedNormalLiquiditySnapshot, FixedNormalMarket, FixedNormalMarketConfig,
+    FixedNormalQuoteTrace, FixedNormalResolution, FixedNormalRiskGridPoint,
+    FixedNormalSettlementWaterfallPreview, FixedNormalTradeQuote, FixedNormalTradeRecord,
 };
 pub use crate::product_v1::{
     MilestoneStatus, ProductMilestoneV1, ProductTrack, RepoTaskMapV1, normal_v1_product_milestones,

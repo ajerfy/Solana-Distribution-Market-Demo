@@ -686,3 +686,107 @@ fn fixed_normal_collateral_quote_exposes_bounded_verifier_metadata() {
     assert!(quote.coarse_samples > 0);
     assert!(quote.refine_samples > 0);
 }
+
+#[test]
+fn fixed_normal_liquidity_snapshot_exposes_maker_risk() {
+    let mut market = FixedNormalMarket::new(
+        Fixed::from_f64(50.0).unwrap(),
+        Fixed::from_f64(21.05026039569057).unwrap(),
+        FixedNormalDistribution::new(
+            Fixed::from_f64(95.0).unwrap(),
+            Fixed::from_f64(10.0).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let before = market.liquidity_snapshot().unwrap();
+    assert_eq!(before.open_trades, 0);
+    assert!(!before.lp_add_remove_locked);
+    assert_eq!(before.locked_trader_collateral, Fixed::ZERO);
+    assert_eq!(before.available_maker_buffer, before.vault_cash);
+
+    market
+        .trade(
+            FixedNormalDistribution::new(
+                Fixed::from_f64(100.0).unwrap(),
+                Fixed::from_f64(10.0).unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+    let after = market.liquidity_snapshot().unwrap();
+    assert_eq!(after.open_trades, 1);
+    assert!(after.lp_add_remove_locked);
+    assert!(after.locked_trader_collateral.raw() > 0);
+    assert!(after.accrued_fees.raw() > 0);
+    assert!(after.worst_case_trader_liability.raw() > 0);
+}
+
+#[test]
+fn fixed_normal_quote_trace_matches_post_trade_liquidity() {
+    let market = FixedNormalMarket::new(
+        Fixed::from_f64(50.0).unwrap(),
+        Fixed::from_f64(21.05026039569057).unwrap(),
+        FixedNormalDistribution::new(
+            Fixed::from_f64(95.0).unwrap(),
+            Fixed::from_f64(10.0).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let trace = market
+        .quote_trace(
+            FixedNormalDistribution::new(
+                Fixed::from_f64(100.0).unwrap(),
+                Fixed::from_f64(10.0).unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+    assert!(trace.max_loss_outcome.raw() >= trace.search_lower_bound.raw());
+    assert!(trace.max_loss_outcome.raw() <= trace.search_upper_bound.raw());
+    assert_eq!(
+        trace.vault_cash_after,
+        trace.vault_cash_before + trace.total_debit
+    );
+    assert_eq!(
+        trace.locked_collateral_after,
+        trace.locked_collateral_before + trace.collateral_required
+    );
+    assert!(trace.worst_case_liability_after.raw() >= trace.collateral_required.raw());
+}
+
+#[test]
+fn fixed_normal_settlement_waterfall_matches_resolution_totals() {
+    let mut market = FixedNormalMarket::new(
+        Fixed::from_f64(50.0).unwrap(),
+        Fixed::from_f64(21.05026039569057).unwrap(),
+        FixedNormalDistribution::new(
+            Fixed::from_f64(95.0).unwrap(),
+            Fixed::from_f64(10.0).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    market
+        .trade(
+            FixedNormalDistribution::new(
+                Fixed::from_f64(100.0).unwrap(),
+                Fixed::from_f64(10.0).unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+    let waterfall = market
+        .settlement_waterfall_preview(Fixed::from_f64(107.6).unwrap())
+        .unwrap();
+    assert!(waterfall.trader_claims.raw() > 0);
+    assert_eq!(
+        waterfall.trader_claims + waterfall.lp_residual_claim + waterfall.protocol_dust,
+        market.cash
+    );
+}

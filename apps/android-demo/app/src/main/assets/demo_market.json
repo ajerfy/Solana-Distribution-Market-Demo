@@ -20,6 +20,213 @@
     "coarse_samples": 4096,
     "refine_samples": 4096
   },
+  "liquidity": {
+    "maker_deposit_display": "50.000000000",
+    "vault_cash_display": "50.000000000",
+    "accrued_fees_display": "0.000000000",
+    "current_k_display": "21.050260396",
+    "total_lp_shares_display": "1.000000000",
+    "locked_trader_collateral_display": "0.000000000",
+    "worst_case_trader_liability_display": "0.000000000",
+    "available_maker_buffer_display": "50.000000000",
+    "open_trades": 0,
+    "max_open_trades": 64,
+    "lp_controls_status": "Open before first trade"
+  },
+  "preview_liquidity": {
+    "maker_deposit_display": "50.000000000",
+    "vault_cash_display": "51.500045228",
+    "accrued_fees_display": "0.014851932",
+    "current_k_display": "21.050260396",
+    "total_lp_shares_display": "1.000000000",
+    "locked_trader_collateral_display": "1.485193296",
+    "worst_case_trader_liability_display": "2.957202228",
+    "available_maker_buffer_display": "48.542843000",
+    "open_trades": 1,
+    "max_open_trades": 64,
+    "lp_controls_status": "Locked after first trade"
+  },
+  "backend_trace": {
+    "market_version": 0,
+    "old_mu_display": "95.000000000",
+    "old_sigma_display": "10.000000000",
+    "new_mu_display": "100.000000000",
+    "new_sigma_display": "10.000000000",
+    "k_display": "21.050260396",
+    "search_lower_bound_display": "10.000000000",
+    "search_upper_bound_display": "185.000000000",
+    "max_loss_outcome_display": "87.374267578",
+    "max_directional_loss_display": "1.485187154",
+    "collateral_required_display": "1.485193296",
+    "fee_paid_display": "0.014851932",
+    "total_debit_display": "1.500045228",
+    "vault_cash_before_display": "50.000000000",
+    "vault_cash_after_display": "51.500045228",
+    "locked_collateral_before_display": "0.000000000",
+    "locked_collateral_after_display": "1.485193296",
+    "worst_case_liability_before_display": "0.000000000",
+    "worst_case_liability_after_display": "2.957202228",
+    "maker_buffer_before_display": "50.000000000",
+    "maker_buffer_after_display": "48.542843000"
+  },
+  "risk_grid": [
+    {
+      "outcome_display": "15.000000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "21.875000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "28.750000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "35.625000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "42.500000000",
+      "trader_liability_display": "1.485188408",
+      "lp_residual_after_traders_display": "50.014856820",
+      "maker_buffer_display": "50.014856820"
+    },
+    {
+      "outcome_display": "49.375000000",
+      "trader_liability_display": "1.485055932",
+      "lp_residual_after_traders_display": "50.014989296",
+      "maker_buffer_display": "50.014989296"
+    },
+    {
+      "outcome_display": "56.250000000",
+      "trader_liability_display": "1.482798213",
+      "lp_residual_after_traders_display": "50.017247015",
+      "maker_buffer_display": "50.017247015"
+    },
+    {
+      "outcome_display": "63.125000000",
+      "trader_liability_display": "1.459671558",
+      "lp_residual_after_traders_display": "50.040373670",
+      "maker_buffer_display": "50.040373670"
+    },
+    {
+      "outcome_display": "70.000000000",
+      "trader_liability_display": "1.321053512",
+      "lp_residual_after_traders_display": "50.178991716",
+      "maker_buffer_display": "50.178991716"
+    },
+    {
+      "outcome_display": "76.875000000",
+      "trader_liability_display": "0.862728563",
+      "lp_residual_after_traders_display": "50.637316665",
+      "maker_buffer_display": "50.637316665"
+    },
+    {
+      "outcome_display": "83.750000000",
+      "trader_liability_display": "0.164972488",
+      "lp_residual_after_traders_display": "51.335072740",
+      "maker_buffer_display": "51.335072740"
+    },
+    {
+      "outcome_display": "90.625000000",
+      "trader_liability_display": "0.163468134",
+      "lp_residual_after_traders_display": "51.336577094",
+      "maker_buffer_display": "51.336577094"
+    },
+    {
+      "outcome_display": "97.500000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "104.375000000",
+      "trader_liability_display": "2.806918458",
+      "lp_residual_after_traders_display": "48.693126770",
+      "maker_buffer_display": "48.693126770"
+    },
+    {
+      "outcome_display": "111.250000000",
+      "trader_liability_display": "2.805414104",
+      "lp_residual_after_traders_display": "48.694631124",
+      "maker_buffer_display": "48.694631124"
+    },
+    {
+      "outcome_display": "118.125000000",
+      "trader_liability_display": "2.107658029",
+      "lp_residual_after_traders_display": "49.392387199",
+      "maker_buffer_display": "49.392387199"
+    },
+    {
+      "outcome_display": "125.000000000",
+      "trader_liability_display": "1.649333080",
+      "lp_residual_after_traders_display": "49.850712148",
+      "maker_buffer_display": "49.850712148"
+    },
+    {
+      "outcome_display": "131.875000000",
+      "trader_liability_display": "1.510715034",
+      "lp_residual_after_traders_display": "49.989330194",
+      "maker_buffer_display": "49.989330194"
+    },
+    {
+      "outcome_display": "138.750000000",
+      "trader_liability_display": "1.487588379",
+      "lp_residual_after_traders_display": "50.012456849",
+      "maker_buffer_display": "50.012456849"
+    },
+    {
+      "outcome_display": "145.625000000",
+      "trader_liability_display": "1.485330660",
+      "lp_residual_after_traders_display": "50.014714568",
+      "maker_buffer_display": "50.014714568"
+    },
+    {
+      "outcome_display": "152.500000000",
+      "trader_liability_display": "1.485198184",
+      "lp_residual_after_traders_display": "50.014847044",
+      "maker_buffer_display": "50.014847044"
+    },
+    {
+      "outcome_display": "159.375000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "166.250000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "173.125000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    },
+    {
+      "outcome_display": "180.000000000",
+      "trader_liability_display": "1.485193296",
+      "lp_residual_after_traders_display": "50.014851932",
+      "maker_buffer_display": "50.014851932"
+    }
+  ],
+  "settlement_waterfall": {
+    "outcome_display": "107.600000000",
+    "trader_claims_display": "2.970386090",
+    "lp_residual_claim_display": "48.529659138",
+    "protocol_dust_display": "0.000000000"
+  },
   "presets": [
     {
       "id": "base",
