@@ -134,6 +134,7 @@ data class DemoPayload(
     val presets: List<DemoPreset>,
     val quoteGrid: List<DemoPreset>,
     val regimeIndexes: List<DemoRegimeIndex>,
+    val perps: DemoPerpMarket,
 )
 
 data class DemoMarket(
@@ -295,8 +296,73 @@ data class DemoRegimeQuote(
     val memoPayload: String,
 )
 
+data class DemoPerpMarket(
+    val symbol: String,
+    val title: String,
+    val status: String,
+    val slot: Long,
+    val nextFundingSlot: Long,
+    val fundingInterval: Long,
+    val markPriceDisplay: String,
+    val anchorMuDisplay: String,
+    val anchorSigmaDisplay: String,
+    val ammMuDisplay: String,
+    val ammSigmaDisplay: String,
+    val klDisplay: String,
+    val spotFundingRateDisplay: String,
+    val vaultCashDisplay: String,
+    val lpNavDisplay: String,
+    val availableLpCashDisplay: String,
+    val openPositions: Long,
+    val totalLpSharesDisplay: String,
+    val curvePoints: List<DemoPerpCurvePoint>,
+    val fundingPath: List<DemoPerpFundingPoint>,
+    val longQuote: DemoPerpQuote,
+    val shortQuote: DemoPerpQuote,
+    val positions: List<DemoPerpPosition>,
+)
+
+data class DemoPerpCurvePoint(
+    val x: Double,
+    val amm: Double,
+    val anchor: Double,
+    val edge: Double,
+)
+
+data class DemoPerpFundingPoint(
+    val slot: Long,
+    val ammMuDisplay: String,
+    val anchorMuDisplay: String,
+    val klDisplay: String,
+    val fundingRateDisplay: String,
+)
+
+data class DemoPerpQuote(
+    val side: String,
+    val targetMuDisplay: String,
+    val targetSigmaDisplay: String,
+    val collateralRequiredDisplay: String,
+    val feePaidDisplay: String,
+    val totalDebitDisplay: String,
+    val estimatedFundingDisplay: String,
+    val closeMarkDisplay: String,
+    val memoPayload: String,
+)
+
+data class DemoPerpPosition(
+    val id: String,
+    val side: String,
+    val entryMuDisplay: String,
+    val collateralDisplay: String,
+    val fundingPaidDisplay: String,
+    val fundingReceivedDisplay: String,
+    val markPayoutDisplay: String,
+    val status: String,
+)
+
 private enum class AppTab(val label: String) {
     Trade("Trade"),
+    Perps("Perps"),
     Liquidity("Liquidity"),
     Backend("Backend"),
     Positions("Positions"),
@@ -326,6 +392,13 @@ private fun AppTab.tutorialCopy(): TutorialCopy {
             watchItem = "Makers earn fees, but their capital is also what pays winning trader claims.",
         )
 
+        AppTab.Perps -> TutorialCopy(
+            headline = "Trade without an expiry",
+            body = "Perps keep the distribution market open by using an anchor and funding instead of waiting for one final settlement outcome.",
+            primaryAction = "Compare the AMM curve to the anchor, choose long or short, then review collateral, fee, and estimated funding.",
+            watchItem = "If your position pushes the AMM away from the anchor, funding can charge you; if it moves toward the anchor, funding can credit you.",
+        )
+
         AppTab.Backend -> TutorialCopy(
             headline = "Follow the program logic",
             body = "This is the plain-English trace of what the backend checks before accepting a trade.",
@@ -350,6 +423,11 @@ private fun AppTab.tutorialCopy(): TutorialCopy {
 }
 
 private enum class RegimeTradeSide(val label: String) {
+    Long("Long"),
+    Short("Short"),
+}
+
+private enum class PerpTradeSide(val label: String) {
     Long("Long"),
     Short("Short"),
 }
@@ -536,6 +614,7 @@ private fun TradeAppScreen(
     var activeTab by remember { mutableStateOf(AppTab.Trade) }
     var selectedRegimeId by remember { mutableStateOf(payload.regimeIndexes.first().id) }
     var selectedRegimeSide by remember { mutableStateOf(RegimeTradeSide.Long) }
+    var selectedPerpSide by remember { mutableStateOf(PerpTradeSide.Long) }
     var submitStatus by remember { mutableStateOf<SubmitStatus?>(null) }
     var tutorialSeenTabs by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var tutorialsSkipped by rememberSaveable { mutableStateOf(false) }
@@ -573,7 +652,10 @@ private fun TradeAppScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         TopBar(payload.market, submitStatus)
-        PrimaryNavigation(activeTab) { activeTab = it }
+        PrimaryNavigation(activeTab) {
+            activeTab = it
+            submitStatus = null
+        }
 
         Column(
             modifier = Modifier.padding(12.dp),
@@ -631,6 +713,46 @@ private fun TradeAppScreen(
                     preview = payload.previewLiquidity,
                     waterfall = payload.settlementWaterfall,
                     riskGrid = payload.riskGrid,
+                )
+
+                AppTab.Perps -> PerpsTab(
+                    market = payload.perps,
+                    selectedSide = selectedPerpSide,
+                    submitStatus = submitStatus,
+                    onSideChange = {
+                        selectedPerpSide = it
+                        submitStatus = null
+                    },
+                    onSubmit = {
+                        submitStatus = SubmitStatus(
+                            message = "Opening wallet for perp memo approval...",
+                            isWorking = true,
+                        )
+                        coroutineScope.launch {
+                            val quote = payload.perps.quoteFor(selectedPerpSide)
+                            submitStatus = when (
+                                val result = WalletSubmitter.submitPerpMemo(
+                                    walletSender,
+                                    payload.perps,
+                                    quote,
+                                )
+                            ) {
+                                is WalletSubmitResult.Success -> SubmitStatus(
+                                    message = "Perp memo submitted. Wallet ${result.walletAddress.take(12)}... signed ${result.signatureHex.take(16)}...",
+                                )
+
+                                is WalletSubmitResult.NoWalletFound -> SubmitStatus(
+                                    message = "No Mobile Wallet Adapter wallet found on this device.",
+                                    isError = true,
+                                )
+
+                                is WalletSubmitResult.Failure -> SubmitStatus(
+                                    message = result.message,
+                                    isError = true,
+                                )
+                            }
+                        }
+                    },
                 )
 
                 AppTab.Backend -> BackendTab(
@@ -1511,6 +1633,331 @@ private fun RegimeTradePanel(
 }
 
 @Composable
+private fun PerpsTab(
+    market: DemoPerpMarket,
+    selectedSide: PerpTradeSide,
+    submitStatus: SubmitStatus?,
+    onSideChange: (PerpTradeSide) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    PerpMarketPanel(market)
+    PerpDistributionPanel(market)
+    PerpFundingPanel(market)
+    PerpTradePanel(
+        market = market,
+        selectedSide = selectedSide,
+        submitStatus = submitStatus,
+        onSideChange = onSideChange,
+        onSubmit = onSubmit,
+    )
+    PerpPositionsPanel(market)
+    PerpBackendPanel(market)
+}
+
+@Composable
+private fun PerpMarketPanel(market: DemoPerpMarket) {
+    Panel {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(market.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Perpetual market priced by AMM curve, anchor curve, and funding pressure.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(market.symbol, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text(market.status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        DenseStats(
+            listOf(
+                "Mark average" to market.markPriceDisplay,
+                "Anchor average" to market.anchorMuDisplay,
+                "KL pressure" to market.klDisplay,
+                "Funding / slot" to market.spotFundingRateDisplay,
+                "Open positions" to market.openPositions.toString(),
+                "Next funding" to market.nextFundingSlot.toString(),
+            )
+        )
+    }
+}
+
+@Composable
+private fun PerpDistributionPanel(market: DemoPerpMarket) {
+    Panel {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column {
+                Text("Perp distribution", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "AMM mark vs anchor reference",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                "slot ${market.slot}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        PerpDistributionCanvas(market.curvePoints)
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            LegendDot("AMM", Color(0xFF0891B2))
+            LegendDot("Anchor", Color(0xFF475569))
+            LegendDot("Divergence", Color(0xFFF59E0B))
+        }
+    }
+}
+
+@Composable
+private fun PerpDistributionCanvas(points: List<DemoPerpCurvePoint>) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+            .padding(8.dp),
+    ) {
+        if (points.size < 2) return@Canvas
+        val minX = points.minOf { it.x }
+        val maxX = points.maxOf { it.x }
+        val maxY = max(points.maxOf { it.amm }, points.maxOf { it.anchor }).coerceAtLeast(0.0001) * 1.12
+        val left = 18f
+        val right = size.width - 12f
+        val top = 14f
+        val bottom = size.height - 18f
+        val width = right - left
+        val height = bottom - top
+
+        fun xOf(x: Double): Float = left + (((x - minX) / (maxX - minX)) * width).toFloat()
+        fun yOf(y: Double): Float = bottom - ((y / maxY) * height).toFloat()
+
+        repeat(4) { index ->
+            val y = top + height * index / 3f
+            drawLine(Color(0xFFE5E7EB), Offset(left, y), Offset(right, y), 1f)
+        }
+
+        val stepWidth = width / (points.size - 1)
+        points.forEach { point ->
+            val x = xOf(point.x)
+            val ammY = yOf(point.amm)
+            val anchorY = yOf(point.anchor)
+            drawRect(
+                color = Color(0xFFF59E0B).copy(alpha = 0.10f),
+                topLeft = Offset(x - stepWidth / 2f, min(ammY, anchorY)),
+                size = Size(stepWidth, abs(ammY - anchorY).coerceAtLeast(1f)),
+            )
+        }
+        points.zipWithNext().forEach { (leftPoint, rightPoint) ->
+            drawLine(
+                color = Color(0xFF475569),
+                start = Offset(xOf(leftPoint.x), yOf(leftPoint.anchor)),
+                end = Offset(xOf(rightPoint.x), yOf(rightPoint.anchor)),
+                strokeWidth = 3f,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = Color(0xFF0891B2),
+                start = Offset(xOf(leftPoint.x), yOf(leftPoint.amm)),
+                end = Offset(xOf(rightPoint.x), yOf(rightPoint.amm)),
+                strokeWidth = 4f,
+                cap = StrokeCap.Round,
+            )
+        }
+        drawLine(Color(0xFFCBD5E1), Offset(left, bottom), Offset(right, bottom), 1.5f)
+    }
+}
+
+@Composable
+private fun PerpFundingPanel(market: DemoPerpMarket) {
+    Panel {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Funding engine", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "every ${market.fundingInterval} slots",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        PerpFundingCanvas(market.fundingPath)
+        DenseStats(
+            listOf(
+                "Vault cash" to market.vaultCashDisplay,
+                "Available LP cash" to market.availableLpCashDisplay,
+                "LP NAV" to market.lpNavDisplay,
+                "LP shares" to market.totalLpSharesDisplay,
+            )
+        )
+    }
+}
+
+@Composable
+private fun PerpFundingCanvas(points: List<DemoPerpFundingPoint>) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(138.dp)
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+            .padding(8.dp),
+    ) {
+        if (points.size < 2) return@Canvas
+        val klValues = points.map { it.klDisplay.toDouble() }
+        val minY = (klValues.minOrNull() ?: 0.0).coerceAtLeast(0.0)
+        val maxY = (klValues.maxOrNull() ?: 1.0).coerceAtLeast(minY + 0.0001) * 1.12
+        val left = 16f
+        val right = size.width - 12f
+        val top = 12f
+        val bottom = size.height - 16f
+        val width = right - left
+        val height = bottom - top
+
+        fun xOf(index: Int): Float = left + width * index / (points.size - 1).coerceAtLeast(1)
+        fun yOf(value: Double): Float = bottom - (((value - minY) / (maxY - minY)) * height).toFloat()
+
+        repeat(3) { index ->
+            val y = top + height * index / 2f
+            drawLine(Color(0xFFE5E7EB), Offset(left, y), Offset(right, y), 1f)
+        }
+        points.zipWithNext().forEachIndexed { index, (leftPoint, rightPoint) ->
+            drawLine(
+                color = Color(0xFFF59E0B),
+                start = Offset(xOf(index), yOf(leftPoint.klDisplay.toDouble())),
+                end = Offset(xOf(index + 1), yOf(rightPoint.klDisplay.toDouble())),
+                strokeWidth = 4f,
+                cap = StrokeCap.Round,
+            )
+        }
+        points.forEachIndexed { index, point ->
+            drawCircle(
+                color = Color(0xFF0891B2),
+                radius = 4.2f,
+                center = Offset(xOf(index), yOf(point.klDisplay.toDouble())),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PerpTradePanel(
+    market: DemoPerpMarket,
+    selectedSide: PerpTradeSide,
+    submitStatus: SubmitStatus?,
+    onSideChange: (PerpTradeSide) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    val quote = market.quoteFor(selectedSide)
+    var showDetails by remember { mutableStateOf(false) }
+    Panel {
+        Text("Perp order", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PerpTradeSide.entries.forEach { side ->
+                FilterChip(
+                    selected = selectedSide == side,
+                    onClick = { onSideChange(side) },
+                    label = { Text(side.label) },
+                )
+            }
+        }
+        QuoteRow("Target average", quote.targetMuDisplay)
+        QuoteRow("Target sigma", quote.targetSigmaDisplay)
+        QuoteRow("Required collateral", quote.collateralRequiredDisplay)
+        QuoteRow("Maker fee", quote.feePaidDisplay)
+        QuoteRow("Est. funding", signedDisplay(quote.estimatedFundingDisplay))
+        QuoteRow("Close mark", quote.closeMarkDisplay)
+        HorizontalDivider()
+        QuoteRow("Total debit", quote.totalDebitDisplay, strong = true)
+        Button(
+            onClick = onSubmit,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = submitStatus?.isWorking != true,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (submitStatus?.isWorking == true) "Waiting on wallet" else "Submit perp memo")
+        }
+        Text(
+            text = "Demo memo transaction: this records a perp intent while the real on-chain perp instruction is wired.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        submitStatus?.let { StatusMessage(it) }
+        OutlinedButton(onClick = { showDetails = !showDetails }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (showDetails) "Hide memo details" else "Show memo details")
+        }
+        if (showDetails) {
+            Text(
+                text = quote.memoPayload,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PerpPositionsPanel(market: DemoPerpMarket) {
+    Panel {
+        Text("Open perp positions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        market.positions.forEachIndexed { index, position ->
+            if (index > 0) {
+                HorizontalDivider()
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column {
+                        Text(position.id, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(position.side, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(position.status, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DenseStats(
+                    listOf(
+                        "Entry average" to position.entryMuDisplay,
+                        "Collateral" to position.collateralDisplay,
+                        "Funding paid" to position.fundingPaidDisplay,
+                        "Funding received" to position.fundingReceivedDisplay,
+                        "Mark payout" to position.markPayoutDisplay,
+                        "Close mark" to market.anchorMuDisplay,
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PerpBackendPanel(market: DemoPerpMarket) {
+    Panel {
+        Text("Perp backend flow", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        TimelineRow("1", "Anchor", "Oracle and EMA anchors define the reference distribution at slot ${market.slot}.")
+        TimelineRow("2", "Open", "A quote moves the AMM curve, locks collateral, charges the taker fee, and stores trade-time exposure.")
+        TimelineRow("3", "Fund", "Every ${market.fundingInterval} slots, KL pressure decides whether positions pay LPs or receive credits.")
+        TimelineRow("4", "Close", "The position closes at the anchor mark instead of waiting for a final market expiry.")
+    }
+}
+
+@Composable
 private fun DistributionChartPanel(
     targetMu: Float,
     targetSigma: Float,
@@ -2036,6 +2483,7 @@ private fun loadDemoPayload(json: String): DemoPayload {
     val presetsArray = root.getJSONArray("presets")
     val quoteGridArray = root.getJSONArray("quote_grid")
     val regimeIndexesArray = root.getJSONArray("regime_indexes")
+    val perpsObject = root.getJSONObject("perps")
     return DemoPayload(
         market = DemoMarket(
             title = marketObject.getString("title"),
@@ -2066,6 +2514,7 @@ private fun loadDemoPayload(json: String): DemoPayload {
         presets = presetsArray.toPresetList(),
         quoteGrid = quoteGridArray.toPresetList(),
         regimeIndexes = regimeIndexesArray.toRegimeIndexList(),
+        perps = perpsObject.toPerpMarket(),
     )
 }
 
@@ -2249,6 +2698,101 @@ private fun JSONObject.toRegimeQuote(): DemoRegimeQuote {
         totalDebitDisplay = getString("total_debit_display"),
         memoPayload = getString("memo_payload"),
     )
+}
+
+private fun JSONObject.toPerpMarket(): DemoPerpMarket {
+    return DemoPerpMarket(
+        symbol = getString("symbol"),
+        title = getString("title"),
+        status = getString("status"),
+        slot = getLong("slot"),
+        nextFundingSlot = getLong("next_funding_slot"),
+        fundingInterval = getLong("funding_interval"),
+        markPriceDisplay = getString("mark_price_display"),
+        anchorMuDisplay = getString("anchor_mu_display"),
+        anchorSigmaDisplay = getString("anchor_sigma_display"),
+        ammMuDisplay = getString("amm_mu_display"),
+        ammSigmaDisplay = getString("amm_sigma_display"),
+        klDisplay = getString("kl_display"),
+        spotFundingRateDisplay = getString("spot_funding_rate_display"),
+        vaultCashDisplay = getString("vault_cash_display"),
+        lpNavDisplay = getString("lp_nav_display"),
+        availableLpCashDisplay = getString("available_lp_cash_display"),
+        openPositions = getLong("open_positions"),
+        totalLpSharesDisplay = getString("total_lp_shares_display"),
+        curvePoints = getJSONArray("curve_points").toPerpCurvePoints(),
+        fundingPath = getJSONArray("funding_path").toPerpFundingPath(),
+        longQuote = getJSONObject("long_quote").toPerpQuote(),
+        shortQuote = getJSONObject("short_quote").toPerpQuote(),
+        positions = getJSONArray("positions").toPerpPositions(),
+    )
+}
+
+private fun JSONArray.toPerpCurvePoints(): List<DemoPerpCurvePoint> {
+    val points = mutableListOf<DemoPerpCurvePoint>()
+    for (index in 0 until length()) {
+        val point = getJSONObject(index)
+        points.add(
+            DemoPerpCurvePoint(
+                x = point.getString("x").toDouble(),
+                amm = point.getString("amm").toDouble(),
+                anchor = point.getString("anchor").toDouble(),
+                edge = point.getString("edge").toDouble(),
+            )
+        )
+    }
+    return points
+}
+
+private fun JSONArray.toPerpFundingPath(): List<DemoPerpFundingPoint> {
+    val points = mutableListOf<DemoPerpFundingPoint>()
+    for (index in 0 until length()) {
+        val point = getJSONObject(index)
+        points.add(
+            DemoPerpFundingPoint(
+                slot = point.getLong("slot"),
+                ammMuDisplay = point.getString("amm_mu_display"),
+                anchorMuDisplay = point.getString("anchor_mu_display"),
+                klDisplay = point.getString("kl_display"),
+                fundingRateDisplay = point.getString("funding_rate_display"),
+            )
+        )
+    }
+    return points
+}
+
+private fun JSONObject.toPerpQuote(): DemoPerpQuote {
+    return DemoPerpQuote(
+        side = getString("side"),
+        targetMuDisplay = getString("target_mu_display"),
+        targetSigmaDisplay = getString("target_sigma_display"),
+        collateralRequiredDisplay = getString("collateral_required_display"),
+        feePaidDisplay = getString("fee_paid_display"),
+        totalDebitDisplay = getString("total_debit_display"),
+        estimatedFundingDisplay = getString("estimated_funding_display"),
+        closeMarkDisplay = getString("close_mark_display"),
+        memoPayload = getString("memo_payload"),
+    )
+}
+
+private fun JSONArray.toPerpPositions(): List<DemoPerpPosition> {
+    val positions = mutableListOf<DemoPerpPosition>()
+    for (index in 0 until length()) {
+        val position = getJSONObject(index)
+        positions.add(
+            DemoPerpPosition(
+                id = position.getString("id"),
+                side = position.getString("side"),
+                entryMuDisplay = position.getString("entry_mu_display"),
+                collateralDisplay = position.getString("collateral_display"),
+                fundingPaidDisplay = position.getString("funding_paid_display"),
+                fundingReceivedDisplay = position.getString("funding_received_display"),
+                markPayoutDisplay = position.getString("mark_payout_display"),
+                status = position.getString("status"),
+            )
+        )
+    }
+    return positions
 }
 
 private fun nearestQuote(
@@ -2482,6 +3026,13 @@ private fun DemoRegimeIndex.quoteFor(side: RegimeTradeSide): DemoRegimeQuote {
     return when (side) {
         RegimeTradeSide.Long -> longQuote
         RegimeTradeSide.Short -> shortQuote
+    }
+}
+
+private fun DemoPerpMarket.quoteFor(side: PerpTradeSide): DemoPerpQuote {
+    return when (side) {
+        PerpTradeSide.Long -> longQuote
+        PerpTradeSide.Short -> shortQuote
     }
 }
 

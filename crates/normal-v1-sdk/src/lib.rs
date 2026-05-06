@@ -215,6 +215,75 @@ pub struct DemoRegimeIndexV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoPerpCurvePointV1 {
+    pub x: String,
+    pub amm: String,
+    pub anchor: String,
+    pub edge: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoPerpFundingPointV1 {
+    pub slot: u64,
+    pub amm_mu_display: String,
+    pub anchor_mu_display: String,
+    pub kl_display: String,
+    pub funding_rate_display: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoPerpQuoteV1 {
+    pub side: String,
+    pub target_mu_display: String,
+    pub target_sigma_display: String,
+    pub collateral_required_display: String,
+    pub fee_paid_display: String,
+    pub total_debit_display: String,
+    pub estimated_funding_display: String,
+    pub close_mark_display: String,
+    pub memo_payload: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoPerpPositionV1 {
+    pub id: String,
+    pub side: String,
+    pub entry_mu_display: String,
+    pub collateral_display: String,
+    pub funding_paid_display: String,
+    pub funding_received_display: String,
+    pub mark_payout_display: String,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DemoPerpMarketV1 {
+    pub symbol: String,
+    pub title: String,
+    pub status: String,
+    pub slot: u64,
+    pub next_funding_slot: u64,
+    pub funding_interval: u64,
+    pub mark_price_display: String,
+    pub anchor_mu_display: String,
+    pub anchor_sigma_display: String,
+    pub amm_mu_display: String,
+    pub amm_sigma_display: String,
+    pub kl_display: String,
+    pub spot_funding_rate_display: String,
+    pub vault_cash_display: String,
+    pub lp_nav_display: String,
+    pub available_lp_cash_display: String,
+    pub open_positions: u64,
+    pub total_lp_shares_display: String,
+    pub curve_points: Vec<DemoPerpCurvePointV1>,
+    pub funding_path: Vec<DemoPerpFundingPointV1>,
+    pub long_quote: DemoPerpQuoteV1,
+    pub short_quote: DemoPerpQuoteV1,
+    pub positions: Vec<DemoPerpPositionV1>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DemoAppPayloadV1 {
     pub market: DemoMarketSnapshotV1,
     pub liquidity: DemoLiquiditySnapshotV1,
@@ -225,6 +294,7 @@ pub struct DemoAppPayloadV1 {
     pub presets: Vec<DemoQuotePresetV1>,
     pub quote_grid: Vec<DemoQuotePresetV1>,
     pub regime_indexes: Vec<DemoRegimeIndexV1>,
+    pub perps: DemoPerpMarketV1,
 }
 
 pub fn seeded_demo_market() -> Result<NormalV1Program, String> {
@@ -416,6 +486,7 @@ pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
 
     let quote_grid = build_quote_grid(&program)?;
     let regime_indexes = demo_regime_indexes()?;
+    let perps = demo_perp_market(&program)?;
 
     Ok(DemoAppPayloadV1 {
         market,
@@ -427,6 +498,7 @@ pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
         presets,
         quote_grid,
         regime_indexes,
+        perps,
     })
 }
 
@@ -535,7 +607,10 @@ pub fn demo_app_payload_json() -> Result<String, String> {
     json.push_str("  ],\n");
     json.push_str("  \"regime_indexes\": [\n");
     push_regime_indexes_json(&mut json, &payload.regime_indexes);
-    json.push_str("  ]\n");
+    json.push_str("  ],\n");
+    json.push_str("  \"perps\": ");
+    push_perp_market_json(&mut json, &payload.perps);
+    json.push('\n');
     json.push_str("}\n");
     Ok(json)
 }
@@ -969,6 +1044,231 @@ fn push_regime_quote_json(json: &mut String, quote: &DemoRegimeQuoteV1) {
     json.push_str("      }");
 }
 
+fn push_perp_market_json(json: &mut String, market: &DemoPerpMarketV1) {
+    json.push_str("{\n");
+    json.push_str(&format!(
+        "    \"symbol\": \"{}\",\n",
+        escape_json(&market.symbol)
+    ));
+    json.push_str(&format!(
+        "    \"title\": \"{}\",\n",
+        escape_json(&market.title)
+    ));
+    json.push_str(&format!(
+        "    \"status\": \"{}\",\n",
+        escape_json(&market.status)
+    ));
+    json.push_str(&format!("    \"slot\": {},\n", market.slot));
+    json.push_str(&format!(
+        "    \"next_funding_slot\": {},\n",
+        market.next_funding_slot
+    ));
+    json.push_str(&format!(
+        "    \"funding_interval\": {},\n",
+        market.funding_interval
+    ));
+    json.push_str(&format!(
+        "    \"mark_price_display\": \"{}\",\n",
+        escape_json(&market.mark_price_display)
+    ));
+    json.push_str(&format!(
+        "    \"anchor_mu_display\": \"{}\",\n",
+        escape_json(&market.anchor_mu_display)
+    ));
+    json.push_str(&format!(
+        "    \"anchor_sigma_display\": \"{}\",\n",
+        escape_json(&market.anchor_sigma_display)
+    ));
+    json.push_str(&format!(
+        "    \"amm_mu_display\": \"{}\",\n",
+        escape_json(&market.amm_mu_display)
+    ));
+    json.push_str(&format!(
+        "    \"amm_sigma_display\": \"{}\",\n",
+        escape_json(&market.amm_sigma_display)
+    ));
+    json.push_str(&format!(
+        "    \"kl_display\": \"{}\",\n",
+        escape_json(&market.kl_display)
+    ));
+    json.push_str(&format!(
+        "    \"spot_funding_rate_display\": \"{}\",\n",
+        escape_json(&market.spot_funding_rate_display)
+    ));
+    json.push_str(&format!(
+        "    \"vault_cash_display\": \"{}\",\n",
+        escape_json(&market.vault_cash_display)
+    ));
+    json.push_str(&format!(
+        "    \"lp_nav_display\": \"{}\",\n",
+        escape_json(&market.lp_nav_display)
+    ));
+    json.push_str(&format!(
+        "    \"available_lp_cash_display\": \"{}\",\n",
+        escape_json(&market.available_lp_cash_display)
+    ));
+    json.push_str(&format!(
+        "    \"open_positions\": {},\n",
+        market.open_positions
+    ));
+    json.push_str(&format!(
+        "    \"total_lp_shares_display\": \"{}\",\n",
+        escape_json(&market.total_lp_shares_display)
+    ));
+    json.push_str("    \"curve_points\": [\n");
+    push_perp_curve_points_json(json, &market.curve_points);
+    json.push_str("    ],\n");
+    json.push_str("    \"funding_path\": [\n");
+    push_perp_funding_path_json(json, &market.funding_path);
+    json.push_str("    ],\n");
+    json.push_str("    \"long_quote\": ");
+    push_perp_quote_json(json, &market.long_quote);
+    json.push_str(",\n");
+    json.push_str("    \"short_quote\": ");
+    push_perp_quote_json(json, &market.short_quote);
+    json.push_str(",\n");
+    json.push_str("    \"positions\": [\n");
+    push_perp_positions_json(json, &market.positions);
+    json.push_str("    ]\n");
+    json.push_str("  }");
+}
+
+fn push_perp_curve_points_json(json: &mut String, points: &[DemoPerpCurvePointV1]) {
+    for (index, point) in points.iter().enumerate() {
+        json.push_str("      {\n");
+        json.push_str(&format!("        \"x\": \"{}\",\n", escape_json(&point.x)));
+        json.push_str(&format!(
+            "        \"amm\": \"{}\",\n",
+            escape_json(&point.amm)
+        ));
+        json.push_str(&format!(
+            "        \"anchor\": \"{}\",\n",
+            escape_json(&point.anchor)
+        ));
+        json.push_str(&format!(
+            "        \"edge\": \"{}\"\n",
+            escape_json(&point.edge)
+        ));
+        json.push_str("      }");
+        if index + 1 != points.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+}
+
+fn push_perp_funding_path_json(json: &mut String, points: &[DemoPerpFundingPointV1]) {
+    for (index, point) in points.iter().enumerate() {
+        json.push_str("      {\n");
+        json.push_str(&format!("        \"slot\": {},\n", point.slot));
+        json.push_str(&format!(
+            "        \"amm_mu_display\": \"{}\",\n",
+            escape_json(&point.amm_mu_display)
+        ));
+        json.push_str(&format!(
+            "        \"anchor_mu_display\": \"{}\",\n",
+            escape_json(&point.anchor_mu_display)
+        ));
+        json.push_str(&format!(
+            "        \"kl_display\": \"{}\",\n",
+            escape_json(&point.kl_display)
+        ));
+        json.push_str(&format!(
+            "        \"funding_rate_display\": \"{}\"\n",
+            escape_json(&point.funding_rate_display)
+        ));
+        json.push_str("      }");
+        if index + 1 != points.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+}
+
+fn push_perp_quote_json(json: &mut String, quote: &DemoPerpQuoteV1) {
+    json.push_str("{\n");
+    json.push_str(&format!(
+        "      \"side\": \"{}\",\n",
+        escape_json(&quote.side)
+    ));
+    json.push_str(&format!(
+        "      \"target_mu_display\": \"{}\",\n",
+        escape_json(&quote.target_mu_display)
+    ));
+    json.push_str(&format!(
+        "      \"target_sigma_display\": \"{}\",\n",
+        escape_json(&quote.target_sigma_display)
+    ));
+    json.push_str(&format!(
+        "      \"collateral_required_display\": \"{}\",\n",
+        escape_json(&quote.collateral_required_display)
+    ));
+    json.push_str(&format!(
+        "      \"fee_paid_display\": \"{}\",\n",
+        escape_json(&quote.fee_paid_display)
+    ));
+    json.push_str(&format!(
+        "      \"total_debit_display\": \"{}\",\n",
+        escape_json(&quote.total_debit_display)
+    ));
+    json.push_str(&format!(
+        "      \"estimated_funding_display\": \"{}\",\n",
+        escape_json(&quote.estimated_funding_display)
+    ));
+    json.push_str(&format!(
+        "      \"close_mark_display\": \"{}\",\n",
+        escape_json(&quote.close_mark_display)
+    ));
+    json.push_str(&format!(
+        "      \"memo_payload\": \"{}\"\n",
+        escape_json(&quote.memo_payload)
+    ));
+    json.push_str("    }");
+}
+
+fn push_perp_positions_json(json: &mut String, positions: &[DemoPerpPositionV1]) {
+    for (index, position) in positions.iter().enumerate() {
+        json.push_str("      {\n");
+        json.push_str(&format!(
+            "        \"id\": \"{}\",\n",
+            escape_json(&position.id)
+        ));
+        json.push_str(&format!(
+            "        \"side\": \"{}\",\n",
+            escape_json(&position.side)
+        ));
+        json.push_str(&format!(
+            "        \"entry_mu_display\": \"{}\",\n",
+            escape_json(&position.entry_mu_display)
+        ));
+        json.push_str(&format!(
+            "        \"collateral_display\": \"{}\",\n",
+            escape_json(&position.collateral_display)
+        ));
+        json.push_str(&format!(
+            "        \"funding_paid_display\": \"{}\",\n",
+            escape_json(&position.funding_paid_display)
+        ));
+        json.push_str(&format!(
+            "        \"funding_received_display\": \"{}\",\n",
+            escape_json(&position.funding_received_display)
+        ));
+        json.push_str(&format!(
+            "        \"mark_payout_display\": \"{}\",\n",
+            escape_json(&position.mark_payout_display)
+        ));
+        json.push_str(&format!(
+            "        \"status\": \"{}\"\n",
+            escape_json(&position.status)
+        ));
+        json.push_str("      }");
+        if index + 1 != positions.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+}
+
 fn quote_preset(
     program: &NormalV1Program,
     id: &str,
@@ -1366,6 +1666,266 @@ fn demo_regime_quote(
     }
 }
 
+struct PerpQuoteNumbers {
+    target_mu: f64,
+    collateral: f64,
+    total_debit: f64,
+    estimated_funding: f64,
+    mark_payout: f64,
+}
+
+fn demo_perp_market(program: &NormalV1Program) -> Result<DemoPerpMarketV1, String> {
+    let slot = 24_u64;
+    let funding_interval = 10_u64;
+    let next_funding_slot = 30_u64;
+    let anchor_mu = 100.0;
+    let anchor_sigma = 8.0;
+    let amm = program.state.market_account.current_distribution;
+    let amm_mu = amm.mu.to_f64();
+    let amm_sigma = amm.sigma.to_f64();
+    let current_kl = normal_kl(amm_mu, amm_sigma, anchor_mu, anchor_sigma);
+    let spot_funding_rate = demo_perp_funding_rate(current_kl, funding_interval);
+
+    let (long_quote, long_numbers) = demo_perp_quote(
+        program,
+        "Long",
+        103.0,
+        9.5,
+        anchor_mu,
+        anchor_sigma,
+        funding_interval,
+    )?;
+    let (short_quote, short_numbers) = demo_perp_quote(
+        program,
+        "Short",
+        90.0,
+        10.5,
+        anchor_mu,
+        anchor_sigma,
+        funding_interval,
+    )?;
+
+    let open_collateral = long_numbers.collateral + short_numbers.collateral;
+    let net_funding = long_numbers.estimated_funding + short_numbers.estimated_funding;
+    let vault_cash = 50.0 + long_numbers.total_debit + short_numbers.total_debit + net_funding;
+    let available_lp_cash = (vault_cash - open_collateral).max(0.0);
+
+    Ok(DemoPerpMarketV1 {
+        symbol: "SOL-PERP".to_string(),
+        title: "Perpetual SOL distribution market".to_string(),
+        status: "Active".to_string(),
+        slot,
+        next_funding_slot,
+        funding_interval,
+        mark_price_display: fixed_display(amm_mu)?,
+        anchor_mu_display: fixed_display(anchor_mu)?,
+        anchor_sigma_display: fixed_display(anchor_sigma)?,
+        amm_mu_display: amm.mu.to_string(),
+        amm_sigma_display: amm.sigma.to_string(),
+        kl_display: fixed_display(current_kl)?,
+        spot_funding_rate_display: fixed_display(spot_funding_rate)?,
+        vault_cash_display: fixed_display(vault_cash)?,
+        lp_nav_display: fixed_display(available_lp_cash)?,
+        available_lp_cash_display: fixed_display(available_lp_cash)?,
+        open_positions: 2,
+        total_lp_shares_display: fixed_display(50.0)?,
+        curve_points: build_perp_curve_points(program, amm_mu, amm_sigma, anchor_mu, anchor_sigma)?,
+        funding_path: build_perp_funding_path(anchor_mu, anchor_sigma, funding_interval)?,
+        long_quote,
+        short_quote,
+        positions: vec![
+            demo_perp_position("perp-long-001", "Long", &long_numbers)?,
+            demo_perp_position("perp-short-002", "Short", &short_numbers)?,
+        ],
+    })
+}
+
+fn demo_perp_quote(
+    program: &NormalV1Program,
+    side: &str,
+    target_mu: f64,
+    target_sigma: f64,
+    anchor_mu: f64,
+    anchor_sigma: f64,
+    funding_interval: u64,
+) -> Result<(DemoPerpQuoteV1, PerpQuoteNumbers), String> {
+    let target_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(target_mu)?, Fixed::from_f64(target_sigma)?)?;
+    let envelope = build_trade_quote(
+        program,
+        TradeQuoteRequestV1 {
+            trader: [8_u8; 32],
+            market: DEMO_MARKET_ID,
+            target_distribution,
+            quote_slot: DEMO_QUOTE_SLOT,
+            quote_expiry_slot: DEMO_QUOTE_EXPIRY_SLOT,
+        },
+    )?;
+    let intent = android_trade_intent(&envelope);
+    let current = program.state.market_account.current_distribution;
+    let old_kl = normal_kl(
+        current.mu.to_f64(),
+        current.sigma.to_f64(),
+        anchor_mu,
+        anchor_sigma,
+    );
+    let new_kl = normal_kl(target_mu, target_sigma, anchor_mu, anchor_sigma);
+    let funding_rate = demo_perp_funding_rate(new_kl, funding_interval);
+    let collateral = envelope.collateral_required.to_f64();
+    let estimated_funding = (new_kl - old_kl) * funding_rate * funding_interval as f64 * collateral;
+    let mark_payout = demo_perp_mark_payout(
+        program,
+        target_mu,
+        target_sigma,
+        anchor_mu,
+        estimated_funding.max(0.0),
+        collateral,
+    )?;
+    let numbers = PerpQuoteNumbers {
+        target_mu,
+        collateral,
+        total_debit: envelope.total_debit.to_f64(),
+        estimated_funding,
+        mark_payout,
+    };
+    let memo_estimated_funding = fixed_display(estimated_funding)?;
+    let memo_payload = format!(
+        "perp-market-demo|side={}|target_mu={}|target_sigma={}|collateral={}|fee={}|total_debit={}|est_funding={}",
+        side.to_ascii_lowercase(),
+        intent.mu_display,
+        intent.sigma_display,
+        intent.collateral_required_display,
+        intent.fee_paid_display,
+        intent.total_debit_display,
+        memo_estimated_funding,
+    );
+
+    Ok((
+        DemoPerpQuoteV1 {
+            side: side.to_string(),
+            target_mu_display: intent.mu_display,
+            target_sigma_display: intent.sigma_display,
+            collateral_required_display: intent.collateral_required_display,
+            fee_paid_display: intent.fee_paid_display,
+            total_debit_display: intent.total_debit_display,
+            estimated_funding_display: fixed_display(estimated_funding)?,
+            close_mark_display: fixed_display(anchor_mu)?,
+            memo_payload,
+        },
+        numbers,
+    ))
+}
+
+fn demo_perp_position(
+    id: &str,
+    side: &str,
+    quote: &PerpQuoteNumbers,
+) -> Result<DemoPerpPositionV1, String> {
+    Ok(DemoPerpPositionV1 {
+        id: id.to_string(),
+        side: side.to_string(),
+        entry_mu_display: fixed_display(quote.target_mu)?,
+        collateral_display: fixed_display(quote.collateral)?,
+        funding_paid_display: fixed_display(quote.estimated_funding.max(0.0))?,
+        funding_received_display: fixed_display((-quote.estimated_funding).max(0.0))?,
+        mark_payout_display: fixed_display(quote.mark_payout)?,
+        status: "Open".to_string(),
+    })
+}
+
+fn build_perp_curve_points(
+    program: &NormalV1Program,
+    amm_mu: f64,
+    amm_sigma: f64,
+    anchor_mu: f64,
+    anchor_sigma: f64,
+) -> Result<Vec<DemoPerpCurvePointV1>, String> {
+    let amm_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(amm_mu)?, Fixed::from_f64(amm_sigma)?)?;
+    let anchor_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(anchor_mu)?, Fixed::from_f64(anchor_sigma)?)?;
+    let k = program.state.market_account.k;
+    let lower = amm_mu.min(anchor_mu) - amm_sigma.max(anchor_sigma) * 4.0;
+    let upper = amm_mu.max(anchor_mu) + amm_sigma.max(anchor_sigma) * 4.0;
+    let samples = 56_usize;
+    let mut points = Vec::with_capacity(samples + 1);
+
+    for step in 0..=samples {
+        let x = lower + (upper - lower) * step as f64 / samples as f64;
+        let x_fixed = Fixed::from_f64(x)?;
+        let amm_value = fixed_calculate_f(x_fixed, amm_distribution, k)?;
+        let anchor_value = fixed_calculate_f(x_fixed, anchor_distribution, k)?;
+        points.push(DemoPerpCurvePointV1 {
+            x: Fixed::from_f64(x)?.to_string(),
+            amm: amm_value.to_string(),
+            anchor: anchor_value.to_string(),
+            edge: (amm_value - anchor_value).to_string(),
+        });
+    }
+
+    Ok(points)
+}
+
+fn build_perp_funding_path(
+    anchor_mu: f64,
+    anchor_sigma: f64,
+    funding_interval: u64,
+) -> Result<Vec<DemoPerpFundingPointV1>, String> {
+    let slots = [0_u64, 4, 8, 12, 16, 20, 24, 30];
+    let mut points = Vec::with_capacity(slots.len());
+    for (index, slot) in slots.iter().enumerate() {
+        let progress = index as f64 / (slots.len() - 1) as f64;
+        let amm_mu = 91.5 + (96.4 - 91.5) * progress;
+        let kl = normal_kl(amm_mu, 10.0, anchor_mu, anchor_sigma);
+        let rate = demo_perp_funding_rate(kl, funding_interval);
+        points.push(DemoPerpFundingPointV1 {
+            slot: *slot,
+            amm_mu_display: fixed_display(amm_mu)?,
+            anchor_mu_display: fixed_display(anchor_mu)?,
+            kl_display: fixed_display(kl)?,
+            funding_rate_display: fixed_display(rate)?,
+        });
+    }
+    Ok(points)
+}
+
+fn demo_perp_mark_payout(
+    program: &NormalV1Program,
+    target_mu: f64,
+    target_sigma: f64,
+    mark: f64,
+    funding_paid: f64,
+    collateral: f64,
+) -> Result<f64, String> {
+    let current = program.state.market_account.current_distribution;
+    let k = program.state.market_account.k;
+    let target_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(target_mu)?, Fixed::from_f64(target_sigma)?)?;
+    let mark_fixed = Fixed::from_f64(mark)?;
+    let old_value = fixed_calculate_f(mark_fixed, current, k)?.to_f64();
+    let new_value = fixed_calculate_f(mark_fixed, target_distribution, k)?.to_f64();
+    Ok((collateral + (new_value - old_value) - funding_paid).max(0.0))
+}
+
+fn normal_kl(mu_p: f64, sigma_p: f64, mu_q: f64, sigma_q: f64) -> f64 {
+    (sigma_q / sigma_p).ln()
+        + (sigma_p * sigma_p + (mu_p - mu_q) * (mu_p - mu_q)) / (2.0 * sigma_q * sigma_q)
+        - 0.5
+}
+
+fn demo_perp_funding_rate(kl: f64, funding_interval: u64) -> f64 {
+    let kl_clamped = kl.min(10.0);
+    if kl_clamped < 0.001 {
+        0.0
+    } else {
+        200.0 / 10_000.0 * kl_clamped / funding_interval as f64
+    }
+}
+
+fn fixed_display(value: f64) -> Result<String, String> {
+    Ok(Fixed::from_f64(value)?.to_string())
+}
+
 fn regime_constituent_side_label(side: RegimeConstituentSide) -> &'static str {
     match side {
         RegimeConstituentSide::Long => "Long",
@@ -1507,6 +2067,8 @@ mod tests {
         assert_eq!(payload.presets.len(), 3);
         assert_eq!(payload.quote_grid.len(), 14);
         assert_eq!(payload.regime_indexes.len(), 3);
+        assert_eq!(payload.perps.symbol, "SOL-PERP");
+        assert_eq!(payload.perps.positions.len(), 2);
         assert_eq!(payload.regime_indexes[0].symbol, "HAWKFED");
         assert_eq!(payload.regime_indexes[0].constituents.len(), 3);
         assert_eq!(payload.liquidity.open_trades, 0);
@@ -1516,6 +2078,8 @@ mod tests {
         assert!(json.contains("\"presets\""));
         assert!(json.contains("\"quote_grid\""));
         assert!(json.contains("\"regime_indexes\""));
+        assert!(json.contains("\"perps\""));
+        assert!(json.contains("\"funding_path\""));
         assert!(json.contains("\"liquidity\""));
         assert!(json.contains("\"backend_trace\""));
         assert!(json.contains("\"settlement_waterfall\""));

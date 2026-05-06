@@ -47,6 +47,17 @@ object WalletSubmitter {
         )
     }
 
+    suspend fun submitPerpMemo(
+        sender: ActivityResultSender,
+        market: DemoPerpMarket,
+        quote: DemoPerpQuote,
+    ): WalletSubmitResult {
+        return submitMemo(
+            sender,
+            "${quote.memoPayload}|market=${market.symbol}|title=${market.title}",
+        )
+    }
+
     private suspend fun submitMemo(
         sender: ActivityResultSender,
         memoText: String,
