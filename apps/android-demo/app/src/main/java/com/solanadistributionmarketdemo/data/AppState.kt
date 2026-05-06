@@ -68,7 +68,7 @@ class AppState(
 enum class NavTab(val label: String) {
     Markets("Markets"),
     Portfolio("Portfolio"),
-    Activity("Activity"),
+    Engine("Engine"),
     Wallet("Wallet"),
 }
 

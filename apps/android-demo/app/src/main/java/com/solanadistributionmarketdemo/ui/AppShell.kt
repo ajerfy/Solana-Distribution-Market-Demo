@@ -39,7 +39,7 @@ fun AppShell(state: AppState, walletSender: ActivityResultSender) {
             when (state.activeTab.value) {
                 NavTab.Markets -> MarketsListScreen(state)
                 NavTab.Portfolio -> PortfolioScreen(state)
-                NavTab.Activity -> ActivityScreen(state)
+                NavTab.Engine -> EngineScreen(state)
                 NavTab.Wallet -> WalletScreen(state)
             }
             BottomNav(
@@ -149,6 +149,6 @@ private fun NavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit) {
 private fun glyphFor(tab: NavTab): String = when (tab) {
     NavTab.Markets -> "◆"
     NavTab.Portfolio -> "▲"
-    NavTab.Activity -> "≈"
+    NavTab.Engine -> "▦"
     NavTab.Wallet -> "◉"
 }
