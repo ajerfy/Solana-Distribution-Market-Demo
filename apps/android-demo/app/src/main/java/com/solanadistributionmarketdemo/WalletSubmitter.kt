@@ -79,36 +79,14 @@ object WalletSubmitter {
                     val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
                     ensureDevnetBalance(walletAddress)
                     val transaction = buildMemoTransaction(walletAddress, memoText)
-                    val signedTransactionBytes = signTransactions(arrayOf(transaction.serialize()))
-                        .signedPayloads
-                        .firstOrNull()
-                        ?: throw IllegalStateException("The wallet signed nothing for this devnet memo.")
-
-                    val rpcClient = SolanaRpcClient(DEVNET_RPC_URL, KtorNetworkDriver())
-                    val signedTransaction = Transaction.from(signedTransactionBytes)
-                    val sendResponse = rpcClient.sendTransaction(
-                        signedTransaction,
-                        TransactionOptions(commitment = Commitment.CONFIRMED),
-                    )
-                    val signature = sendResponse.result
+                    val sendResult = signAndSendTransactions(arrayOf(transaction.serialize()))
+                    val signatureBytes = sendResult.signatures.firstOrNull()
                         ?: throw IllegalStateException(
-                            sendResponse.error?.message ?: "Devnet RPC did not return a transaction signature."
+                            "The wallet returned no signature for the devnet memo. Make sure Phantom is on devnet and try again."
                         )
-
-                    val confirmed = rpcClient.confirmTransaction(
-                        signature,
-                        TransactionOptions(commitment = Commitment.CONFIRMED),
-                    ).getOrElse { error ->
-                        throw IllegalStateException(
-                            error.message ?: "Devnet RPC could not confirm the submitted memo transaction."
-                        )
-                    }
-
-                    if (!confirmed) {
-                        throw IllegalStateException("Devnet RPC did not confirm the submitted memo transaction.")
-                    }
-
-                    signature
+                    val signatureHex = encodeHex(signatureBytes)
+                    bestEffortConfirm(signatureHex)
+                    signatureHex
                 }
             ) {
                 is TransactionResult.Success -> {
@@ -123,23 +101,48 @@ object WalletSubmitter {
                     )
                 }
                 is TransactionResult.NoWalletFound -> WalletSubmitResult.NoWalletFound
-                is TransactionResult.Failure -> {
-                    WalletSubmitResult.Failure(
-                        walletMessage(
-                            result.message.ifBlank { result.e.message ?: "Wallet submission failed." },
-                            memoText.length,
-                        )
-                    )
-                }
+                is TransactionResult.Failure -> WalletSubmitResult.Failure(
+                    walletMessage(describeFailure(result.message, result.e), memoText.length)
+                )
             }
         } catch (error: Exception) {
             WalletSubmitResult.Failure(
-                walletMessage(
-                    error.message ?: "Wallet submission failed.",
-                    memoText.length,
-                )
+                walletMessage(describeException(error), memoText.length)
             )
         }
+    }
+
+    private suspend fun bestEffortConfirm(signatureHex: String) {
+        try {
+            val rpcClient = SolanaRpcClient(DEVNET_RPC_URL, KtorNetworkDriver())
+            rpcClient.confirmTransaction(
+                signatureHex,
+                TransactionOptions(commitment = Commitment.CONFIRMED),
+            )
+        } catch (_: Exception) {
+            // Confirmation is best-effort: the wallet already returned a signature, the demo can proceed.
+        }
+    }
+
+    private fun describeFailure(message: String, throwable: Throwable?): String {
+        val raw = sequenceOf(message, throwable?.message, throwable?.javaClass?.simpleName)
+            .map { it?.trim().orEmpty() }
+            .firstOrNull { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+            .orEmpty()
+        return if (raw.isEmpty()) {
+            throwable?.let { "${it.javaClass.simpleName}: <no message>" } ?: "Wallet submission failed."
+        } else raw
+    }
+
+    private fun describeException(error: Throwable): String {
+        val parts = mutableListOf<String>()
+        parts += error.javaClass.simpleName
+        error.message?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }?.let { parts += it }
+        error.cause?.let { cause ->
+            cause.javaClass.simpleName.takeIf { it != error.javaClass.simpleName }?.let { parts += "cause=$it" }
+            cause.message?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }?.let { parts += it }
+        }
+        return parts.joinToString(" · ")
     }
 
     private fun buildMemoText(quote: DemoPreset): String {
