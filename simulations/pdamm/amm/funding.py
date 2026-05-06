@@ -104,12 +104,13 @@ class FundingRateEngine:
     _total_funding_collected: float = field(default=0.0, init=False)
     _total_funding_paid_out: float = field(default=0.0, init=False)
 
-    def register_position(self, record: TradeRecord) -> None:
-        """Call when a new trade is opened."""
+    def register_position(self, record: TradeRecord, opened_at_slot: int) -> None:
+        """Call when a new trade is opened.  opened_at_slot prevents charging
+        funding for slots before the position existed."""
         self._position_states[record.trade_id] = PositionFundingState(
             trade_id=record.trade_id,
             trader_id=record.trader_id,
-            last_settled_slot=0,
+            last_settled_slot=opened_at_slot,
         )
 
     def close_position(self, trade_id: int) -> None:

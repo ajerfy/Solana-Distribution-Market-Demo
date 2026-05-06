@@ -137,7 +137,7 @@ class PerpMarket:
             new_params=new_params,
             max_total_debit=max_total_debit,
         )
-        self._funding_engine.register_position(record)
+        self._funding_engine.register_position(record, opened_at_slot=self.slot)
         self._ema_anchor.update(self.amm.params, self.slot)
 
         pos = OpenPosition(record=record)
@@ -148,15 +148,17 @@ class PerpMarket:
         """
         Close an open position.  In a perpetual market there is no
         oracle-resolved outcome — instead the trader receives a mark-to-market
-        payout based on the current AMM distribution vs their entry.
+        payout evaluated at the current anchor mu.
 
         Payout formula (mark-to-market):
-          payout = collateral + (f_current(midpoint) - f_entry(midpoint))
-        where midpoint = average of current anchor mu and position entry mu.
+          payout = collateral + (f_new(mark) - f_old(mark)) - funding_paid
 
-        This is conservative — it uses a single representative outcome rather
-        than the full distribution.  A full settlement would require an
-        oracle observation.
+        where new/old refer to the distribution the trader moved the market
+        between (their own position delta), and mark = current anchor mu.
+
+        Using new_params vs old_params (not current AMM params) isolates the
+        trader's payout to their own contribution, regardless of what other
+        traders did after them.
         """
         if trade_id not in self.open_positions:
             raise ValueError(f"position {trade_id} not open")
@@ -167,11 +169,11 @@ class PerpMarket:
 
         record = pos.record
         anchor_params = self.anchor.distribution(self.slot)
-        midpoint = anchor_params.components[0].mu
+        mark = anchor_params.components[0].mu
 
-        f_current = position_value(midpoint, self.amm.params, record.k_at_trade)
-        f_entry = position_value(midpoint, record.old_params, record.k_at_trade)
-        payout = max(0.0, record.collateral + (f_current - f_entry) - pos.funding_paid)
+        f_new = position_value(mark, record.new_params, record.k_at_trade)
+        f_old = position_value(mark, record.old_params, record.k_at_trade)
+        payout = max(0.0, record.collateral + (f_new - f_old) - pos.funding_paid)
 
         pos.closed = True
         self._funding_engine.close_position(trade_id)
