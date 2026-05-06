@@ -62,9 +62,12 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.math.BigInteger
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 private val terminalColorScheme = lightColorScheme(
     primary = Color(0xFF0891B2),
@@ -115,14 +118,23 @@ data class DemoPayload(
 data class DemoMarket(
     val title: String,
     val status: String,
+    val marketIdHex: String,
+    val stateVersion: Long,
     val currentMuDisplay: String,
     val currentSigmaDisplay: String,
+    val kDisplay: String,
     val backingDisplay: String,
+    val takerFeeBps: Int,
+    val minTakerFeeDisplay: String,
     val makerFeesEarnedDisplay: String,
     val makerDepositDisplay: String,
     val totalTrades: Long,
     val maxOpenTrades: Long,
     val expirySlot: Long,
+    val demoQuoteSlot: Long,
+    val demoQuoteExpirySlot: Long,
+    val coarseSamples: Int,
+    val refineSamples: Int,
 )
 
 data class DemoCurvePoint(
@@ -153,12 +165,14 @@ data class SubmitStatus(
 )
 
 data class ContinuousQuotePreview(
+    val targetMu: Double,
+    val targetSigma: Double,
     val collateralRequired: Double,
     val feePaid: Double,
     val totalDebit: Double,
     val maxTotalDebit: Double,
     val quoteExpirySlot: Long,
-    val snappedQuote: DemoPreset,
+    val serializedInstructionHex: String,
 )
 
 private enum class AppTab(val label: String) {
@@ -181,10 +195,9 @@ private fun TradeAppScreen(
     val previewQuote = nearestQuote(payload.quoteGrid, targetMu.toDouble(), targetSigma.toDouble())
     val continuousQuote = remember(payload.quoteGrid, targetMu, targetSigma, previewQuote) {
         buildContinuousQuotePreview(
-            quotes = payload.quoteGrid,
+            market = payload.market,
             targetMu = targetMu.toDouble(),
             targetSigma = targetSigma.toDouble(),
-            snappedQuote = previewQuote,
         )
     }
     val continuousCurvePoints = remember(
@@ -254,7 +267,7 @@ private fun TradeAppScreen(
                             isWorking = true,
                         )
                         coroutineScope.launch {
-                            submitStatus = when (val result = WalletSubmitter.submitTradeMemo(walletSender, previewQuote)) {
+                            submitStatus = when (val result = WalletSubmitter.submitTradeMemo(walletSender, continuousQuote)) {
                                 is WalletSubmitResult.Success -> SubmitStatus(
                                     message = "Demo memo submitted. Wallet ${result.walletAddress.take(12)}... signed ${result.signatureHex.take(16)}...",
                                 )
@@ -273,7 +286,7 @@ private fun TradeAppScreen(
                     },
                 )
 
-                AppTab.Positions -> PositionsTab(previewQuote, submitStatus)
+                AppTab.Positions -> PositionsTab(continuousQuote, submitStatus)
                 AppTab.Market -> MarketTab(payload.market)
                 AppTab.Maker -> MakerTab(payload.market)
             }
@@ -580,7 +593,7 @@ private fun QuoteExecutionPanel(
             Text(if (submitStatus?.isWorking == true) "Waiting on wallet" else "Submit demo memo")
         }
         Text(
-            text = "Submission snaps to nearest executable quote: ${quote.snappedQuote.label}",
+            text = "This preview and the submitted demo payload are built from the same live Normal quote.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -592,7 +605,7 @@ private fun QuoteExecutionPanel(
         }
         if (showDetails) {
             Text(
-                text = quote.snappedQuote.serializedInstructionHex.take(180) + "...",
+                text = quote.serializedInstructionHex.take(180) + "...",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -634,7 +647,7 @@ private fun StatusMessage(status: SubmitStatus) {
 }
 
 @Composable
-private fun PositionsTab(quote: DemoPreset, submitStatus: SubmitStatus?) {
+private fun PositionsTab(quote: ContinuousQuotePreview, submitStatus: SubmitStatus?) {
     Panel {
         Text("Position preview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
@@ -642,9 +655,9 @@ private fun PositionsTab(quote: DemoPreset, submitStatus: SubmitStatus?) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        QuoteRow("Pending mean", quote.targetMuDisplay)
-        QuoteRow("Pending sigma", quote.targetSigmaDisplay)
-        QuoteRow("Pending total debit", quote.totalDebitDisplay, strong = true)
+        QuoteRow("Pending mean", quote.targetMu.formattedDecimal())
+        QuoteRow("Pending sigma", quote.targetSigma.formattedDecimal())
+        QuoteRow("Pending total debit", quote.totalDebit.formattedDecimal(), strong = true)
         submitStatus?.let { StatusMessage(it) }
     }
 }
@@ -739,14 +752,23 @@ private fun loadDemoPayload(json: String): DemoPayload {
         market = DemoMarket(
             title = marketObject.getString("title"),
             status = marketObject.getString("status"),
+            marketIdHex = marketObject.getString("market_id_hex"),
+            stateVersion = marketObject.getLong("state_version"),
             currentMuDisplay = marketObject.getString("current_mu_display"),
             currentSigmaDisplay = marketObject.getString("current_sigma_display"),
+            kDisplay = marketObject.getString("k_display"),
             backingDisplay = marketObject.getString("backing_display"),
+            takerFeeBps = marketObject.getInt("taker_fee_bps"),
+            minTakerFeeDisplay = marketObject.getString("min_taker_fee_display"),
             makerFeesEarnedDisplay = marketObject.getString("maker_fees_earned_display"),
             makerDepositDisplay = marketObject.getString("maker_deposit_display"),
             totalTrades = marketObject.getLong("total_trades"),
             maxOpenTrades = marketObject.getLong("max_open_trades"),
             expirySlot = marketObject.getLong("expiry_slot"),
+            demoQuoteSlot = marketObject.getLong("demo_quote_slot"),
+            demoQuoteExpirySlot = marketObject.getLong("demo_quote_expiry_slot"),
+            coarseSamples = marketObject.getInt("coarse_samples"),
+            refineSamples = marketObject.getInt("refine_samples"),
         ),
         presets = presetsArray.toPresetList(),
         quoteGrid = quoteGridArray.toPresetList(),
@@ -807,101 +829,217 @@ private fun nearestQuote(
 }
 
 private fun buildContinuousQuotePreview(
-    quotes: List<DemoPreset>,
+    market: DemoMarket,
     targetMu: Double,
     targetSigma: Double,
-    snappedQuote: DemoPreset,
 ): ContinuousQuotePreview {
+    val currentMu = market.currentMuDisplay.toDouble()
+    val currentSigma = market.currentSigmaDisplay.toDouble()
+    val k = market.kDisplay.toDouble()
+    val searchBounds = computeSearchBounds(currentMu, currentSigma, targetMu, targetSigma)
+    val collateralRequired = computeCollateralRequired(
+        currentMu = currentMu,
+        currentSigma = currentSigma,
+        proposedMu = targetMu,
+        proposedSigma = targetSigma,
+        k = k,
+        lowerBound = searchBounds.first,
+        upperBound = searchBounds.second,
+        coarseSamples = market.coarseSamples,
+        refineSamples = market.refineSamples,
+    )
+    val minTakerFee = market.minTakerFeeDisplay.toDouble()
+    val feePaid = max(collateralRequired * market.takerFeeBps / 10_000.0, minTakerFee)
+    val totalDebit = collateralRequired + feePaid
+    val serializedInstructionHex = buildTradeInstructionHex(
+        market = market,
+        targetMu = targetMu,
+        targetSigma = targetSigma,
+        collateralRequired = collateralRequired,
+        feePaid = feePaid,
+        totalDebit = totalDebit,
+        maxTotalDebit = totalDebit,
+        lowerBound = searchBounds.first,
+        upperBound = searchBounds.second,
+    )
+
     return ContinuousQuotePreview(
-        collateralRequired = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
-            it.collateralRequiredDisplay.toDouble()
-        },
-        feePaid = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
-            it.feePaidDisplay.toDouble()
-        },
-        totalDebit = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
-            it.totalDebitDisplay.toDouble()
-        },
-        maxTotalDebit = interpolateQuoteMetric(quotes, targetMu, targetSigma) {
-            it.maxTotalDebitDisplay.toDouble()
-        },
-        quoteExpirySlot = snappedQuote.quoteExpirySlot,
-        snappedQuote = snappedQuote,
+        targetMu = targetMu,
+        targetSigma = targetSigma,
+        collateralRequired = collateralRequired,
+        feePaid = feePaid,
+        totalDebit = totalDebit,
+        maxTotalDebit = totalDebit,
+        quoteExpirySlot = market.demoQuoteExpirySlot,
+        serializedInstructionHex = serializedInstructionHex,
     )
 }
 
-private fun interpolateQuoteMetric(
-    quotes: List<DemoPreset>,
+private fun computeCollateralRequired(
+    currentMu: Double,
+    currentSigma: Double,
+    proposedMu: Double,
+    proposedSigma: Double,
+    k: Double,
+    lowerBound: Double,
+    upperBound: Double,
+    coarseSamples: Int,
+    refineSamples: Int,
+): Double {
+    val coarse = maximumDirectionalLossWithArgmax(
+        currentMu,
+        currentSigma,
+        proposedMu,
+        proposedSigma,
+        k,
+        lowerBound,
+        upperBound,
+        coarseSamples,
+    )
+    val coarseStep = (upperBound - lowerBound) / coarseSamples.coerceAtLeast(1)
+    val refineLower = max(lowerBound, coarse.first - coarseStep)
+    val refineUpper = min(upperBound, coarse.first + coarseStep)
+    val refine = maximumDirectionalLossWithArgmax(
+        currentMu,
+        currentSigma,
+        proposedMu,
+        proposedSigma,
+        k,
+        refineLower,
+        refineUpper,
+        refineSamples,
+    )
+    val endpointLoss = max(
+        directionalLossAt(lowerBound, currentMu, currentSigma, proposedMu, proposedSigma, k),
+        directionalLossAt(upperBound, currentMu, currentSigma, proposedMu, proposedSigma, k),
+    )
+    return max(max(coarse.second, refine.second), endpointLoss) + FIXED_EPSILON
+}
+
+private fun computeSearchBounds(
+    currentMu: Double,
+    currentSigma: Double,
+    proposedMu: Double,
+    proposedSigma: Double,
+): Pair<Double, Double> {
+    val span = abs(currentMu - proposedMu)
+    val sigma = max(currentSigma, proposedSigma)
+    val tail = span + sigma * 8.0
+    return Pair(min(currentMu, proposedMu) - tail, max(currentMu, proposedMu) + tail)
+}
+
+private fun maximumDirectionalLossWithArgmax(
+    currentMu: Double,
+    currentSigma: Double,
+    proposedMu: Double,
+    proposedSigma: Double,
+    k: Double,
+    lowerBound: Double,
+    upperBound: Double,
+    samples: Int,
+): Pair<Double, Double> {
+    var bestX = lowerBound
+    var bestLoss = 0.0
+    val safeSamples = samples.coerceAtLeast(1)
+    for (step in 0..safeSamples) {
+        val x = lowerBound + (upperBound - lowerBound) * step.toDouble() / safeSamples.toDouble()
+        val loss = directionalLossAt(x, currentMu, currentSigma, proposedMu, proposedSigma, k)
+        if (loss > bestLoss) {
+            bestLoss = loss
+            bestX = x
+        }
+    }
+    return Pair(bestX, bestLoss)
+}
+
+private fun directionalLossAt(
+    x: Double,
+    currentMu: Double,
+    currentSigma: Double,
+    proposedMu: Double,
+    proposedSigma: Double,
+    k: Double,
+): Double {
+    val currentValue = scaledNormalValue(x, currentMu, currentSigma, k)
+    val proposedValue = scaledNormalValue(x, proposedMu, proposedSigma, k)
+    return max(currentValue - proposedValue, 0.0)
+}
+
+private fun scaledNormalValue(x: Double, mu: Double, sigma: Double, k: Double): Double {
+    val safeSigma = sigma.coerceAtLeast(0.0001)
+    val lambda = k * sqrt(2.0 * safeSigma * sqrt(Math.PI))
+    return lambda * normalPdf(x, mu, safeSigma)
+}
+
+private fun buildTradeInstructionHex(
+    market: DemoMarket,
     targetMu: Double,
     targetSigma: Double,
-    metric: (DemoPreset) -> Double,
-): Double {
-    val exact = quotes.firstOrNull {
-        it.targetMuDisplay.toDouble() == targetMu && it.targetSigmaDisplay.toDouble() == targetSigma
-    }
-    if (exact != null) return metric(exact)
-
-    val sameSigma = quotes
-        .filter { it.targetSigmaDisplay.toDouble() == targetSigma }
-        .sortedBy { it.targetMuDisplay.toDouble() }
-    interpolateOneDimensional(
-        quotes = sameSigma,
-        target = targetMu,
-        axis = { it.targetMuDisplay.toDouble() },
-        metric = metric,
-    )?.let { return it }
-
-    val sameMu = quotes
-        .filter { it.targetMuDisplay.toDouble() == targetMu }
-        .sortedBy { it.targetSigmaDisplay.toDouble() }
-    interpolateOneDimensional(
-        quotes = sameMu,
-        target = targetSigma,
-        axis = { it.targetSigmaDisplay.toDouble() },
-        metric = metric,
-    )?.let { return it }
-
-    val nearest = quotes
-        .sortedBy {
-            val muDistance = targetMu - it.targetMuDisplay.toDouble()
-            val sigmaDistance = targetSigma - it.targetSigmaDisplay.toDouble()
-            (muDistance * muDistance) + (sigmaDistance * sigmaDistance)
-        }
-        .take(4)
-
-    var weightedTotal = 0.0
-    var weightSum = 0.0
-    nearest.forEach { quote ->
-        val muDistance = targetMu - quote.targetMuDisplay.toDouble()
-        val sigmaDistance = targetSigma - quote.targetSigmaDisplay.toDouble()
-        val distanceSquared = (muDistance * muDistance) + (sigmaDistance * sigmaDistance)
-        val weight = 1.0 / max(distanceSquared, 1e-9)
-        weightedTotal += metric(quote) * weight
-        weightSum += weight
-    }
-
-    return if (weightSum > 0.0) weightedTotal / weightSum else metric(snappedQuoteFallback(quotes))
+    collateralRequired: Double,
+    feePaid: Double,
+    totalDebit: Double,
+    maxTotalDebit: Double,
+    lowerBound: Double,
+    upperBound: Double,
+): String {
+    val bytes = mutableListOf<Byte>()
+    bytes += 1.toByte()
+    bytes += decodeHex(market.marketIdHex).toList()
+    bytes += packU64(market.stateVersion)
+    bytes += packFixed(targetMu)
+    bytes += packFixed(targetSigma)
+    bytes += packFixed(collateralRequired)
+    bytes += packFixed(feePaid)
+    bytes += packFixed(totalDebit)
+    bytes += packFixed(maxTotalDebit)
+    bytes += packU32(market.takerFeeBps.toLong())
+    bytes += packFixed(market.minTakerFeeDisplay.toDouble())
+    bytes += packFixed(lowerBound)
+    bytes += packFixed(upperBound)
+    bytes += packU32(market.coarseSamples.toLong())
+    bytes += packU32(market.refineSamples.toLong())
+    bytes += packU64(market.demoQuoteSlot)
+    bytes += packU64(market.demoQuoteExpirySlot)
+    return encodeHex(bytes.toByteArray())
 }
 
-private fun interpolateOneDimensional(
-    quotes: List<DemoPreset>,
-    target: Double,
-    axis: (DemoPreset) -> Double,
-    metric: (DemoPreset) -> Double,
-): Double? {
-    if (quotes.size < 2) return null
-    val lower = quotes.lastOrNull { axis(it) <= target } ?: quotes.first()
-    val upper = quotes.firstOrNull { axis(it) >= target } ?: quotes.last()
-    val lowerAxis = axis(lower)
-    val upperAxis = axis(upper)
-    if (lowerAxis == upperAxis) return metric(lower)
-    val t = ((target - lowerAxis) / (upperAxis - lowerAxis)).coerceIn(0.0, 1.0)
-    return metric(lower) + (metric(upper) - metric(lower)) * t
+private fun packFixed(value: Double): List<Byte> {
+    val scaled = BigInteger.valueOf((value * FIXED_SCALE).let { kotlin.math.round(it).toLong() })
+    return packI128LittleEndian(scaled)
 }
 
-private fun snappedQuoteFallback(quotes: List<DemoPreset>): DemoPreset = quotes.first()
+private fun packU64(value: Long): List<Byte> =
+    List(8) { index -> ((value ushr (index * 8)) and 0xff).toByte() }
 
-private fun Double.formattedDecimal(): String = "%.9f".format(this)
+private fun packU32(value: Long): List<Byte> =
+    List(4) { index -> ((value ushr (index * 8)) and 0xff).toByte() }
+
+private fun packI128LittleEndian(value: BigInteger): List<Byte> {
+    val signByte: Byte = if (value.signum() < 0) 0xff.toByte() else 0x00
+    val bigEndian = value.toByteArray()
+    val padded = MutableList(16) { signByte }
+    val copyStart = max(0, bigEndian.size - 16)
+    val copyLength = min(16, bigEndian.size)
+    for (index in 0 until copyLength) {
+        padded[16 - copyLength + index] = bigEndian[copyStart + index]
+    }
+    return padded.reversed()
+}
+
+private fun decodeHex(value: String): ByteArray {
+    val bytes = ByteArray(value.length / 2)
+    for (index in bytes.indices) {
+        val high = value[index * 2].digitToInt(16)
+        val low = value[index * 2 + 1].digitToInt(16)
+        bytes[index] = ((high shl 4) or low).toByte()
+    }
+    return bytes
+}
+
+private const val FIXED_SCALE = 1_000_000_000.0
+private const val FIXED_EPSILON = 0.000000001
+
+fun Double.formattedDecimal(): String = "%.9f".format(this)
 
 private fun buildContinuousCurvePoints(
     currentMu: Double,

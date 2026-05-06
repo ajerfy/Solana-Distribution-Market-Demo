@@ -31,7 +31,7 @@ sealed class WalletSubmitResult {
 object WalletSubmitter {
     suspend fun submitTradeMemo(
         sender: ActivityResultSender,
-        quote: DemoPreset,
+        quote: ContinuousQuotePreview,
     ): WalletSubmitResult {
         return try {
             val walletAdapter = MobileWalletAdapter(
@@ -75,16 +75,39 @@ object WalletSubmitter {
     }
 
     private fun buildMemoText(quote: DemoPreset): String {
+        return buildMemoText(
+            targetMu = quote.targetMuDisplay,
+            targetSigma = quote.targetSigmaDisplay,
+            collateral = quote.collateralRequiredDisplay,
+            payload = quote.serializedInstructionHex,
+        )
+    }
+
+    private fun buildMemoText(quote: ContinuousQuotePreview): String {
+        return buildMemoText(
+            targetMu = quote.targetMu.formattedDecimal(),
+            targetSigma = quote.targetSigma.formattedDecimal(),
+            collateral = quote.collateralRequired.formattedDecimal(),
+            payload = quote.serializedInstructionHex,
+        )
+    }
+
+    private fun buildMemoText(
+        targetMu: String,
+        targetSigma: String,
+        collateral: String,
+        payload: String,
+    ): String {
         return buildString {
             append("distribution-market-demo|")
             append("mu=")
-            append(quote.targetMuDisplay)
+            append(targetMu)
             append("|sigma=")
-            append(quote.targetSigmaDisplay)
+            append(targetSigma)
             append("|collateral=")
-            append(quote.collateralRequiredDisplay)
+            append(collateral)
             append("|payload=")
-            append(quote.serializedInstructionHex)
+            append(payload)
         }
     }
 
@@ -126,7 +149,7 @@ private fun walletMessage(message: String): String {
     }
 }
 
-private fun encodeHex(bytes: ByteArray): String {
+fun encodeHex(bytes: ByteArray): String {
     val hex = StringBuilder(bytes.size * 2)
     bytes.forEach { byte ->
         hex.append(((byte.toInt() ushr 4) and 0x0f).toString(16))

@@ -6,6 +6,10 @@ use normal_v1_program::{
     NormalV1Program, ProgramInitializeArgsV1, ProgramTokenOperationV1, pack_instruction,
 };
 
+const DEMO_MARKET_ID: [u8; 32] = [4_u8; 32];
+const DEMO_QUOTE_SLOT: u64 = 2;
+const DEMO_QUOTE_EXPIRY_SLOT: u64 = 12;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HackathonMarketSeed {
     pub initializer: [u8; 32],
@@ -57,14 +61,23 @@ pub struct AndroidTradeIntentV1 {
 pub struct DemoMarketSnapshotV1 {
     pub title: String,
     pub status: String,
+    pub market_id_hex: String,
+    pub state_version: u64,
     pub current_mu_display: String,
     pub current_sigma_display: String,
+    pub k_display: String,
     pub backing_display: String,
+    pub taker_fee_bps: u32,
+    pub min_taker_fee_display: String,
     pub maker_fees_earned_display: String,
     pub maker_deposit_display: String,
     pub total_trades: u64,
     pub max_open_trades: u64,
     pub expiry_slot: u64,
+    pub demo_quote_slot: u64,
+    pub demo_quote_expiry_slot: u64,
+    pub coarse_samples: u32,
+    pub refine_samples: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -225,6 +238,8 @@ pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
     let market = DemoMarketSnapshotV1 {
         title: "Seeded SOL price market".to_string(),
         status: format!("{:?}", program.state.market_account.status),
+        market_id_hex: encode_hex(&DEMO_MARKET_ID),
+        state_version: program.state.market_account.state_version,
         current_mu_display: program
             .state
             .market_account
@@ -237,12 +252,19 @@ pub fn demo_app_payload() -> Result<DemoAppPayloadV1, String> {
             .current_distribution
             .sigma
             .to_string(),
+        k_display: program.state.market_account.k.to_string(),
         backing_display: program.state.market_account.b.to_string(),
+        taker_fee_bps: program.state.market_account.taker_fee_bps,
+        min_taker_fee_display: program.state.market_account.min_taker_fee.to_string(),
         maker_fees_earned_display: program.state.market_account.fees_accrued.to_string(),
         maker_deposit_display: program.state.market_account.b.to_string(),
         total_trades: program.state.market_account.total_trades,
         max_open_trades: program.state.market_account.max_open_trades,
         expiry_slot: program.state.market_account.expiry_slot,
+        demo_quote_slot: DEMO_QUOTE_SLOT,
+        demo_quote_expiry_slot: DEMO_QUOTE_EXPIRY_SLOT,
+        coarse_samples: 4096,
+        refine_samples: 4096,
     };
 
     let presets = vec![
@@ -280,6 +302,14 @@ pub fn demo_app_payload_json() -> Result<String, String> {
         escape_json(&payload.market.status)
     ));
     json.push_str(&format!(
+        "    \"market_id_hex\": \"{}\",\n",
+        escape_json(&payload.market.market_id_hex)
+    ));
+    json.push_str(&format!(
+        "    \"state_version\": {},\n",
+        payload.market.state_version
+    ));
+    json.push_str(&format!(
         "    \"current_mu_display\": \"{}\",\n",
         escape_json(&payload.market.current_mu_display)
     ));
@@ -288,8 +318,20 @@ pub fn demo_app_payload_json() -> Result<String, String> {
         escape_json(&payload.market.current_sigma_display)
     ));
     json.push_str(&format!(
+        "    \"k_display\": \"{}\",\n",
+        escape_json(&payload.market.k_display)
+    ));
+    json.push_str(&format!(
         "    \"backing_display\": \"{}\",\n",
         escape_json(&payload.market.backing_display)
+    ));
+    json.push_str(&format!(
+        "    \"taker_fee_bps\": {},\n",
+        payload.market.taker_fee_bps
+    ));
+    json.push_str(&format!(
+        "    \"min_taker_fee_display\": \"{}\",\n",
+        escape_json(&payload.market.min_taker_fee_display)
     ));
     json.push_str(&format!(
         "    \"maker_fees_earned_display\": \"{}\",\n",
@@ -308,8 +350,24 @@ pub fn demo_app_payload_json() -> Result<String, String> {
         payload.market.max_open_trades
     ));
     json.push_str(&format!(
-        "    \"expiry_slot\": {}\n",
+        "    \"expiry_slot\": {},\n",
         payload.market.expiry_slot
+    ));
+    json.push_str(&format!(
+        "    \"demo_quote_slot\": {},\n",
+        payload.market.demo_quote_slot
+    ));
+    json.push_str(&format!(
+        "    \"demo_quote_expiry_slot\": {},\n",
+        payload.market.demo_quote_expiry_slot
+    ));
+    json.push_str(&format!(
+        "    \"coarse_samples\": {},\n",
+        payload.market.coarse_samples
+    ));
+    json.push_str(&format!(
+        "    \"refine_samples\": {}\n",
+        payload.market.refine_samples
     ));
     json.push_str("  },\n");
     json.push_str("  \"presets\": [\n");
@@ -413,10 +471,10 @@ fn quote_preset(
         program,
         TradeQuoteRequestV1 {
             trader: [8_u8; 32],
-            market: [4_u8; 32],
+            market: DEMO_MARKET_ID,
             target_distribution,
-            quote_slot: 2,
-            quote_expiry_slot: 12,
+            quote_slot: DEMO_QUOTE_SLOT,
+            quote_expiry_slot: DEMO_QUOTE_EXPIRY_SLOT,
         },
     )?;
     let intent = android_trade_intent(&quote);
@@ -533,11 +591,11 @@ mod tests {
         let quote = build_trade_quote(
             &program,
             TradeQuoteRequestV1 {
-                trader: [8_u8; 32],
-                market: [4_u8; 32],
-                target_distribution: distribution(100.0, 10.0),
-                quote_slot: 2,
-                quote_expiry_slot: 12,
+            trader: [8_u8; 32],
+            market: DEMO_MARKET_ID,
+            target_distribution: distribution(100.0, 10.0),
+            quote_slot: DEMO_QUOTE_SLOT,
+            quote_expiry_slot: DEMO_QUOTE_EXPIRY_SLOT,
             },
         )
         .unwrap();
@@ -561,11 +619,11 @@ mod tests {
         let quote = build_trade_quote(
             &program,
             TradeQuoteRequestV1 {
-                trader: [8_u8; 32],
-                market: [4_u8; 32],
-                target_distribution: distribution(100.0, 10.0),
-                quote_slot: 2,
-                quote_expiry_slot: 12,
+            trader: [8_u8; 32],
+            market: DEMO_MARKET_ID,
+            target_distribution: distribution(100.0, 10.0),
+            quote_slot: DEMO_QUOTE_SLOT,
+            quote_expiry_slot: DEMO_QUOTE_EXPIRY_SLOT,
             },
         )
         .unwrap();
@@ -584,11 +642,11 @@ mod tests {
         let quote = build_trade_quote(
             &program,
             TradeQuoteRequestV1 {
-                trader: [8_u8; 32],
-                market: [4_u8; 32],
-                target_distribution: distribution(100.0, 10.0),
-                quote_slot: 2,
-                quote_expiry_slot: 12,
+            trader: [8_u8; 32],
+            market: DEMO_MARKET_ID,
+            target_distribution: distribution(100.0, 10.0),
+            quote_slot: DEMO_QUOTE_SLOT,
+            quote_expiry_slot: DEMO_QUOTE_EXPIRY_SLOT,
             },
         )
         .unwrap();

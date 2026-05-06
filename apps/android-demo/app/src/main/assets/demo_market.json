@@ -2,14 +2,23 @@
   "market": {
     "title": "Seeded SOL price market",
     "status": "Active",
+    "market_id_hex": "0404040404040404040404040404040404040404040404040404040404040404",
+    "state_version": 0,
     "current_mu_display": "95.000000000",
     "current_sigma_display": "10.000000000",
+    "k_display": "21.050260396",
     "backing_display": "50.000000000",
+    "taker_fee_bps": 100,
+    "min_taker_fee_display": "0.001000000",
     "maker_fees_earned_display": "0.000000000",
     "maker_deposit_display": "50.000000000",
     "total_trades": 0,
     "max_open_trades": 64,
-    "expiry_slot": 1000000
+    "expiry_slot": 1000000,
+    "demo_quote_slot": 2,
+    "demo_quote_expiry_slot": 12,
+    "coarse_samples": 4096,
+    "refine_samples": 4096
   },
   "presets": [
     {
