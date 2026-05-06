@@ -39,8 +39,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -279,19 +277,7 @@ private fun TradeAppScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         TopBar(payload.market, submitStatus)
-        TabRow(
-            selectedTabIndex = activeTab.ordinal,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
-        ) {
-            AppTab.entries.forEach { tab ->
-                Tab(
-                    selected = activeTab == tab,
-                    onClick = { activeTab = tab },
-                    text = { Text(tab.label, maxLines = 1) },
-                )
-            }
-        }
+        PrimaryNavigation(activeTab) { activeTab = it }
 
         Column(
             modifier = Modifier.padding(12.dp),
@@ -424,6 +410,36 @@ private fun TopBar(market: DemoMarket, submitStatus: SubmitStatus?) {
                 Icon(Icons.Outlined.Refresh, contentDescription = "Refresh market")
             }
             WalletBadge(submitStatus)
+        }
+    }
+}
+
+@Composable
+private fun PrimaryNavigation(
+    activeTab: AppTab,
+    onSelect: (AppTab) -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AppTab.entries.forEach { tab ->
+                FilterChip(
+                    selected = activeTab == tab,
+                    onClick = { onSelect(tab) },
+                    label = {
+                        Text(
+                            text = tab.label,
+                            maxLines = 1,
+                            fontWeight = if (activeTab == tab) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    },
+                )
+            }
         }
     }
 }
