@@ -95,14 +95,18 @@ object WalletSubmitter {
                 val result = walletAdapter.transact(sender) { authResult ->
                     val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
                     val transaction = buildMemoTransactionWithBlockhash(walletAddress, memoText, blockhash)
-                    val sendResult = signAndSendTransactions(arrayOf(transaction.serialize()))
-                    val signatureBytes = sendResult.signatures.firstOrNull()
+                    // Wallet signs only — no broadcast. Some wallets (Phantom on Seeker observed)
+                    // hang in their own RPC submission step, never returning control to us.
+                    val signResult = signTransactions(arrayOf(transaction.serialize()))
+                    val signedTxBytes = signResult.signedPayloads.firstOrNull()
                         ?: throw IllegalStateException(
-                            "The wallet returned no signature for the devnet memo. Make sure Phantom is on devnet and try again."
+                            "The wallet returned no signed payload. Make sure Phantom is on devnet and try again."
                         )
-                    val signatureHex = encodeHex(signatureBytes)
-                    bestEffortConfirm(signatureHex)
-                    signatureHex
+                    // Broadcast from the demo app via HttpURLConnection — same path the blockhash
+                    // fetch uses, which is known to work on this device.
+                    val signatureBase58 = sendSignedTransactionWithRetry(signedTxBytes)
+                    bestEffortConfirm(signatureBase58)
+                    signatureBase58
                 }
             ) {
                 is TransactionResult.Success -> {
@@ -254,6 +258,56 @@ object WalletSubmitter {
             }
         }
         throw lastError ?: IllegalStateException("Could not fetch a recent blockhash from devnet.")
+    }
+
+    private suspend fun sendSignedTransactionWithRetry(signedTxBytes: ByteArray): String =
+        withContext(Dispatchers.IO) {
+            var lastError: Throwable? = null
+            repeat(3) { attempt ->
+                try {
+                    return@withContext sendSignedTransactionViaHttpURLConnection(signedTxBytes)
+                } catch (error: UnresolvedAddressException) {
+                    lastError = error; delay(200L * (attempt + 1))
+                } catch (error: java.net.UnknownHostException) {
+                    lastError = error; delay(200L * (attempt + 1))
+                } catch (error: java.net.ConnectException) {
+                    lastError = error; delay(200L * (attempt + 1))
+                } catch (error: java.net.SocketTimeoutException) {
+                    lastError = error; delay(200L * (attempt + 1))
+                }
+            }
+            throw lastError ?: IllegalStateException("Could not broadcast the signed transaction to devnet.")
+        }
+
+    private fun sendSignedTransactionViaHttpURLConnection(signedTxBytes: ByteArray): String {
+        val base64 = android.util.Base64.encodeToString(signedTxBytes, android.util.Base64.NO_WRAP)
+        val conn = (URL(DEVNET_RPC_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 8_000
+            readTimeout = 12_000
+            doOutput = true
+            useCaches = false
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "application/json")
+        }
+        val body = """{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["$base64",{"encoding":"base64","skipPreflight":false,"preflightCommitment":"processed"}]}"""
+        try {
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+            if (code !in 200..299) {
+                throw IllegalStateException("Devnet RPC sendTransaction HTTP $code: ${text.take(220).ifBlank { "<no body>" }}")
+            }
+            val json = JSONObject(text)
+            json.optJSONObject("error")?.let { err ->
+                throw IllegalStateException("Devnet RPC sendTransaction error: ${err.optString("message", "<no message>")}")
+            }
+            return json.optString("result").takeIf { it.isNotBlank() }
+                ?: throw IllegalStateException("Devnet RPC sendTransaction returned no signature.")
+        } finally {
+            conn.disconnect()
+        }
     }
 
     private fun fetchBlockhashViaHttpURLConnection(): String {
