@@ -50,12 +50,43 @@ fun AppShell(state: AppState, walletSender: ActivityResultSender) {
         }
 
         if (state.showBetSheet.value && selectedMarket != null) {
-            BetSheet(
-                state = state,
-                market = selectedMarket,
-                walletSender = walletSender,
-                onDismiss = { state.showBetSheet.value = false },
-            )
+            when (selectedMarket.marketType) {
+                com.solanadistributionmarketdemo.data.MarketType.Estimation ->
+                    BetSheet(
+                        state = state,
+                        market = selectedMarket,
+                        walletSender = walletSender,
+                        onDismiss = { state.showBetSheet.value = false },
+                    )
+                com.solanadistributionmarketdemo.data.MarketType.RegimeIndex -> {
+                    val regime = selectedMarket.regime
+                    val side = BetSheetPrefill.consumeRegimeSide() ?: RegimeBetSide.Long
+                    if (regime != null) {
+                        RegimeBetSheet(
+                            state = state,
+                            market = selectedMarket,
+                            regime = regime,
+                            initialSide = side,
+                            walletSender = walletSender,
+                            onDismiss = { state.showBetSheet.value = false },
+                        )
+                    }
+                }
+                com.solanadistributionmarketdemo.data.MarketType.Perp -> {
+                    val perp = selectedMarket.perp
+                    val side = BetSheetPrefill.consumePerpSide() ?: PerpBetSide.Long
+                    if (perp != null) {
+                        PerpBetSheet(
+                            state = state,
+                            market = selectedMarket,
+                            perp = perp,
+                            initialSide = side,
+                            walletSender = walletSender,
+                            onDismiss = { state.showBetSheet.value = false },
+                        )
+                    }
+                }
+            }
         }
     }
 }

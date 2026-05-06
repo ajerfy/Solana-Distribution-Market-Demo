@@ -40,6 +40,43 @@ private enum class DetailTab(val label: String) { Bet("Bet"), Stats("Stats"), Fl
 
 @Composable
 fun MarketDetailScreen(state: AppState, market: MarketListing) {
+    when (market.marketType) {
+        com.solanadistributionmarketdemo.data.MarketType.Estimation -> EstimationDetailScreen(state, market)
+        com.solanadistributionmarketdemo.data.MarketType.RegimeIndex -> {
+            val regime = market.regime
+            if (regime != null) {
+                Box(modifier = Modifier.fillMaxSize().background(DemoColors.Background)) {
+                    RegimeIndexDetailBody(state, market, regime, onBack = { state.closeMarket() })
+                    RegimeBottomCta(
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                        onPickSide = { side ->
+                            BetSheetPrefill.regimeSide = side
+                            state.showBetSheet.value = true
+                        },
+                    )
+                }
+            }
+        }
+        com.solanadistributionmarketdemo.data.MarketType.Perp -> {
+            val perp = market.perp
+            if (perp != null) {
+                Box(modifier = Modifier.fillMaxSize().background(DemoColors.Background)) {
+                    PerpDetailBody(state, market, perp, onBack = { state.closeMarket() })
+                    PerpBottomCta(
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                        onPickSide = { side ->
+                            BetSheetPrefill.perpSide = side
+                            state.showBetSheet.value = true
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
     var activeTab by remember(market.id) { mutableStateOf(DetailTab.Bet) }
     val activity = remember(market.id) { MockActivity.feedFor(market) }
     val yourBets = state.bets.filter { it.marketId == market.id }
@@ -484,10 +521,18 @@ private fun BottomBetCta(
 internal object BetSheetPrefill {
     var muOverride: Double? = null
     var sigmaOverride: Double? = null
+    var regimeSide: RegimeBetSide? = null
+    var perpSide: PerpBetSide? = null
     fun consume(): Pair<Double?, Double?> {
         val m = muOverride; val s = sigmaOverride
         muOverride = null; sigmaOverride = null
         return m to s
+    }
+    fun consumeRegimeSide(): RegimeBetSide? {
+        val s = regimeSide; regimeSide = null; return s
+    }
+    fun consumePerpSide(): PerpBetSide? {
+        val s = perpSide; perpSide = null; return s
     }
 }
 
