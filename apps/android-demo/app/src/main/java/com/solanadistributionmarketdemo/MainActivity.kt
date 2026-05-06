@@ -1644,9 +1644,8 @@ private fun QuoteControls(
             step = 5f,
             onChange = { onSigmaChange(confidencePercentToSigma(it)) },
         )
-        AdvancedSelectionSlider(
+        AdvancedSelectionLauncher(
             targetSigma = targetSigma,
-            onSigmaChange = onSigmaChange,
             onOpenAdvanced = { showAdvancedSigma = true },
         )
         Text(
@@ -1666,47 +1665,27 @@ private fun QuoteControls(
 }
 
 @Composable
-private fun AdvancedSelectionSlider(
+private fun AdvancedSelectionLauncher(
     targetSigma: Float,
-    onSigmaChange: (Float) -> Unit,
     onOpenAdvanced: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    OutlinedButton(
+        onClick = onOpenAdvanced,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+    ) {
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Advanced selection", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(
-                    onClick = {
-                        onSigmaChange((targetSigma - 0.5f).coerceIn(SigmaControlRange.start, SigmaControlRange.endInclusive))
-                    },
-                ) {
-                    Text("-")
-                }
-                TextButton(onClick = onOpenAdvanced) {
-                    Text(
-                        "${"%.1f".format(targetSigma).trimZeros()} sigma",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                OutlinedButton(
-                    onClick = {
-                        onSigmaChange((targetSigma + 0.5f).coerceIn(SigmaControlRange.start, SigmaControlRange.endInclusive))
-                    },
-                ) {
-                    Text("+")
-                }
-            }
+            Text("Advanced selection")
+            Text(
+                "${"%.1f".format(targetSigma).trimZeros()} sigma",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
-        Slider(
-            value = targetSigma,
-            onValueChange = onSigmaChange,
-            valueRange = SigmaControlRange,
-        )
     }
 }
 
@@ -1797,16 +1776,16 @@ private fun AdvancedSigmaSheet(
                         }
                     }
                     Text(
-                        "Confidence is a simplified UI layer over sigma. Higher confidence maps to a tighter sigma; moving this slider updates the same chart behind the sheet.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
                         "Confidence ${"%.0f".format(confidence)}% maps to sigma ${"%.1f".format(targetSigma).trimZeros()}.",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     SliderControl("Sigma", targetSigma, SigmaControlRange, 0.5f, onSigmaChange)
+                    Text(
+                        "Moving sigma here updates the chart behind this sheet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
