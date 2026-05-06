@@ -86,9 +86,9 @@ object WalletSubmitter {
             val walletAdapter = MobileWalletAdapter(
                 connectionIdentity = ConnectionIdentity(
                     identityUri = Uri.parse("https://github.com/ajerfy/Solana-Distribution-Market-Demo"),
-                    // Some wallets validate this URI and refuse to establish a local association
-                    // when it's a bare relative path. Use a fully-qualified HTTPS icon.
-                    iconUri = Uri.parse("https://github.githubassets.com/favicons/favicon.png"),
+                    // iconUri must be relative to identityUri (per MWA spec). Omitting entirely
+                    // is safer than guessing a relative path; the wallet falls back to no icon.
+                    iconUri = Uri.EMPTY,
                     identityName = IDENTITY_NAME,
                 )
             )
