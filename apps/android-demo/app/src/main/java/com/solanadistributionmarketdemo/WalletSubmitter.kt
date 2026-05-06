@@ -72,6 +72,16 @@ object WalletSubmitter {
         sender: ActivityResultSender,
         memoText: String,
     ): WalletSubmitResult {
+        // Pre-fetch the blockhash BEFORE opening the wallet, while the demo app is fully foregrounded.
+        // Some Android builds (Solana Seeker among them) restrict per-app outbound networking once
+        // another activity is foregrounded by an intent, so doing this first is safer.
+        val blockhash = try {
+            fetchRecentBlockhashWithRetry()
+        } catch (error: Exception) {
+            return WalletSubmitResult.Failure(
+                walletMessage(describeException(error), memoText.length)
+            )
+        }
         return try {
             val walletAdapter = MobileWalletAdapter(
                 connectionIdentity = ConnectionIdentity(
@@ -84,7 +94,7 @@ object WalletSubmitter {
             when (
                 val result = walletAdapter.transact(sender) { authResult ->
                     val walletAddress = SolanaPublicKey(authResult.accounts[0].publicKey)
-                    val transaction = buildMemoTransaction(walletAddress, memoText)
+                    val transaction = buildMemoTransactionWithBlockhash(walletAddress, memoText, blockhash)
                     val sendResult = signAndSendTransactions(arrayOf(transaction.serialize()))
                     val signatureBytes = sendResult.signatures.firstOrNull()
                         ?: throw IllegalStateException(
@@ -189,12 +199,11 @@ object WalletSubmitter {
         }
     }
 
-    private suspend fun buildMemoTransaction(
+    private fun buildMemoTransactionWithBlockhash(
         signerAddress: SolanaPublicKey,
         memoText: String,
+        blockhash: String,
     ): Transaction {
-        val blockhash = fetchRecentBlockhashWithRetry()
-
         val memoInstruction = TransactionInstruction(
             SolanaPublicKey.from(MEMO_PROGRAM_ID),
             listOf(AccountMeta(signerAddress, true, true)),
@@ -216,6 +225,16 @@ object WalletSubmitter {
      * CIO's NIO selector throws UnresolvedAddressException for hosts the OS resolves fine.
      */
     private suspend fun fetchRecentBlockhashWithRetry(): String = withContext(Dispatchers.IO) {
+        // Try a plain DNS resolve first so we can tell DNS-vs-connect apart in the error.
+        try {
+            java.net.InetAddress.getAllByName("api.devnet.solana.com")
+        } catch (host: java.net.UnknownHostException) {
+            throw IllegalStateException(
+                "DNS resolution failed for api.devnet.solana.com from this app (UnknownHostException). The OS resolver may be restricting this app — check Settings → Apps → Solana Distribution Market Demo → Mobile data & WiFi → both on, and Battery → Unrestricted.",
+                host,
+            )
+        }
+
         var lastError: Throwable? = null
         repeat(3) { attempt ->
             try {
@@ -280,11 +299,11 @@ private fun walletMessage(message: String, memoLength: Int): String {
 
         normalized.contains("UnresolvedAddressException", ignoreCase = true) ||
             normalized.contains("UnknownHostException", ignoreCase = true) ->
-            "Couldn't reach api.devnet.solana.com — the device looks offline or its DNS isn't resolving. Check that wifi or cellular data is on, then retry."
+            "Couldn't reach api.devnet.solana.com — DNS resolution failed for the app even though Chrome works. Diagnostic: $normalized"
 
         normalized.contains("ConnectException", ignoreCase = true) ||
             normalized.contains("SocketTimeoutException", ignoreCase = true) ->
-            "Network call to devnet timed out. Check connectivity and retry; devnet RPC is sometimes briefly unreachable."
+            "Network call to devnet failed. Diagnostic: $normalized"
 
         normalized.contains("LifecycleOwner", ignoreCase = true) ||
             normalized.contains("register before", ignoreCase = true) ->
