@@ -4,6 +4,8 @@ data class DemoPayload(
     val market: DemoMarket,
     val presets: List<DemoPreset>,
     val quoteGrid: List<DemoPreset>,
+    val regimeIndexes: List<DemoRegimeIndex> = emptyList(),
+    val perp: DemoPerpMarket? = null,
 )
 
 data class DemoMarket(
@@ -68,13 +70,18 @@ data class SubmitStatus(
 
 enum class MarketCategory(val label: String, val emoji: String) {
     All("All", "✦"),
-    Macro("Macro", "◆"),
+    Events("Events", "◆"),
+    Weather("Weather", "☁"),
     Crypto("Crypto", "◈"),
-    Equities("Equities", "◇"),
-    Climate("Climate", "◉"),
     Sports("Sports", "◎"),
+    PopCulture("Pop", "♫"),
+    Climate("Climate", "◉"),
+    Macro("Macro", "▤"),
+    Equities("Equities", "◇"),
     Politics("Politics", "◐"),
 }
+
+enum class MarketType { Estimation, RegimeIndex, Perp }
 
 data class MarketListing(
     val id: String,
@@ -95,6 +102,9 @@ data class MarketListing(
     val isOnChain: Boolean,
     val resolutionSource: String,
     val resolutionRule: String,
+    val marketType: MarketType = MarketType.Estimation,
+    val regime: DemoRegimeIndex? = null,
+    val perp: DemoPerpMarket? = null,
 )
 
 data class ActivityEvent(
@@ -123,24 +133,115 @@ data class BetRecord(
     val isOnChain: Boolean,
 )
 
-// Phase-1 stubs for the regime-index and perp markets that current main embeds inside
-// MainActivity.kt. Phase 4 replaces these with full content-bearing versions and
-// extends Payload.kt to parse demo_market.json's `regime_indexes` and `perps` sections.
-// The minimal field set here is exactly what WalletSubmitter touches.
+// Regime-index market (basket of yes/no constituents — "themes" in consumer copy).
 data class DemoRegimeIndex(
     val id: String,
+    val symbol: String,
     val title: String,
+    val thesis: String,
+    val status: String,
+    val levelDisplay: String,
+    val previousLevelDisplay: String,
+    val changeDisplay: String,
+    val rebalanceSlot: Long,
+    val nextRebalanceSlot: Long,
+    val quoteExpirySlot: Long,
+    val constituents: List<DemoRegimeConstituent>,
+    val history: List<DemoRegimeHistoryPoint>,
+    val longQuote: DemoRegimeQuote,
+    val shortQuote: DemoRegimeQuote,
+)
+
+data class DemoRegimeConstituent(
+    val id: String,
+    val label: String,
+    val side: String,
+    val weightBps: Int,
+    val probabilityDisplay: String,
+    val previousProbabilityDisplay: String,
+    val levelContributionDisplay: String,
+    val signedPressureDisplay: String,
+    val status: String,
+    val expirySlot: Long,
+)
+
+data class DemoRegimeHistoryPoint(
+    val slot: Long,
+    val levelDisplay: String,
 )
 
 data class DemoRegimeQuote(
+    val side: String,
+    val sizeDisplay: String,
+    val entryLevelDisplay: String,
+    val tokenPriceDisplay: String,
+    val collateralRequiredDisplay: String,
+    val feePaidDisplay: String,
+    val totalDebitDisplay: String,
     val memoPayload: String,
 )
 
+// Perpetual market.
 data class DemoPerpMarket(
     val symbol: String,
     val title: String,
+    val status: String,
+    val slot: Long,
+    val nextFundingSlot: Long,
+    val fundingInterval: Long,
+    val markPriceDisplay: String,
+    val anchorMuDisplay: String,
+    val anchorSigmaDisplay: String,
+    val ammMuDisplay: String,
+    val ammSigmaDisplay: String,
+    val klDisplay: String,
+    val spotFundingRateDisplay: String,
+    val vaultCashDisplay: String,
+    val lpNavDisplay: String,
+    val availableLpCashDisplay: String,
+    val openPositions: Int,
+    val totalLpSharesDisplay: String,
+    val curvePoints: List<DemoPerpCurvePoint>,
+    val fundingPath: List<DemoPerpFundingPoint>,
+    val longQuote: DemoPerpQuote,
+    val shortQuote: DemoPerpQuote,
+    val positions: List<DemoPerpPosition>,
+)
+
+data class DemoPerpCurvePoint(
+    val x: Double,
+    val amm: Double,
+    val anchor: Double,
+    val edge: Double,
+)
+
+data class DemoPerpFundingPoint(
+    val slot: Long,
+    val ammMuDisplay: String,
+    val anchorMuDisplay: String,
+    val klDisplay: String,
+    val fundingRateDisplay: String,
 )
 
 data class DemoPerpQuote(
+    val side: String,
+    val targetMuDisplay: String,
+    val targetSigmaDisplay: String,
+    val collateralRequiredDisplay: String,
+    val feePaidDisplay: String,
+    val totalDebitDisplay: String,
+    val estimatedFundingDisplay: String,
+    val closeMarkDisplay: String,
     val memoPayload: String,
+)
+
+data class DemoPerpPosition(
+    val id: String,
+    val side: String,
+    val entryMuDisplay: String,
+    val collateralDisplay: String,
+    val fundingPaidDisplay: String,
+    val fundingReceivedDisplay: String,
+    val markPayoutDisplay: String,
+    val status: String,
 )

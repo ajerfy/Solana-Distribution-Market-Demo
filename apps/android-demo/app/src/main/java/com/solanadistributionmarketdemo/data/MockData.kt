@@ -5,7 +5,9 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 object MockMarkets {
-    fun build(onChain: DemoMarket): List<MarketListing> {
+    fun build(payload: DemoPayload): List<MarketListing> = build(payload.market, payload.regimeIndexes, payload.perp)
+
+    fun build(onChain: DemoMarket, regimeIndexes: List<DemoRegimeIndex> = emptyList(), perp: DemoPerpMarket? = null): List<MarketListing> {
         val onChainListing = MarketListing(
             id = "onchain-eth-return",
             title = onChain.title,
@@ -25,6 +27,7 @@ object MockMarkets {
             isOnChain = true,
             resolutionSource = "Pyth ETH/USD · settlement slot ${onChain.expirySlot}",
             resolutionRule = "Realized ETH return at expiry slot, scaled to display units.",
+            marketType = MarketType.Estimation,
         )
 
         val mocks = listOf(
@@ -149,9 +152,165 @@ object MockMarkets {
                 rule = "U-3 headline unemployment rate from the BLS Employment Situation release.",
                 seed = 12,
             ),
+            // Consumer-friendly markets — added so the app reads like a real betting product
+            // for someone who didn't come for the math.
+            mock(
+                id = "events-consensus-miami", category = MarketCategory.Events,
+                title = "Consensus Miami 2026 · attendance",
+                subtitle = "Total registered badges, day-2 doors",
+                unit = "people", crowdMu = 18_400.0, crowdSigma = 2_300.0,
+                muMin = 9_000.0, muMax = 30_000.0, sigmaMin = 600.0, sigmaMax = 5_000.0,
+                volumeUsd = 78_300.0, bettorCount = 312,
+                resolvesAt = "May 16, 2026", source = "CoinDesk official tally",
+                rule = "Total unique badges scanned at Consensus Miami 2026 by close of day 2, as reported by CoinDesk.",
+                seed = 21,
+            ),
+            mock(
+                id = "weather-nyc", category = MarketCategory.Weather,
+                title = "NYC high temp · tomorrow",
+                subtitle = "Central Park, NWS reading",
+                unit = "°F", crowdMu = 76.0, crowdSigma = 4.5,
+                muMin = 55.0, muMax = 100.0, sigmaMin = 1.0, sigmaMax = 12.0,
+                volumeUsd = 42_100.0, bettorCount = 588,
+                resolvesAt = "Tomorrow, 11:59 PM ET", source = "NWS Central Park",
+                rule = "Daily high recorded at NWS Central Park station, tomorrow's calendar day in ET.",
+                seed = 22,
+            ),
+            mock(
+                id = "weather-hurricanes", category = MarketCategory.Weather,
+                title = "Atlantic named storms · 2026 season",
+                subtitle = "NOAA tally, Jun 1 → Nov 30",
+                unit = "storms", crowdMu = 16.5, crowdSigma = 4.2,
+                muMin = 4.0, muMax = 32.0, sigmaMin = 1.0, sigmaMax = 9.0,
+                volumeUsd = 31_000.0, bettorCount = 92,
+                resolvesAt = "Dec 1, 2026", source = "NOAA NHC",
+                rule = "Total named storms (≥39 mph sustained winds) in the Atlantic basin during the 2026 hurricane season.",
+                seed = 23,
+            ),
+            mock(
+                id = "weather-tahoe-snow", category = MarketCategory.Weather,
+                title = "Tahoe season snowfall · 2026/27",
+                subtitle = "UC Berkeley CSSL Donner Pass",
+                unit = "in", crowdMu = 380.0, crowdSigma = 95.0,
+                muMin = 100.0, muMax = 750.0, sigmaMin = 25.0, sigmaMax = 200.0,
+                volumeUsd = 18_400.0, bettorCount = 41,
+                resolvesAt = "Jun 1, 2027", source = "UC Berkeley CSSL",
+                rule = "Cumulative snowfall reported by the UC Berkeley Central Sierra Snow Lab for the 2026/27 winter season.",
+                seed = 24,
+            ),
+            mock(
+                id = "pop-taylor-streams", category = MarketCategory.PopCulture,
+                title = "Taylor Swift Spotify monthly listeners",
+                subtitle = "End of month figure",
+                unit = "M", crowdMu = 91.0, crowdSigma = 5.5,
+                muMin = 60.0, muMax = 130.0, sigmaMin = 1.0, sigmaMax = 14.0,
+                volumeUsd = 64_500.0, bettorCount = 1_104,
+                resolvesAt = "Last day of month", source = "Spotify artist page",
+                rule = "Monthly listeners count shown on the official Taylor Swift Spotify artist page at end-of-month UTC.",
+                seed = 25,
+            ),
+            mock(
+                id = "pop-boxoffice", category = MarketCategory.PopCulture,
+                title = "Top weekend box office · this Sunday",
+                subtitle = "Domestic gross, Fri–Sun",
+                unit = "M$", crowdMu = 38.0, crowdSigma = 11.0,
+                muMin = 5.0, muMax = 200.0, sigmaMin = 2.0, sigmaMax = 35.0,
+                volumeUsd = 27_900.0, bettorCount = 174,
+                resolvesAt = "Mon morning", source = "Box Office Mojo",
+                rule = "Domestic 3-day weekend gross of the #1 film, as published Monday morning by Box Office Mojo.",
+                seed = 26,
+            ),
+            mock(
+                id = "events-coachella", category = MarketCategory.Events,
+                title = "Coachella weekend-1 · attendance",
+                subtitle = "Festival promoter announced figure",
+                unit = "people", crowdMu = 125_000.0, crowdSigma = 9_000.0,
+                muMin = 90_000.0, muMax = 160_000.0, sigmaMin = 2_500.0, sigmaMax = 20_000.0,
+                volumeUsd = 51_300.0, bettorCount = 233,
+                resolvesAt = "Apr 19, 2026", source = "Goldenvoice",
+                rule = "Per-day average attendance announced by Goldenvoice for Coachella weekend 1, 2026.",
+                seed = 27,
+            ),
+            mock(
+                id = "sports-superbowl-total", category = MarketCategory.Sports,
+                title = "Super Bowl LX · combined points",
+                subtitle = "Final score, both teams",
+                unit = "pts", crowdMu = 49.5, crowdSigma = 9.5,
+                muMin = 24.0, muMax = 90.0, sigmaMin = 3.0, sigmaMax = 18.0,
+                volumeUsd = 940_000.0, bettorCount = 6_220,
+                resolvesAt = "Feb 8, 2026", source = "NFL official",
+                rule = "Combined regulation-and-overtime points scored by both teams in Super Bowl LX, as published by the NFL.",
+                seed = 28,
+            ),
         )
 
-        return listOf(onChainListing) + mocks
+        val regimeListings = regimeIndexes.map { it.toListing() }
+        val perpListing = perp?.toListing()
+
+        return buildList {
+            add(onChainListing)
+            addAll(regimeListings)
+            if (perpListing != null) add(perpListing)
+            addAll(mocks)
+        }
+    }
+
+    private fun DemoRegimeIndex.toListing(): MarketListing {
+        val level = levelDisplay.toDoubleOrNull() ?: 0.0
+        val muSpread = level * 0.6
+        val sigma = (level * 0.18).coerceAtLeast(1.0)
+        val historyDoubles = history.mapNotNull { it.levelDisplay.toDoubleOrNull() }
+        val resolvedAt = if (nextRebalanceSlot > 0L) "Rebalance ~slot $nextRebalanceSlot" else "Continuous"
+        return MarketListing(
+            id = "regime-$id",
+            title = title,
+            subtitle = thesis.ifBlank { "Theme basket — long if this regime plays out, short if it doesn't" },
+            category = MarketCategory.Macro,
+            unit = "level",
+            resolvesAt = resolvedAt,
+            crowdMu = level,
+            crowdSigma = sigma,
+            muMin = (level - muSpread).coerceAtLeast(0.0),
+            muMax = level + muSpread,
+            sigmaMin = sigma * 0.4,
+            sigmaMax = sigma * 2.5,
+            volumeUsd = 220_000.0 + level * 1_500.0,
+            bettorCount = (constituents.size * 80) + 60,
+            crowdHistory = if (historyDoubles.size >= 4) historyDoubles else synthHistory(level, sigma * 0.15, seed = 91),
+            isOnChain = false,
+            resolutionSource = "Index of " + constituents.take(3).joinToString(" / ") { it.label },
+            resolutionRule = "Index level recomputes as a weighted basket of yes/no constituent probabilities at each rebalance slot.",
+            marketType = MarketType.RegimeIndex,
+            regime = this,
+        )
+    }
+
+    private fun DemoPerpMarket.toListing(): MarketListing {
+        val mark = markPriceDisplay.toDoubleOrNull() ?: 100.0
+        val sigma = (ammSigmaDisplay.toDoubleOrNull() ?: anchorSigmaDisplay.toDoubleOrNull() ?: 8.0)
+        val historyDoubles = fundingPath.mapNotNull { it.ammMuDisplay.toDoubleOrNull() }
+        return MarketListing(
+            id = "perp-${symbol.lowercase().replace(' ', '-').replace('/', '-')}",
+            title = title,
+            subtitle = "Perpetual market · funding " + spotFundingRateDisplay.take(8),
+            category = MarketCategory.Crypto,
+            unit = "$",
+            resolvesAt = "Continuous",
+            crowdMu = mark,
+            crowdSigma = sigma,
+            muMin = mark - sigma * 4.0,
+            muMax = mark + sigma * 4.0,
+            sigmaMin = sigma * 0.4,
+            sigmaMax = sigma * 2.5,
+            volumeUsd = (vaultCashDisplay.toDoubleOrNull() ?: 0.0) * 1_500.0 + 380_000.0,
+            bettorCount = openPositions.coerceAtLeast(8) * 110,
+            crowdHistory = if (historyDoubles.size >= 4) historyDoubles else synthHistory(mark, sigma * 0.1, seed = 95),
+            isOnChain = false,
+            resolutionSource = "$symbol mark price · continuous",
+            resolutionRule = "Perpetual market: long pays funding when AMM curve is above anchor, short pays when below.",
+            marketType = MarketType.Perp,
+            perp = this,
+        )
     }
 
     private fun mock(

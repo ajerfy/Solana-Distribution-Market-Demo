@@ -13,7 +13,7 @@ class AppState(
     val positionStore: PositionStore,
     val themeStore: ThemeStore,
 ) {
-    val markets: List<MarketListing> = MockMarkets.build(payload.market)
+    val markets: List<MarketListing> = MockMarkets.build(payload)
     val bets: SnapshotStateList<BetRecord> = mutableStateListOf<BetRecord>().apply {
         addAll(positionStore.load())
     }
