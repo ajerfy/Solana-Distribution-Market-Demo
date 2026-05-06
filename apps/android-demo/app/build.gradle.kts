@@ -1,16 +1,17 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.solanadistributionmarketdemo"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.solanadistributionmarketdemo"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
     }
@@ -34,10 +35,6 @@ android {
         compose = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
-
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -52,5 +49,11 @@ dependencies {
     implementation("androidx.compose.ui:ui:1.6.8")
     implementation("androidx.compose.material3:material3:1.2.1")
     implementation("androidx.compose.ui:ui-tooling-preview:1.6.8")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("com.solanamobile:mobile-wallet-adapter-clientlib-ktx:2.0.7")
+    implementation("com.solanamobile:web3-solana:0.3.2-beta6")
+    implementation("com.solanamobile:rpc-core:0.2.10")
+    implementation("com.solanamobile:rpc-solana:0.2.10")
+    implementation("com.solanamobile:rpc-ktordriver:0.2.10")
     debugImplementation("androidx.compose.ui:ui-tooling:1.6.8")
 }

@@ -24,17 +24,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -53,7 +54,7 @@ class MainActivity : ComponentActivity() {
                             context.assets.open("demo_market.json").bufferedReader().use { it.readText() }
                         )
                     }
-                    TradeAppScreen(payload)
+                    TradeAppScreen(payload, this@MainActivity)
                 }
             }
         }
@@ -83,12 +84,23 @@ data class DemoPreset(
     val serializedInstructionHex: String,
 )
 
+data class SubmitStatus(
+    val message: String,
+    val isError: Boolean = false,
+    val isWorking: Boolean = false,
+)
+
 @Composable
-private fun TradeAppScreen(payload: DemoPayload) {
+private fun TradeAppScreen(
+    payload: DemoPayload,
+    activity: ComponentActivity,
+) {
     var selectedPreset by remember { mutableStateOf(payload.presets.first()) }
     var targetMu by remember { mutableStateOf(payload.presets.first().targetMuDisplay) }
     var targetSigma by remember { mutableStateOf(payload.presets.first().targetSigmaDisplay) }
     var previewQuote by remember { mutableStateOf(payload.presets.first()) }
+    var submitStatus by remember { mutableStateOf<SubmitStatus?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -111,10 +123,35 @@ private fun TradeAppScreen(payload: DemoPayload) {
                     targetMu.toDoubleOrNull(),
                     targetSigma.toDoubleOrNull(),
                 )
+                submitStatus = null
             },
         )
 
-        SelectedQuoteCard(previewQuote = previewQuote)
+        SelectedQuoteCard(
+            previewQuote = previewQuote,
+            submitStatus = submitStatus,
+            onSubmit = {
+                submitStatus = SubmitStatus(
+                    message = "Opening a wallet so you can approve a devnet trade memo...",
+                    isWorking = true,
+                )
+                coroutineScope.launch {
+                    submitStatus = when (val result = WalletSubmitter.submitTradeMemo(activity, previewQuote)) {
+                        is WalletSubmitResult.Success -> SubmitStatus(
+                            message = "Submitted on devnet. Wallet ${result.walletAddress.take(12)}... signed tx ${result.signatureHex.take(16)}...",
+                        )
+                        is WalletSubmitResult.NoWalletFound -> SubmitStatus(
+                            message = "No Solana Mobile Wallet Adapter wallet was found. Install a compatible wallet in the emulator first.",
+                            isError = true,
+                        )
+                        is WalletSubmitResult.Failure -> SubmitStatus(
+                            message = result.message,
+                            isError = true,
+                        )
+                    }
+                }
+            },
+        )
 
         PresetStrip(
             presets = payload.presets,
@@ -124,6 +161,7 @@ private fun TradeAppScreen(payload: DemoPayload) {
                 targetMu = preset.targetMuDisplay
                 targetSigma = preset.targetSigmaDisplay
                 previewQuote = preset
+                submitStatus = null
             },
         )
 
@@ -244,7 +282,11 @@ private fun QuoteBuilderCard(
 }
 
 @Composable
-private fun SelectedQuoteCard(previewQuote: DemoPreset) {
+private fun SelectedQuoteCard(
+    previewQuote: DemoPreset,
+    submitStatus: SubmitStatus?,
+    onSubmit: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -281,8 +323,34 @@ private fun SelectedQuoteCard(previewQuote: DemoPreset) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = { }) {
-                Text("Wallet submit flow: next milestone")
+            Text(
+                text = "This demo currently submits your selected trade as a real devnet memo transaction through a Solana mobile wallet. The market program call comes next.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onSubmit,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = submitStatus?.isWorking != true,
+            ) {
+                Text(
+                    if (submitStatus?.isWorking == true) {
+                        "Waiting on wallet..."
+                    } else {
+                        "Connect Wallet & Submit"
+                    }
+                )
+            }
+            submitStatus?.let { status ->
+                Text(
+                    text = status.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (status.isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
             }
         }
     }
