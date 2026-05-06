@@ -109,16 +109,20 @@ def base_amm() -> GaussianMixtureAMM:
     return _build_amm_from_json()
 
 
+def _preset_ids() -> list[str]:
+    if not os.path.exists(_DEMO_JSON):
+        return []
+    return [p["id"] for p in _load_presets()]
+
+
 class TestCollateralParity:
     def test_presets_present(self, demo_presets):
         assert len(demo_presets) > 0, "no presets found in demo_market.json"
 
-    @pytest.mark.parametrize("preset_index", range(0, 5))
-    def test_collateral_matches_rust(self, demo_presets, base_amm, preset_index):
-        if preset_index >= len(demo_presets):
-            pytest.skip(f"preset {preset_index} not in fixture")
+    @pytest.mark.parametrize("preset_id", _preset_ids())
+    def test_collateral_matches_rust(self, demo_presets, base_amm, preset_id):
+        preset = next(p for p in demo_presets if p["id"] == preset_id)
 
-        preset = demo_presets[preset_index]
         rust_collateral = float(preset["collateral_required_display"])
 
         target_mu = float(preset["target_mu_display"])
