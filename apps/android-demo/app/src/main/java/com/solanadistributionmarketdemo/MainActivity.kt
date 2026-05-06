@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -67,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -93,6 +95,10 @@ private val terminalColorScheme = lightColorScheme(
     error = Color(0xFFDC2626),
 )
 
+private const val SigmaControlMin = 8.5f
+private const val SigmaControlMax = 12f
+private val SigmaControlRange = SigmaControlMin..SigmaControlMax
+
 class MainActivity : ComponentActivity() {
     private lateinit var walletSender: ActivityResultSender
 
@@ -111,7 +117,7 @@ class MainActivity : ComponentActivity() {
                             context.assets.open("demo_market.json").bufferedReader().use { it.readText() }
                         )
                     }
-                    EstimaApp(payload, walletSender)
+                    ParabolaApp(payload, walletSender)
                 }
             }
         }
@@ -309,7 +315,7 @@ private fun AppTab.tutorialCopy(): TutorialCopy {
         AppTab.Trade -> TutorialCopy(
             headline = "Make your estimate",
             body = "Move the curve to show where you think the market should be. The app prices how much risk that opinion adds before you submit anything.",
-            primaryAction = "Adjust mean and sigma, then review collateral, fee, and total debit.",
+            primaryAction = "Adjust average and confidence, then review collateral, fee, and total debit.",
             watchItem = "Green means your new estimate wins there. Red means it loses there.",
         )
 
@@ -349,7 +355,7 @@ private enum class RegimeTradeSide(val label: String) {
 }
 
 @Composable
-private fun EstimaApp(
+private fun ParabolaApp(
     payload: DemoPayload,
     walletSender: ActivityResultSender,
 ) {
@@ -367,7 +373,7 @@ private fun EstimaApp(
     Crossfade(
         targetState = entered,
         animationSpec = tween(durationMillis = 700),
-        label = "Estima entrance transition",
+        label = "Parabola entrance transition",
     ) { hasEntered ->
         if (hasEntered) {
             TradeAppScreen(
@@ -376,13 +382,13 @@ private fun EstimaApp(
                 tutorialsEnabled = terminalTutorialsReady,
             )
         } else {
-            EstimaEntranceScreen(onEnter = { entered = true })
+            ParabolaEntranceScreen(onEnter = { entered = true })
         }
     }
 }
 
 @Composable
-private fun EstimaEntranceScreen(onEnter: () -> Unit) {
+private fun ParabolaEntranceScreen(onEnter: () -> Unit) {
     var composed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         composed = true
@@ -390,7 +396,7 @@ private fun EstimaEntranceScreen(onEnter: () -> Unit) {
     val reveal by animateFloatAsState(
         targetValue = if (composed) 1f else 0f,
         animationSpec = tween(durationMillis = 900),
-        label = "Estima reveal",
+        label = "Parabola reveal",
     )
 
     Box(
@@ -415,7 +421,7 @@ private fun EstimaEntranceScreen(onEnter: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Text(
-                text = "Estima",
+                text = "Parabola",
                 style = MaterialTheme.typography.displayMedium,
                 color = Color(0xFF0F172A).copy(alpha = reveal),
                 fontWeight = FontWeight.SemiBold,
@@ -1510,6 +1516,7 @@ private fun DistributionChartPanel(
     targetSigma: Float,
     curvePoints: List<DemoCurvePoint>,
 ) {
+    val confidence = sigmaToConfidencePercent(targetSigma)
     Panel {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1525,7 +1532,7 @@ private fun DistributionChartPanel(
                 )
             }
             Text(
-                "mu ${"%.1f".format(targetMu).trimZeros()}  sigma ${"%.1f".format(targetSigma).trimZeros()}",
+                "avg ${"%.1f".format(targetMu).trimZeros()}  confidence ${"%.0f".format(confidence)}%",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -1625,11 +1632,154 @@ private fun QuoteControls(
     onMuChange: (Float) -> Unit,
     onSigmaChange: (Float) -> Unit,
 ) {
+    var showAdvancedSigma by rememberSaveable { mutableStateOf(false) }
+    val confidence = sigmaToConfidencePercent(targetSigma)
     Panel {
         Text("Trade controls", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        SliderControl("Mean", targetMu, 88f..105f, 1f, onMuChange)
-        SliderControl("Sigma", targetSigma, 8.5f..12f, 0.5f, onSigmaChange)
+        SliderControl("Average", targetMu, 88f..105f, 1f, onMuChange)
+        PercentSliderControl(
+            label = "Confidence",
+            value = confidence,
+            range = 0f..100f,
+            step = 5f,
+            onChange = { onSigmaChange(confidencePercentToSigma(it)) },
+        )
+        Text(
+            text = "Higher confidence narrows the estimate curve; lower confidence widens it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(
+            onClick = { showAdvancedSigma = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+        ) {
+            Text("Advanced selection")
+        }
     }
+    if (showAdvancedSigma) {
+        AdvancedSigmaSheet(
+            targetSigma = targetSigma,
+            confidence = confidence,
+            onSigmaChange = onSigmaChange,
+            onDismiss = { showAdvancedSigma = false },
+        )
+    }
+}
+
+@Composable
+private fun PercentSliderControl(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    step: Float,
+    onChange: (Float) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = { onChange((value - step).coerceIn(range.start, range.endInclusive)) }) {
+                    Text("-")
+                }
+                Text(
+                    "${"%.0f".format(value.coerceIn(range.start, range.endInclusive))}%",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                OutlinedButton(onClick = { onChange((value + step).coerceIn(range.start, range.endInclusive)) }) {
+                    Text("+")
+                }
+            }
+        }
+        Slider(value = value, onValueChange = onChange, valueRange = range)
+    }
+}
+
+@Composable
+private fun AdvancedSigmaSheet(
+    targetSigma: Float,
+    confidence: Float,
+    onSigmaChange: (Float) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 560.dp)
+                    .navigationBarsPadding(),
+                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column {
+                            Text(
+                                "Advanced selection",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                "Raw sigma control",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text("Done")
+                        }
+                    }
+                    Text(
+                        "Confidence is a simplified UI layer over sigma. Higher confidence maps to a tighter sigma; moving this slider updates the same chart behind the sheet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "Confidence ${"%.0f".format(confidence)}% maps to sigma ${"%.1f".format(targetSigma).trimZeros()}.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    SliderControl("Sigma", targetSigma, SigmaControlRange, 0.5f, onSigmaChange)
+                }
+            }
+        }
+    }
+}
+
+private fun sigmaToConfidencePercent(sigma: Float): Float {
+    val width = SigmaControlMax - SigmaControlMin
+    if (width <= 0f) return 0f
+    return ((SigmaControlMax - sigma.coerceIn(SigmaControlMin, SigmaControlMax)) / width * 100f)
+        .coerceIn(0f, 100f)
+}
+
+private fun confidencePercentToSigma(confidence: Float): Float {
+    val normalizedConfidence = confidence.coerceIn(0f, 100f) / 100f
+    return SigmaControlMax - normalizedConfidence * (SigmaControlMax - SigmaControlMin)
 }
 
 @Composable
