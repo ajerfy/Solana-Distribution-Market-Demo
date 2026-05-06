@@ -14,6 +14,14 @@ import com.solana.transaction.AccountMeta
 import com.solana.transaction.Message
 import com.solana.transaction.Transaction
 import com.solana.transaction.TransactionInstruction
+import com.solanadistributionmarketdemo.core.encodeHex
+import com.solanadistributionmarketdemo.core.formattedDecimal
+import com.solanadistributionmarketdemo.data.ContinuousQuotePreview
+import com.solanadistributionmarketdemo.data.DemoPerpMarket
+import com.solanadistributionmarketdemo.data.DemoPerpQuote
+import com.solanadistributionmarketdemo.data.DemoPreset
+import com.solanadistributionmarketdemo.data.DemoRegimeIndex
+import com.solanadistributionmarketdemo.data.DemoRegimeQuote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -405,11 +413,3 @@ private fun walletMessage(message: String, memoLength: Int): String {
     }
 }
 
-fun encodeHex(bytes: ByteArray): String {
-    val hex = StringBuilder(bytes.size * 2)
-    bytes.forEach { byte ->
-        hex.append(((byte.toInt() ushr 4) and 0x0f).toString(16))
-        hex.append((byte.toInt() and 0x0f).toString(16))
-    }
-    return hex.toString()
-}
