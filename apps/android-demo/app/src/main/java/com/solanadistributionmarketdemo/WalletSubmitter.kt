@@ -14,6 +14,13 @@ import com.solana.transaction.AccountMeta
 import com.solana.transaction.Message
 import com.solana.transaction.Transaction
 import com.solana.transaction.TransactionInstruction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.nio.channels.UnresolvedAddressException
 import java.util.Locale
 
 private const val DEVNET_RPC_URL = "https://api.devnet.solana.com"
@@ -203,28 +210,65 @@ object WalletSubmitter {
         return Transaction(memoMessage)
     }
 
-    private suspend fun fetchRecentBlockhashWithRetry(): String {
+    /**
+     * Fetches a recent blockhash via java.net.HttpURLConnection (the system HTTP stack).
+     * We bypass Ktor's CIO engine here because on some devices — including the Solana Seeker —
+     * CIO's NIO selector throws UnresolvedAddressException for hosts the OS resolves fine.
+     */
+    private suspend fun fetchRecentBlockhashWithRetry(): String = withContext(Dispatchers.IO) {
         var lastError: Throwable? = null
         repeat(3) { attempt ->
             try {
-                val rpcClient = SolanaRpcClient(DEVNET_RPC_URL, KtorNetworkDriver())
-                val response = rpcClient.getLatestBlockhash()
-                response.result?.blockhash?.let { return it }
-                lastError = IllegalStateException(
-                    response.error?.message ?: "Devnet RPC returned no blockhash."
-                )
-            } catch (error: java.nio.channels.UnresolvedAddressException) {
+                return@withContext fetchBlockhashViaHttpURLConnection()
+            } catch (error: UnresolvedAddressException) {
                 lastError = error
-                kotlinx.coroutines.delay(150L * (attempt + 1))
+                delay(200L * (attempt + 1))
+            } catch (error: java.net.UnknownHostException) {
+                lastError = error
+                delay(200L * (attempt + 1))
             } catch (error: java.net.ConnectException) {
                 lastError = error
-                kotlinx.coroutines.delay(150L * (attempt + 1))
+                delay(200L * (attempt + 1))
             } catch (error: java.net.SocketTimeoutException) {
                 lastError = error
-                kotlinx.coroutines.delay(150L * (attempt + 1))
+                delay(200L * (attempt + 1))
             }
         }
         throw lastError ?: IllegalStateException("Could not fetch a recent blockhash from devnet.")
+    }
+
+    private fun fetchBlockhashViaHttpURLConnection(): String {
+        val conn = (URL(DEVNET_RPC_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 8_000
+            readTimeout = 8_000
+            doOutput = true
+            useCaches = false
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "application/json")
+        }
+        val body = """{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"finalized"}]}"""
+        try {
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+            if (code !in 200..299) {
+                throw IllegalStateException("Devnet RPC HTTP $code: ${text.take(200).ifBlank { "<no body>" }}")
+            }
+            val json = JSONObject(text)
+            json.optJSONObject("error")?.let { err ->
+                throw IllegalStateException("Devnet RPC error: ${err.optString("message", "<no message>")}")
+            }
+            val result = json.optJSONObject("result")
+                ?: throw IllegalStateException("Devnet RPC returned no result for getLatestBlockhash.")
+            val value = result.optJSONObject("value")
+                ?: throw IllegalStateException("Devnet RPC getLatestBlockhash result missing value object.")
+            return value.optString("blockhash").takeIf { it.isNotBlank() }
+                ?: throw IllegalStateException("Devnet RPC getLatestBlockhash returned empty blockhash.")
+        } finally {
+            conn.disconnect()
+        }
     }
 }
 
