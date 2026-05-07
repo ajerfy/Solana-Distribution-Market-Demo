@@ -35,8 +35,11 @@ import androidx.compose.ui.window.DialogProperties
 import com.solanadistributionmarketdemo.core.compactDecimal
 import com.solanadistributionmarketdemo.data.ActivityEvent
 import com.solanadistributionmarketdemo.data.AppState
+import com.solanadistributionmarketdemo.data.LiveEventStats
 import com.solanadistributionmarketdemo.data.MarketListing
 import com.solanadistributionmarketdemo.data.MockActivity
+import java.text.DateFormat
+import java.util.Date
 
 private enum class DetailTab(val label: String) { Bet("Bet"), Stats("Stats"), Flow("Flow"), Rules("Rules") }
 
@@ -101,6 +104,7 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
                 Column(modifier = Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (market.isOnChain) TagPill("ON-CHAIN", color = DemoColors.AccentChain, filled = true)
+                        market.sourceBadge?.let { TagPill(it, color = DemoColors.AccentChain) }
                         TagPill(market.category.label.uppercase(), color = DemoColors.AccentCrowd)
                         Text(
                             "· resolves ${market.resolvesAt}",
@@ -110,6 +114,15 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
                     }
                     Text(market.title, color = DemoColors.TextPrimary, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                     Text(market.subtitle, color = DemoColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            if (market.liveEventStats != null) {
+                item {
+                    LiveEstimateSourceCard(
+                        market = market,
+                        stats = market.liveEventStats,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
                 }
             }
             item {
@@ -182,6 +195,59 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
                 sigma = previewSigma,
                 onSigma = { previewSigma = it },
                 onDismiss = { showAdvanced = false },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveEstimateSourceCard(
+    market: MarketListing,
+    stats: LiveEventStats,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Live source",
+                color = DemoColors.TextPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.weight(1f))
+            market.sourceBadge?.let { TagPill(it, color = DemoColors.AccentChain) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "This estimate is pinned to a live binary market and remapped onto a probability curve so you can trade conviction and uncertainty together.",
+            color = DemoColors.TextSecondary,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(12.dp))
+        StatRow("Outcome", stats.outcomeLabel, DemoColors.AccentLong, strong = true)
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MetricPill("YES", stats.yesPrice?.let { "${(it * 100.0).compactDecimal(1)}¢" } ?: "—")
+            MetricPill("NO", stats.noPrice?.let { "${(it * 100.0).compactDecimal(1)}¢" } ?: "—")
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MetricPill("BID", stats.bestBid?.let { "${(it * 100.0).compactDecimal(1)}¢" } ?: "—")
+            MetricPill("ASK", stats.bestAsk?.let { "${(it * 100.0).compactDecimal(1)}¢" } ?: "—")
+            MetricPill("SPREAD", stats.spread?.let { "${(it * 100.0).compactDecimal(1)}¢" } ?: "—")
+        }
+        stats.updatedAtMillis?.let { updatedAt ->
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Updated ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(updatedAt))}",
+                color = DemoColors.TextDim,
+                style = MaterialTheme.typography.labelSmall,
             )
         }
     }

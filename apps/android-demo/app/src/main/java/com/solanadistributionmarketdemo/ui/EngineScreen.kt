@@ -52,19 +52,30 @@ fun EngineScreen(state: AppState) {
         item {
             Card(modifier = Modifier.padding(horizontal = 20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("How pricing starts", color = DemoColors.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Live feeds now", color = DemoColors.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
                     TagPill("DEVNET", color = DemoColors.AccentChain)
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "Every market opens with a crowd estimate. When you move Average or Confidence, the app measures how much extra collateral is needed to support that new curve.",
+                    "Parabola is currently anchoring one live Polymarket event and one live SOL perp. The event becomes the crowd estimate for the probability market; the perp stays pinned to a live oracle-backed anchor.",
                     color = DemoColors.TextSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(12.dp))
-                StatRow("Crowd average", market.currentMuDisplay.take(10), DemoColors.AccentCrowd, strong = true)
-                StatRow("Crowd confidence width", market.currentSigmaDisplay.take(10))
+                StatRow("Featured event", market.title, DemoColors.AccentCrowd, strong = true)
+                StatRow("Event source", market.sourceBadge ?: "Live market feed")
+                StatRow("Live event estimate", market.currentMuDisplay.take(10), DemoColors.AccentCrowd)
+                StatRow("Confidence width", market.currentSigmaDisplay.take(10))
+                market.bestBidDisplay?.let { StatRow("Best bid / ask", "${it.take(6)} / ${market.bestAskDisplay?.take(6) ?: "—"}") }
+                if (perp != null) {
+                    CompactDivider()
+                    StatRow("Featured perp", perp.symbol, DemoColors.AccentWarn, strong = true)
+                    StatRow("Perp source", "Pyth Hermes")
+                    StatRow("Current mark", "$${perp.markPriceDisplay.take(8)}")
+                    StatRow("Funding rate", perp.spotFundingRateDisplay.take(10), if ((perp.spotFundingRateDisplay.toDoubleOrNull() ?: 0.0) >= 0) DemoColors.AccentLong else DemoColors.AccentShort)
+                }
+                CompactDivider()
                 StatRow("Trading fee", feePercent)
                 CompactDivider()
                 StatRow("Status", market.status.uppercase(), DemoColors.AccentLong, strong = true)

@@ -44,6 +44,7 @@ fun MarketsListScreen(state: AppState) {
         val typeMatches = selectedType.marketType == null || market.marketType == selectedType.marketType
         categoryMatches && typeMatches
     }
+    val featuredMarkets = markets.filter { it.isFeaturedLive }
 
     LazyColumn(
         modifier = Modifier
@@ -66,6 +67,14 @@ fun MarketsListScreen(state: AppState) {
                 markets = state.markets,
                 selectedCategory = selectedCat,
             )
+        }
+        if (featuredMarkets.isNotEmpty()) {
+            item {
+                LiveNowSection(
+                    markets = featuredMarkets,
+                    onOpen = { state.openMarket(it.id) },
+                )
+            }
         }
         item {
             Row(
@@ -117,7 +126,7 @@ private fun Header(state: AppState) {
             )
             TagPill(
                 when (liveStatus.mode) {
-                    LiveSyncMode.Live -> "LIVE ORACLE"
+                    LiveSyncMode.Live -> "LIVE FEEDS"
                     LiveSyncMode.Connecting -> "CONNECTING"
                     LiveSyncMode.Error -> "LIVE ERROR"
                     LiveSyncMode.Demo -> "DEMO DATA"
@@ -140,7 +149,7 @@ private fun Header(state: AppState) {
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            "Pick a guess, set how sure you are, win when reality lands close. Live on Solana devnet.",
+            "Track one live Polymarket event, one live SOL perp, and the broader estimation market sandbox from the same terminal.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -149,6 +158,106 @@ private fun Header(state: AppState) {
             color = DemoColors.TextDim,
             style = MaterialTheme.typography.labelSmall,
         )
+    }
+}
+
+@Composable
+private fun LiveNowSection(
+    markets: List<MarketListing>,
+    onOpen: (MarketListing) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        SectionLabel("LIVE NOW")
+        markets.forEach { market ->
+            LiveFacetCard(
+                market = market,
+                onClick = { onOpen(market) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveFacetCard(
+    market: MarketListing,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        padding = PaddingValues(18.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    TagPill("LIVE", color = DemoColors.AccentLong, filled = true)
+                    market.sourceBadge?.let { TagPill(it, color = DemoColors.AccentChain) }
+                    MarketTypeBadge(market.marketType)
+                }
+                Text(
+                    market.title,
+                    color = DemoColors.TextPrimary,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    market.subtitle,
+                    color = DemoColors.TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Sparkline(
+                values = market.crowdHistory,
+                modifier = Modifier.width(88.dp),
+                color = when (market.marketType) {
+                    MarketType.Estimation -> DemoColors.AccentCrowd
+                    MarketType.RegimeIndex -> DemoColors.AccentLong
+                    MarketType.Perp -> DemoColors.AccentWarn
+                },
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        when (market.marketType) {
+            MarketType.Perp -> {
+                val perp = market.perp
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CrowdBlock("MARK", "$${market.crowdMu.compactDecimal(2)}", Modifier.weight(1f))
+                    CrowdBlock("ANCHOR", "$${perp?.anchorMuDisplay?.toDoubleOrNull()?.compactDecimal(2) ?: "—"}", Modifier.weight(1f))
+                    CrowdBlock("FUNDING", perp?.spotFundingRateDisplay?.take(9) ?: "—", Modifier.weight(1f))
+                    CrowdBlock("STATUS", market.resolvesAt, Modifier.weight(1f))
+                }
+            }
+            else -> {
+                val stats = market.liveEventStats
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CrowdBlock("LIVE PROB", "${market.crowdMu.compactDecimal(1)} ${market.unit}", Modifier.weight(1.1f))
+                    CrowdBlock("BID", stats?.bestBid?.let { "${(it * 100.0).compactDecimal(1)}¢" } ?: "—", Modifier.weight(0.8f))
+                    CrowdBlock("ASK", stats?.bestAsk?.let { "${(it * 100.0).compactDecimal(1)}¢" } ?: "—", Modifier.weight(0.8f))
+                    CrowdBlock("VOLUME", formatVolume(market.volumeUsd), Modifier.weight(1f))
+                }
+            }
+        }
     }
 }
 
@@ -256,6 +365,7 @@ private fun MarketRow(market: MarketListing, onClick: () -> Unit, modifier: Modi
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (market.isOnChain) TagPill("ON-CHAIN", color = DemoColors.AccentChain, filled = true)
+                    market.sourceBadge?.let { TagPill(it, color = DemoColors.AccentChain) }
                     MarketTypeBadge(market.marketType)
                     Text(market.category.label.uppercase(), color = DemoColors.TextDim, style = MaterialTheme.typography.labelSmall)
                 }

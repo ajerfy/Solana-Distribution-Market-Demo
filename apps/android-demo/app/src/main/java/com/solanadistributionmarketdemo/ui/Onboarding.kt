@@ -184,14 +184,14 @@ private fun NavTab.tutorialSteps(): List<OnboardingStep> = when (this) {
     NavTab.Markets -> listOf(
         OnboardingStep(
             glyph = "◆",
-            title = "Browse the market board",
-            body = "The top rail filters by topic: Crypto, Macro, Weather, Sports, Events, and more. Tap any market card to open its chart, rules, and trade flow.",
+            title = "Start with live markets",
+            body = "Live Now pins the featured Polymarket event and the featured SOL perp at the top of the board. Tap either card to open the live chart, pricing, and trade flow.",
             accent = DemoColors.AccentCrowd,
         ),
         OnboardingStep(
             glyph = "▦",
             title = "Choose the market type",
-            body = "The second rail switches between Estimates, Perps, and Regime indexes. Use it with the category rail to show only the exact market structure you want.",
+            body = "Below the live cards, the topic rail filters by category and the type rail switches between Estimates, Perps, and Regime indexes. Use both together to narrow the board fast.",
             accent = DemoColors.AccentWarn,
         ),
     )

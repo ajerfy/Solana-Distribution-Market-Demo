@@ -2,6 +2,7 @@ package com.solanadistributionmarketdemo.data
 
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 fun loadDemoPayload(json: String): DemoPayload {
     val root = JSONObject(json)
@@ -29,6 +30,25 @@ fun loadDemoPayload(json: String): DemoPayload {
             demoQuoteExpirySlot = marketObject.getLong("demo_quote_expiry_slot"),
             coarseSamples = marketObject.getInt("coarse_samples"),
             refineSamples = marketObject.getInt("refine_samples"),
+            subtitle = marketObject.optString("subtitle").ifEmpty { null },
+            categoryLabel = marketObject.optString("category_label").ifEmpty { null },
+            unitLabel = marketObject.optString("unit_label").ifEmpty { null },
+            resolvesAtLabel = marketObject.optString("resolves_at_label").ifEmpty { null },
+            volumeUsd = marketObject.optDouble("volume_usd").takeIf { !it.isNaN() && it > 0.0 },
+            bettorCount = marketObject.optInt("bettor_count").takeIf { it > 0 },
+            resolutionSourceLabel = marketObject.optString("resolution_source_label").ifEmpty { null },
+            resolutionRuleText = marketObject.optString("resolution_rule_text").ifEmpty { null },
+            sourceBadge = marketObject.optString("source_badge").ifEmpty { null },
+            sourceUrl = marketObject.optString("source_url").ifEmpty { null },
+            marketSlug = marketObject.optString("market_slug").ifEmpty { null },
+            outcomeLabel = marketObject.optString("outcome_label").ifEmpty { null },
+            yesPriceDisplay = marketObject.optString("yes_price_display").ifEmpty { null },
+            noPriceDisplay = marketObject.optString("no_price_display").ifEmpty { null },
+            bestBidDisplay = marketObject.optString("best_bid_display").ifEmpty { null },
+            bestAskDisplay = marketObject.optString("best_ask_display").ifEmpty { null },
+            spreadDisplay = marketObject.optString("spread_display").ifEmpty { null },
+            updatedAtMillis = marketObject.optLong("updated_at_millis").takeIf { it > 0L },
+            featuredLive = marketObject.optBoolean("featured_live", false),
         ),
         presets = presetsArray.toPresetList(),
         quoteGrid = quoteGridArray.toPresetList(),
@@ -55,20 +75,24 @@ private fun JSONArray.toRegimeIndexList(): List<DemoRegimeIndex> {
     val out = mutableListOf<DemoRegimeIndex>()
     for (i in 0 until length()) {
         val o = getJSONObject(i)
+        val history = o.optJSONArray("history")?.toRegimeHistory().orEmpty()
+        val previousLevel = o.optString("previous_level_display").ifEmpty {
+            history.dropLast(1).lastOrNull()?.levelDisplay.orEmpty()
+        }
         out += DemoRegimeIndex(
             id = o.getString("id"),
-            symbol = o.getString("symbol"),
+            symbol = o.optString("symbol").ifEmpty { o.optString("id").uppercase() },
             title = o.getString("title"),
-            thesis = o.optString("thesis"),
-            status = o.optString("status"),
-            levelDisplay = o.getString("level_display"),
-            previousLevelDisplay = o.optString("previous_level_display"),
+            thesis = o.optString("thesis").ifEmpty { o.optString("description") },
+            status = o.optString("status").ifEmpty { "Live basket" },
+            levelDisplay = o.optString("level_display").ifEmpty { o.optString("current_score_display") },
+            previousLevelDisplay = previousLevel,
             changeDisplay = o.optString("change_display"),
-            rebalanceSlot = o.optLong("rebalance_slot"),
+            rebalanceSlot = o.optLong("rebalance_slot").takeIf { it > 0L } ?: history.lastOrNull()?.slot ?: 0L,
             nextRebalanceSlot = o.optLong("next_rebalance_slot"),
             quoteExpirySlot = o.optLong("quote_expiry_slot"),
             constituents = o.optJSONArray("constituents")?.toConstituentList().orEmpty(),
-            history = o.optJSONArray("history")?.toRegimeHistory().orEmpty(),
+            history = history,
             longQuote = o.getJSONObject("long_quote").toRegimeQuote(),
             shortQuote = o.getJSONObject("short_quote").toRegimeQuote(),
         )
@@ -80,11 +104,13 @@ private fun JSONArray.toConstituentList(): List<DemoRegimeConstituent> {
     val out = mutableListOf<DemoRegimeConstituent>()
     for (i in 0 until length()) {
         val o = getJSONObject(i)
+        val weightBps = o.optInt("weight_bps").takeIf { it > 0 }
+            ?: ((o.optString("weight_display").toDoubleOrNull() ?: 0.0) * 10_000.0).roundToInt()
         out += DemoRegimeConstituent(
-            id = o.getString("id"),
+            id = o.optString("id").ifEmpty { o.optString("market_id").ifEmpty { "constituent-$i" } },
             label = o.getString("label"),
             side = o.optString("side"),
-            weightBps = o.optInt("weight_bps"),
+            weightBps = weightBps,
             probabilityDisplay = o.optString("probability_display"),
             previousProbabilityDisplay = o.optString("previous_probability_display"),
             levelContributionDisplay = o.optString("level_contribution_display"),
@@ -102,7 +128,7 @@ private fun JSONArray.toRegimeHistory(): List<DemoRegimeHistoryPoint> {
         val o = getJSONObject(i)
         out += DemoRegimeHistoryPoint(
             slot = o.getLong("slot"),
-            levelDisplay = o.getString("level_display"),
+            levelDisplay = o.optString("level_display").ifEmpty { o.optString("score_display") },
         )
     }
     return out
@@ -110,12 +136,12 @@ private fun JSONArray.toRegimeHistory(): List<DemoRegimeHistoryPoint> {
 
 private fun JSONObject.toRegimeQuote(): DemoRegimeQuote = DemoRegimeQuote(
     side = optString("side"),
-    sizeDisplay = optString("size_display"),
-    entryLevelDisplay = optString("entry_level_display"),
-    tokenPriceDisplay = optString("token_price_display"),
-    collateralRequiredDisplay = optString("collateral_required_display"),
-    feePaidDisplay = optString("fee_paid_display"),
-    totalDebitDisplay = optString("total_debit_display"),
+    sizeDisplay = optString("size_display").ifEmpty { "1.000000000" },
+    entryLevelDisplay = optString("entry_level_display").ifEmpty { optString("target_score_display") },
+    tokenPriceDisplay = optString("token_price_display").ifEmpty { optString("target_score_display") },
+    collateralRequiredDisplay = optString("collateral_required_display").ifEmpty { optString("collateral_display") },
+    feePaidDisplay = optString("fee_paid_display").ifEmpty { "0.000000000" },
+    totalDebitDisplay = optString("total_debit_display").ifEmpty { optString("collateral_display") },
     memoPayload = optString("memo_payload"),
 )
 

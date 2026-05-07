@@ -42,6 +42,25 @@ data class DemoMarket(
     val demoQuoteExpirySlot: Long,
     val coarseSamples: Int,
     val refineSamples: Int,
+    val subtitle: String? = null,
+    val categoryLabel: String? = null,
+    val unitLabel: String? = null,
+    val resolvesAtLabel: String? = null,
+    val volumeUsd: Double? = null,
+    val bettorCount: Int? = null,
+    val resolutionSourceLabel: String? = null,
+    val resolutionRuleText: String? = null,
+    val sourceBadge: String? = null,
+    val sourceUrl: String? = null,
+    val marketSlug: String? = null,
+    val outcomeLabel: String? = null,
+    val yesPriceDisplay: String? = null,
+    val noPriceDisplay: String? = null,
+    val bestBidDisplay: String? = null,
+    val bestAskDisplay: String? = null,
+    val spreadDisplay: String? = null,
+    val updatedAtMillis: Long? = null,
+    val featuredLive: Boolean = false,
 )
 
 data class DemoCurvePoint(
@@ -128,8 +147,22 @@ data class MarketListing(
     val resolutionSource: String,
     val resolutionRule: String,
     val marketType: MarketType = MarketType.Estimation,
+    val sourceBadge: String? = null,
+    val sourceUrl: String? = null,
+    val isFeaturedLive: Boolean = false,
+    val liveEventStats: LiveEventStats? = null,
     val regime: DemoRegimeIndex? = null,
     val perp: DemoPerpMarket? = null,
+)
+
+data class LiveEventStats(
+    val outcomeLabel: String,
+    val yesPrice: Double?,
+    val noPrice: Double?,
+    val bestBid: Double?,
+    val bestAsk: Double?,
+    val spread: Double?,
+    val updatedAtMillis: Long?,
 )
 
 data class ActivityEvent(

@@ -8,26 +8,66 @@ object MockMarkets {
     fun build(payload: DemoPayload): List<MarketListing> = build(payload.market, payload.regimeIndexes, payload.perp)
 
     fun build(onChain: DemoMarket, regimeIndexes: List<DemoRegimeIndex> = emptyList(), perp: DemoPerpMarket? = null): List<MarketListing> {
+        val category = categoryFromLabel(onChain.categoryLabel) ?: MarketCategory.Crypto
+        val unit = onChain.unitLabel ?: "%"
+        val marketId = onChain.marketSlug?.let { "event-$it" } ?: "market-${onChain.marketIdHex.take(8)}"
+        val comesFromLiveSource = onChain.sourceBadge == "POLYMARKET"
+        val currentMu = onChain.currentMuDisplay.toDouble()
+        val currentSigma = onChain.currentSigmaDisplay.toDouble()
+        val muMin = when {
+            unit == "%" && currentMu in 0.0..100.0 -> 0.0
+            else -> currentMu - currentSigma * 2.5
+        }
+        val muMax = when {
+            unit == "%" && currentMu in 0.0..100.0 -> 100.0
+            else -> currentMu + currentSigma * 2.5
+        }
+        val resolutionSource = onChain.resolutionSourceLabel
+            ?: "Pyth ETH/USD · settlement slot ${onChain.expirySlot}"
+        val resolutionRule = onChain.resolutionRuleText
+            ?: "Realized ETH return at expiry slot, scaled to display units."
+        val liveEventStats = if (
+            onChain.outcomeLabel != null ||
+            onChain.yesPriceDisplay != null ||
+            onChain.bestBidDisplay != null ||
+            onChain.bestAskDisplay != null
+        ) {
+            LiveEventStats(
+                outcomeLabel = onChain.outcomeLabel ?: "Live outcome",
+                yesPrice = onChain.yesPriceDisplay?.toDoubleOrNull(),
+                noPrice = onChain.noPriceDisplay?.toDoubleOrNull(),
+                bestBid = onChain.bestBidDisplay?.toDoubleOrNull(),
+                bestAsk = onChain.bestAskDisplay?.toDoubleOrNull(),
+                spread = onChain.spreadDisplay?.toDoubleOrNull(),
+                updatedAtMillis = onChain.updatedAtMillis,
+            )
+        } else {
+            null
+        }
         val onChainListing = MarketListing(
-            id = "onchain-eth-return",
+            id = marketId,
             title = onChain.title,
-            subtitle = "Live devnet market · single seeded pool",
-            category = MarketCategory.Crypto,
-            unit = "%",
-            resolvesAt = "Slot ${onChain.expirySlot}",
-            crowdMu = onChain.currentMuDisplay.toDouble(),
-            crowdSigma = onChain.currentSigmaDisplay.toDouble(),
-            muMin = onChain.currentMuDisplay.toDouble() - onChain.currentSigmaDisplay.toDouble() * 2.5,
-            muMax = onChain.currentMuDisplay.toDouble() + onChain.currentSigmaDisplay.toDouble() * 2.5,
-            sigmaMin = onChain.currentSigmaDisplay.toDouble() * 0.5,
-            sigmaMax = onChain.currentSigmaDisplay.toDouble() * 2.0,
-            volumeUsd = onChain.backingDisplay.toDouble() * 1_000.0,
-            bettorCount = onChain.totalTrades.toInt().coerceAtLeast(1),
-            crowdHistory = synthHistory(onChain.currentMuDisplay.toDouble(), onChain.currentSigmaDisplay.toDouble() * 0.15, seed = 11),
-            isOnChain = true,
-            resolutionSource = "Pyth ETH/USD · settlement slot ${onChain.expirySlot}",
-            resolutionRule = "Realized ETH return at expiry slot, scaled to display units.",
+            subtitle = onChain.subtitle ?: "Live devnet market · single seeded pool",
+            category = category,
+            unit = unit,
+            resolvesAt = onChain.resolvesAtLabel ?: "Slot ${onChain.expirySlot}",
+            crowdMu = currentMu,
+            crowdSigma = currentSigma,
+            muMin = muMin,
+            muMax = muMax,
+            sigmaMin = currentSigma * 0.5,
+            sigmaMax = currentSigma * 2.0,
+            volumeUsd = onChain.volumeUsd ?: onChain.backingDisplay.toDouble() * 1_000.0,
+            bettorCount = onChain.bettorCount ?: onChain.totalTrades.toInt().coerceAtLeast(1),
+            crowdHistory = synthHistory(currentMu, currentSigma * 0.15, seed = 11),
+            isOnChain = !comesFromLiveSource,
+            resolutionSource = resolutionSource,
+            resolutionRule = resolutionRule,
             marketType = MarketType.Estimation,
+            sourceBadge = onChain.sourceBadge,
+            sourceUrl = onChain.sourceUrl,
+            isFeaturedLive = onChain.featuredLive,
+            liveEventStats = liveEventStats,
         )
 
         val mocks = listOf(
@@ -281,6 +321,7 @@ object MockMarkets {
             resolutionSource = "Index of " + constituents.take(3).joinToString(" / ") { it.label },
             resolutionRule = "Index level recomputes as a weighted basket of yes/no constituent probabilities at each rebalance slot.",
             marketType = MarketType.RegimeIndex,
+            sourceBadge = "REGIME",
             regime = this,
         )
     }
@@ -309,8 +350,23 @@ object MockMarkets {
             resolutionSource = "$symbol mark price · continuous",
             resolutionRule = "Perpetual market: long pays funding when AMM curve is above anchor, short pays when below.",
             marketType = MarketType.Perp,
+            sourceBadge = "PYTH",
+            isFeaturedLive = true,
             perp = this,
         )
+    }
+
+    private fun categoryFromLabel(label: String?): MarketCategory? = when (label?.trim()?.lowercase()) {
+        "events" -> MarketCategory.Events
+        "weather" -> MarketCategory.Weather
+        "crypto" -> MarketCategory.Crypto
+        "sports" -> MarketCategory.Sports
+        "pop", "popculture", "pop culture" -> MarketCategory.PopCulture
+        "climate" -> MarketCategory.Climate
+        "macro" -> MarketCategory.Macro
+        "equities" -> MarketCategory.Equities
+        "politics" -> MarketCategory.Politics
+        else -> null
     }
 
     private fun mock(
