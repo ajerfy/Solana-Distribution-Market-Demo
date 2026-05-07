@@ -34,8 +34,22 @@ fun loadDemoPayload(json: String): DemoPayload {
         quoteGrid = quoteGridArray.toPresetList(),
         regimeIndexes = root.optJSONArray("regime_indexes")?.toRegimeIndexList().orEmpty(),
         perp = root.optJSONObject("perps")?.toPerpMarket(),
+        liveFeed = root.optJSONObject("live_feed")?.toLiveFeed(),
     )
 }
+
+private fun JSONObject.toLiveFeed(): DemoLiveFeed = DemoLiveFeed(
+    mode = optString("mode"),
+    source = optString("source"),
+    symbol = optString("symbol"),
+    status = optString("status"),
+    endpoint = optString("endpoint"),
+    chain = optString("chain"),
+    feedId = optString("feed_id").ifEmpty { null },
+    lastUpdateUnixMs = optLong("last_update_unix_ms"),
+    executionMode = optString("execution_mode").ifEmpty { null },
+    message = optString("message").ifEmpty { null },
+)
 
 private fun JSONArray.toRegimeIndexList(): List<DemoRegimeIndex> {
     val out = mutableListOf<DemoRegimeIndex>()

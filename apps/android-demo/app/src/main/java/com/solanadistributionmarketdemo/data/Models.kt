@@ -6,6 +6,20 @@ data class DemoPayload(
     val quoteGrid: List<DemoPreset>,
     val regimeIndexes: List<DemoRegimeIndex> = emptyList(),
     val perp: DemoPerpMarket? = null,
+    val liveFeed: DemoLiveFeed? = null,
+)
+
+data class DemoLiveFeed(
+    val mode: String,
+    val source: String,
+    val symbol: String,
+    val status: String,
+    val endpoint: String,
+    val chain: String,
+    val feedId: String?,
+    val lastUpdateUnixMs: Long,
+    val executionMode: String?,
+    val message: String?,
 )
 
 data class DemoMarket(

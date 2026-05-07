@@ -1,6 +1,12 @@
 package com.solanadistributionmarketdemo.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.DonutLarge
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,8 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import com.solanadistributionmarketdemo.data.AppState
@@ -149,45 +155,51 @@ private fun BottomNav(modifier: Modifier = Modifier, active: NavTab, onSelect: (
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NavTab.entries.forEach { tab ->
-                NavItem(tab = tab, selected = tab == active, onClick = { onSelect(tab) })
+                NavItem(
+                    modifier = Modifier.weight(1f),
+                    tab = tab,
+                    selected = tab == active,
+                    onClick = { onSelect(tab) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun NavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit) {
+private fun NavItem(modifier: Modifier = Modifier, tab: NavTab, selected: Boolean, onClick: () -> Unit) {
     val bg = if (selected) DemoColors.AccentYou else Color.Transparent
     val fg = if (selected) DemoColors.OnAccent else DemoColors.TextSecondary
-    Row(
-        modifier = Modifier
+    Column(
+        modifier = modifier
+            .padding(horizontal = 4.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            glyphFor(tab),
-            color = fg,
-            fontFamily = FontFamily.Monospace,
-            style = MaterialTheme.typography.titleSmall,
+        Icon(
+            imageVector = iconFor(tab),
+            contentDescription = tab.label,
+            tint = fg,
+            modifier = Modifier.size(20.dp),
         )
-        if (selected) {
-            Text(
-                tab.label,
-                color = fg,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        Text(
+            tab.label,
+            color = fg,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
     }
 }
 
-private fun glyphFor(tab: NavTab): String = when (tab) {
-    NavTab.Markets -> "◆"
-    NavTab.Portfolio -> "▲"
-    NavTab.Engine -> "▦"
-    NavTab.Wallet -> "◉"
+private fun iconFor(tab: NavTab) = when (tab) {
+    NavTab.Markets -> Icons.AutoMirrored.Filled.ShowChart
+    NavTab.Portfolio -> Icons.Filled.DonutLarge
+    NavTab.Engine -> Icons.Filled.Bolt
+    NavTab.Wallet -> Icons.Filled.AccountBalanceWallet
 }

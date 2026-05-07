@@ -29,8 +29,11 @@ import com.solanadistributionmarketdemo.core.compactDecimal
 import com.solanadistributionmarketdemo.core.shortHash
 import com.solanadistributionmarketdemo.data.AppState
 import com.solanadistributionmarketdemo.data.BetRecord
+import com.solanadistributionmarketdemo.data.LiveSyncMode
 import com.solanadistributionmarketdemo.data.MarketListing
 import com.solanadistributionmarketdemo.data.MockActivity
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun PortfolioScreen(state: AppState) {
@@ -246,7 +249,34 @@ fun WalletScreen(state: AppState) {
                 Text("Solana devnet", color = DemoColors.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("api.devnet.solana.com", color = DemoColors.TextDim, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(12.dp))
-                SectionLabel("SEEDED MARKET")
+                SectionLabel("DATA SOURCE")
+                Spacer(Modifier.height(4.dp))
+                val live = state.liveSyncStatus.value
+                Text(
+                    when (live.mode) {
+                        LiveSyncMode.Live -> "Live oracle feed"
+                        LiveSyncMode.Connecting -> "Connecting to live backend"
+                        LiveSyncMode.Error -> "Live backend error"
+                        LiveSyncMode.Demo -> "Bundled demo payload"
+                    },
+                    color = DemoColors.TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(live.source, color = DemoColors.TextSecondary, style = MaterialTheme.typography.bodySmall)
+                live.endpoint?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = DemoColors.TextDim, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                }
+                live.lastUpdatedMillis?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Updated ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it))}",
+                        color = DemoColors.TextDim,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                SectionLabel("PRIMARY MARKET")
                 Spacer(Modifier.height(4.dp))
                 Text(state.payload.market.title, color = DemoColors.TextPrimary, style = MaterialTheme.typography.bodyMedium)
                 Text(

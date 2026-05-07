@@ -206,8 +206,8 @@ private fun NavTab.tutorialSteps(): List<OnboardingStep> = when (this) {
     NavTab.Engine -> listOf(
         OnboardingStep(
             glyph = "▦",
-            title = "Inspect backend state",
-            body = "Engine shows what the program sees: maker pool, quote envelope, fee settings, regime baskets, perp funding, vault cash, and last submission receipt.",
+            title = "Understand the market plumbing",
+            body = "Engine now gives the simple version: how pricing starts, where liquidity comes from, how perps stay anchored, how regime baskets work, and what your last action did.",
             accent = DemoColors.AccentChain,
         )
     )

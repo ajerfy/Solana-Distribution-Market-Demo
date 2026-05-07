@@ -9,11 +9,15 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.solanadistributionmarketdemo.ui.ThemeMode
 
 class AppState(
-    val payload: DemoPayload,
+    initialPayload: DemoPayload,
     val positionStore: PositionStore,
     val themeStore: ThemeStore,
 ) {
-    val markets: List<MarketListing> = MockMarkets.build(payload)
+    private val payloadState: MutableState<DemoPayload> = mutableStateOf(initialPayload)
+    val payload: DemoPayload
+        get() = payloadState.value
+    val markets: List<MarketListing>
+        get() = MockMarkets.build(payload)
     val bets: SnapshotStateList<BetRecord> = mutableStateListOf<BetRecord>().apply {
         addAll(positionStore.load())
     }
@@ -25,6 +29,15 @@ class AppState(
     val walletAddress: MutableState<String?> = mutableStateOf(null)
     val lastSubmit: MutableState<SubmitStatus?> = mutableStateOf(null)
     val themeMode: MutableState<ThemeMode> = mutableStateOf(themeStore.load())
+    val liveSyncStatus: MutableState<LiveSyncStatus> = mutableStateOf(
+        LiveSyncStatus(
+            mode = LiveSyncMode.Demo,
+            source = "Bundled demo asset",
+            endpoint = null,
+            lastUpdatedMillis = null,
+            message = "Using seeded payload until a live backend responds.",
+        )
+    )
     var replayOnboarding: () -> Unit = {}
 
     fun setTheme(mode: ThemeMode) {
@@ -33,6 +46,17 @@ class AppState(
     }
 
     fun marketById(id: String?): MarketListing? = id?.let { markets.firstOrNull { m -> m.id == it } }
+
+    fun updatePayload(next: DemoPayload) {
+        payloadState.value = next
+        if (selectedMarketId.value != null && marketById(selectedMarketId.value) == null) {
+            closeMarket()
+        }
+    }
+
+    fun updateLiveSync(status: LiveSyncStatus) {
+        liveSyncStatus.value = status
+    }
 
     fun openMarket(id: String) {
         selectedMarketId.value = id
@@ -73,6 +97,21 @@ enum class NavTab(val label: String) {
     Engine("Engine"),
     Wallet("Wallet"),
 }
+
+enum class LiveSyncMode {
+    Demo,
+    Connecting,
+    Live,
+    Error,
+}
+
+data class LiveSyncStatus(
+    val mode: LiveSyncMode,
+    val source: String,
+    val endpoint: String?,
+    val lastUpdatedMillis: Long?,
+    val message: String,
+)
 
 @Composable
 fun rememberAppState(payload: DemoPayload, store: PositionStore, themeStore: ThemeStore): AppState =

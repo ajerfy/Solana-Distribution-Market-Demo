@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.solanadistributionmarketdemo.core.compactDecimal
 import com.solanadistributionmarketdemo.data.AppState
+import com.solanadistributionmarketdemo.data.LiveSyncMode
 import com.solanadistributionmarketdemo.data.MarketCategory
 import com.solanadistributionmarketdemo.data.MarketListing
 import com.solanadistributionmarketdemo.data.MarketType
@@ -105,6 +106,7 @@ private fun Header(state: AppState) {
             .padding(horizontal = 20.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        val liveStatus = state.liveSyncStatus.value
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "PARABOLA",
@@ -112,6 +114,20 @@ private fun Header(state: AppState) {
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
+            )
+            TagPill(
+                when (liveStatus.mode) {
+                    LiveSyncMode.Live -> "LIVE ORACLE"
+                    LiveSyncMode.Connecting -> "CONNECTING"
+                    LiveSyncMode.Error -> "LIVE ERROR"
+                    LiveSyncMode.Demo -> "DEMO DATA"
+                },
+                color = when (liveStatus.mode) {
+                    LiveSyncMode.Live -> DemoColors.AccentLong
+                    LiveSyncMode.Connecting -> DemoColors.AccentWarn
+                    LiveSyncMode.Error -> DemoColors.AccentShort
+                    LiveSyncMode.Demo -> DemoColors.AccentChain
+                }
             )
             TagPill("DEVNET", color = DemoColors.AccentChain)
             Spacer(Modifier.weight(1f))
@@ -127,6 +143,11 @@ private fun Header(state: AppState) {
             "Pick a guess, set how sure you are, win when reality lands close. Live on Solana devnet.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            liveStatus.message,
+            color = DemoColors.TextDim,
+            style = MaterialTheme.typography.labelSmall,
         )
     }
 }
