@@ -2,7 +2,7 @@
 
 Solana Mobile demo repo for a Normal-only estimation prediction market.
 
-Watch our demo video here!
+Watch our demo video here! (YouTube Link)
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=FdCR-rBYMu8">
