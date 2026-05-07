@@ -84,6 +84,7 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
 
     var previewMu by remember(market.id) { mutableStateOf(market.crowdMu.toFloat()) }
     var previewSigma by remember(market.id) { mutableStateOf(market.crowdSigma.toFloat()) }
+    var showAdvanced by remember(market.id) { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(DemoColors.Background)) {
         LazyColumn(
@@ -132,6 +133,8 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
                         previewMu = market.crowdMu.toFloat()
                         previewSigma = market.crowdSigma.toFloat()
                     },
+                    showAdvanced = showAdvanced,
+                    onToggleAdvanced = { showAdvanced = !showAdvanced },
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
@@ -183,6 +186,8 @@ private fun DistributionSliderCard(
     onMu: (Float) -> Unit,
     onSigma: (Float) -> Unit,
     onResetToCrowd: () -> Unit,
+    showAdvanced: Boolean,
+    onToggleAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier) {
@@ -195,10 +200,20 @@ private fun DistributionSliderCard(
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.clickable(onClick = onResetToCrowd),
             )
+            Spacer(Modifier.size(10.dp))
+            Text(
+                if (showAdvanced) "hide σ" else "advanced",
+                color = if (showAdvanced) DemoColors.AccentLong else DemoColors.AccentCrowd,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable(onClick = onToggleAdvanced),
+            )
         }
         Spacer(Modifier.height(2.dp))
         Text(
-            "Slide your average, set how confident you are, fine-tune the standard deviation.",
+            if (showAdvanced)
+                "Average + confidence drive your bet. Standard deviation is the raw σ — moving it overrides confidence."
+            else "Slide your average and pick how confident you are.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -231,17 +246,19 @@ private fun DistributionSliderCard(
             onChange = { c -> onSigma(sigmaMin + (1f - c) * span) },
             crowdAsPercentage = true,
         )
-        Spacer(Modifier.height(10.dp))
-        SliderRow(
-            label = "Standard deviation",
-            value = sigma,
-            range = sigmaMin..sigmaMax,
-            display = sigma.toDouble().compactDecimal(3),
-            crowd = market.crowdSigma,
-            unit = "",
-            accent = DemoColors.AccentLong,
-            onChange = onSigma,
-        )
+        if (showAdvanced) {
+            Spacer(Modifier.height(10.dp))
+            SliderRow(
+                label = "Standard deviation",
+                value = sigma,
+                range = sigmaMin..sigmaMax,
+                display = sigma.toDouble().compactDecimal(3),
+                crowd = market.crowdSigma,
+                unit = "",
+                accent = DemoColors.AccentLong,
+                onChange = onSigma,
+            )
+        }
     }
 }
 

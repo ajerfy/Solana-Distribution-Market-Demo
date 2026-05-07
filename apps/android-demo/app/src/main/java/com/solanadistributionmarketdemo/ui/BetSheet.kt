@@ -65,6 +65,7 @@ fun BetSheet(
     var sigma by remember(market.id) { mutableFloatStateOf((prefillSigma ?: market.crowdSigma).toFloat()) }
     var stake by remember(market.id) { mutableStateOf(50.0) }
     var status by remember(market.id) { mutableStateOf<SubmitStatus?>(null) }
+    var showAdvanced by remember(market.id) { mutableStateOf(false) }
 
     val muRange = market.muMin.toFloat()..market.muMax.toFloat()
     val sigmaRange = market.sigmaMin.toFloat()..market.sigmaMax.toFloat()
@@ -152,16 +153,30 @@ fun BetSheet(
                 colors = sliderColors(DemoColors.AccentCrowd),
             )
 
-            ValueRow(
-                left = "Standard deviation" to sigma.toDouble().compactDecimal(3),
-                right = "Crowd's σ" to market.crowdSigma.compactDecimal(2),
-            )
-            Slider(
-                value = sigma,
-                onValueChange = { sigma = it; status = null },
-                valueRange = sigmaRange,
-                colors = sliderColors(DemoColors.AccentLong),
-            )
+            // Advanced toggle row — exposes the raw σ slider for power users.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (showAdvanced) "hide σ" else "advanced · show σ",
+                    color = if (showAdvanced) DemoColors.AccentLong else DemoColors.AccentCrowd,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { showAdvanced = !showAdvanced },
+                )
+            }
+
+            if (showAdvanced) {
+                ValueRow(
+                    left = "Standard deviation" to sigma.toDouble().compactDecimal(3),
+                    right = "Crowd's σ" to market.crowdSigma.compactDecimal(2),
+                )
+                Slider(
+                    value = sigma,
+                    onValueChange = { sigma = it; status = null },
+                    valueRange = sigmaRange,
+                    colors = sliderColors(DemoColors.AccentLong),
+                )
+            }
 
             SectionLabel("Stake")
             StakeChips(stake = stake, onPick = { stake = it })
