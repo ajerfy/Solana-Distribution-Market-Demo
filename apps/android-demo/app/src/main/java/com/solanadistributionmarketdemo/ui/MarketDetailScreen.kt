@@ -198,14 +198,14 @@ private fun DistributionSliderCard(
         }
         Spacer(Modifier.height(2.dp))
         Text(
-            "Slide to set your guess and how sure you are.",
+            "Slide your average, set how confident you are, fine-tune the standard deviation.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(10.dp))
 
         SliderRow(
-            label = "Your guess",
+            label = "Average",
             value = mu,
             range = market.muMin.toFloat()..market.muMax.toFloat(),
             display = "${mu.toDouble().compactDecimal(3)} ${market.unit}",
@@ -215,14 +215,31 @@ private fun DistributionSliderCard(
             onChange = onMu,
         )
         Spacer(Modifier.height(10.dp))
+        // Confidence is an inverse view of σ over [sigmaMin, sigmaMax]: lower σ → tighter range → higher confidence %.
+        val sigmaMin = market.sigmaMin.toFloat()
+        val sigmaMax = market.sigmaMax.toFloat()
+        val span = (sigmaMax - sigmaMin).coerceAtLeast(0.0001f)
+        val confidenceValue = (1f - (sigma - sigmaMin) / span).coerceIn(0f, 1f)
         SliderRow(
-            label = "How sure",
+            label = "Confidence",
+            value = confidenceValue,
+            range = 0f..1f,
+            display = "${(confidenceValue * 100).toInt()}%",
+            crowd = (1f - (market.crowdSigma.toFloat() - sigmaMin) / span).coerceIn(0f, 1f).toDouble(),
+            unit = " confident",
+            accent = DemoColors.AccentCrowd,
+            onChange = { c -> onSigma(sigmaMin + (1f - c) * span) },
+            crowdAsPercentage = true,
+        )
+        Spacer(Modifier.height(10.dp))
+        SliderRow(
+            label = "Standard deviation",
             value = sigma,
-            range = market.sigmaMin.toFloat()..market.sigmaMax.toFloat(),
+            range = sigmaMin..sigmaMax,
             display = sigma.toDouble().compactDecimal(3),
             crowd = market.crowdSigma,
             unit = "",
-            accent = DemoColors.AccentCrowd,
+            accent = DemoColors.AccentLong,
             onChange = onSigma,
         )
     }
@@ -238,6 +255,7 @@ private fun SliderRow(
     unit: String,
     accent: androidx.compose.ui.graphics.Color,
     onChange: (Float) -> Unit,
+    crowdAsPercentage: Boolean = false,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = DemoColors.TextSecondary, style = MaterialTheme.typography.labelMedium)
@@ -262,8 +280,13 @@ private fun SliderRow(
             inactiveTickColor = androidx.compose.ui.graphics.Color.Transparent,
         ),
     )
+    val crowdText = if (crowdAsPercentage) {
+        "crowd's ${(crowd * 100).toInt()}%${if (unit.isNotEmpty()) unit else ""}"
+    } else {
+        "crowd's ${crowd.compactDecimal(2)}${if (unit.isNotEmpty()) " $unit" else ""}"
+    }
     Text(
-        "crowd's ${crowd.compactDecimal(2)}${if (unit.isNotEmpty()) " $unit" else ""}",
+        crowdText,
         color = DemoColors.TextDim,
         fontFamily = FontFamily.Monospace,
         style = MaterialTheme.typography.labelSmall,

@@ -125,8 +125,8 @@ fun BetSheet(
             )
 
             ValueRow(
-                left = "Your guess" to "${mu.toDouble().compactDecimal(3)} ${market.unit}",
-                right = "Crowd guess" to "${market.crowdMu.compactDecimal(2)} ${market.unit}",
+                left = "Average" to "${mu.toDouble().compactDecimal(3)} ${market.unit}",
+                right = "Crowd average" to "${market.crowdMu.compactDecimal(2)} ${market.unit}",
             )
             Slider(
                 value = mu,
@@ -134,15 +134,33 @@ fun BetSheet(
                 valueRange = muRange,
                 colors = sliderColors(DemoColors.AccentYou),
             )
+
+            // Confidence slider (inverted view of σ over [sigmaMin, sigmaMax]).
+            val sigmaMin = market.sigmaMin.toFloat()
+            val sigmaMax = market.sigmaMax.toFloat()
+            val span = (sigmaMax - sigmaMin).coerceAtLeast(0.0001f)
+            val confidence = (1f - (sigma - sigmaMin) / span).coerceIn(0f, 1f)
+            val crowdConfidence = (1f - (market.crowdSigma.toFloat() - sigmaMin) / span).coerceIn(0f, 1f)
             ValueRow(
-                left = "How sure" to sigma.toDouble().compactDecimal(3),
-                right = "Crowd's range" to market.crowdSigma.compactDecimal(2),
+                left = "Confidence" to "${(confidence * 100).toInt()}%",
+                right = "Crowd's" to "${(crowdConfidence * 100).toInt()}%",
+            )
+            Slider(
+                value = confidence,
+                onValueChange = { c -> sigma = sigmaMin + (1f - c) * span; status = null },
+                valueRange = 0f..1f,
+                colors = sliderColors(DemoColors.AccentCrowd),
+            )
+
+            ValueRow(
+                left = "Standard deviation" to sigma.toDouble().compactDecimal(3),
+                right = "Crowd's σ" to market.crowdSigma.compactDecimal(2),
             )
             Slider(
                 value = sigma,
                 onValueChange = { sigma = it; status = null },
                 valueRange = sigmaRange,
-                colors = sliderColors(DemoColors.AccentCrowd),
+                colors = sliderColors(DemoColors.AccentLong),
             )
 
             SectionLabel("Stake")
