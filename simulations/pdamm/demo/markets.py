@@ -10,6 +10,11 @@ Resolving markets  (expiry → single outcome):
   eth_merge_vote        Community distribution over ETH upgrade timing
   fed_rate_decision     Fed funds rate after next FOMC meeting
 
+Live Polymarket markets  (seeded from real Polymarket data, UFC 328 May 9 2026):
+  ufc328_chimaev_win    Chimaev win probability  — Polymarket: 83¢ ($919K vol)
+  ufc328_goes_distance  Fight goes to decision   — Polymarket: 28¢ ($19.4K vol)
+  ufc328_submission     Fight ends by submission — Polymarket: 53¢ ($4.2K vol)
+
 Perpetual markets  (no expiry, funding-rate anchored):
   sol_usd_perp          SOL/USD spot perpetual (Pyth-style oracle)
   btc_dominance_perp    BTC market-cap dominance perpetual
@@ -182,8 +187,110 @@ FED_RATE_DECISION = ResolvingMarketDef(
     ],
 )
 
+# ---------------------------------------------------------------------------
+# Live Polymarket markets — UFC 328: Chimaev vs Strickland (May 9, 2026)
+# Data snapshot: May 7 2026 | source: polymarket.com/sports/ufc/ufc-sea2-kha7-2026-05-09
+# ---------------------------------------------------------------------------
+
+UFC328_CHIMAEV_WIN = ResolvingMarketDef(
+    id="ufc328_chimaev_win",
+    title="UFC 328 — Chimaev Win Probability",
+    description=(
+        "Will Khamzat Chimaev defeat Sean Strickland at UFC 328 (May 9, 2026)?\n"
+        "Distribution market over the win probability (0–100 scale).\n"
+        "Seeded from live Polymarket: Chimaev 83¢, Strickland 18¢ (~$919K volume).\n"
+        "Oracle path simulates pre-fight odds drift as fight approaches."
+    ),
+    unit="probability (0–100)",
+    initial_mu=83.0,
+    initial_sigma=10.0,
+    b=50.0,
+    true_outcome=100.0,   # demo scenario: Chimaev finishes Strickland
+    oracle=NoisyOracle(
+        underlying=StepOracle(
+            initial_mu=83.0,
+            steps=[(20, 86.0), (55, 91.0), (85, 100.0)],
+            sigma=4.0,
+        ),
+        noise_sigma=2.5,
+        seed=328,
+    ),
+    presets=[
+        {"label": "Polymarket consensus (83%)", "target_mu": 83.0, "target_sigma": 10.0},
+        {"label": "Chimaev dominant (92%)",     "target_mu": 92.0, "target_sigma": 6.0},
+        {"label": "Strickland upset (40%)",     "target_mu": 40.0, "target_sigma": 18.0},
+        {"label": "Pick'em (50%)",              "target_mu": 50.0, "target_sigma": 15.0},
+        {"label": "High conviction bull (96%)", "target_mu": 96.0, "target_sigma": 4.0},
+    ],
+)
+
+UFC328_GOES_DISTANCE = ResolvingMarketDef(
+    id="ufc328_goes_distance",
+    title="UFC 328 — Fight Goes to Decision",
+    description=(
+        "Will Chimaev vs Strickland go all 5 rounds to a judges' decision?\n"
+        "Distribution market over the 'goes distance' probability (0–100 scale).\n"
+        "Polymarket: 28¢ Yes ($19.4K volume). Chimaev KO/TKO 24%, sub 53%.\n"
+        "Oracle drifts lower as Chimaev's finishing ability is priced in."
+    ),
+    unit="probability (0–100)",
+    initial_mu=28.0,
+    initial_sigma=12.0,
+    b=50.0,
+    true_outcome=0.0,   # demo scenario: fight ends before the final bell
+    oracle=NoisyOracle(
+        underlying=StepOracle(
+            initial_mu=28.0,
+            steps=[(25, 24.0), (60, 18.0), (90, 5.0)],
+            sigma=5.0,
+        ),
+        noise_sigma=3.0,
+        seed=329,
+    ),
+    presets=[
+        {"label": "Polymarket (28%)",       "target_mu": 28.0, "target_sigma": 12.0},
+        {"label": "Likely finish (<20%)",   "target_mu": 18.0, "target_sigma": 8.0},
+        {"label": "Goes long (55%)",        "target_mu": 55.0, "target_sigma": 14.0},
+        {"label": "Early finish (<10%)",    "target_mu": 9.0,  "target_sigma": 6.0},
+    ],
+)
+
+UFC328_SUBMISSION = ResolvingMarketDef(
+    id="ufc328_submission",
+    title="UFC 328 — Fight Ends by Submission",
+    description=(
+        "Will the Chimaev vs Strickland fight end by submission?\n"
+        "Distribution market over submission-finish probability (0–100 scale).\n"
+        "Polymarket: 53¢ Yes ($4.2K volume) — driven by Chimaev's elite grappling.\n"
+        "Sigma captures uncertainty between sub finish vs striking TKO."
+    ),
+    unit="probability (0–100)",
+    initial_mu=53.0,
+    initial_sigma=14.0,
+    b=50.0,
+    true_outcome=100.0,   # demo scenario: Chimaev submits Strickland
+    oracle=NoisyOracle(
+        underlying=StepOracle(
+            initial_mu=53.0,
+            steps=[(30, 57.0), (70, 65.0)],
+            sigma=5.0,
+        ),
+        noise_sigma=4.0,
+        seed=330,
+    ),
+    presets=[
+        {"label": "Polymarket (53%)",             "target_mu": 53.0, "target_sigma": 14.0},
+        {"label": "Sub likely (70%)",             "target_mu": 70.0, "target_sigma": 10.0},
+        {"label": "Striking finish favored (25%)", "target_mu": 25.0, "target_sigma": 12.0},
+        {"label": "Toss-up (50%)",                "target_mu": 50.0, "target_sigma": 16.0},
+    ],
+)
+
 RESOLVING_MARKETS: dict[str, ResolvingMarketDef] = {
-    m.id: m for m in [SOL_PRICE_EXPIRY, ETH_MERGE_VOTE, FED_RATE_DECISION]
+    m.id: m for m in [
+        SOL_PRICE_EXPIRY, ETH_MERGE_VOTE, FED_RATE_DECISION,
+        UFC328_CHIMAEV_WIN, UFC328_GOES_DISTANCE, UFC328_SUBMISSION,
+    ]
 }
 
 
