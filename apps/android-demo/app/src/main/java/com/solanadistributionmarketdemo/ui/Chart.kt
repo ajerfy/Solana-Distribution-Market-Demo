@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -17,7 +18,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.solanadistributionmarketdemo.core.normalPdf
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 @Composable
 fun DistributionChart(
@@ -41,6 +44,8 @@ fun DistributionChart(
     val crowdLine = DemoColors.AccentCrowd
     val youLine = DemoColors.AccentYou
     val warnLine = DemoColors.AccentWarn
+    val profitFill = DemoColors.AccentLong
+    val lossFill = DemoColors.AccentShort
 
     Canvas(
         modifier = modifier
@@ -112,6 +117,20 @@ fun DistributionChart(
 
         // crowd fill
         drawPath(filledPathOf(crowdPts), color = crowdLine.copy(alpha = 0.10f))
+        if (yourPts != null) {
+            val stepW = plotW / (samples - 1)
+            for (i in 0 until samples) {
+                val x = padX + plotW * (i.toFloat() / (samples - 1))
+                val crowdY = padTop + plotH - (crowdPts[i].toFloat() * yScale)
+                val yourY = padTop + plotH - (yourPts[i].toFloat() * yScale)
+                val isProfitZone = yourPts[i] >= crowdPts[i]
+                drawRect(
+                    color = (if (isProfitZone) profitFill else lossFill).copy(alpha = 0.14f),
+                    topLeft = Offset(x - stepW / 2f, min(crowdY, yourY)),
+                    size = Size(stepW, abs(crowdY - yourY).coerceAtLeast(1f)),
+                )
+            }
+        }
         // crowd line
         drawPath(pathOf(crowdPts), color = crowdLine, style = Stroke(width = 2f, cap = StrokeCap.Round))
 

@@ -19,6 +19,7 @@ class AppState(
     }
     val selectedMarketId: MutableState<String?> = mutableStateOf(null)
     val selectedCategory: MutableState<MarketCategory> = mutableStateOf(MarketCategory.All)
+    val selectedMarketTypeFilter: MutableState<MarketTypeFilter> = mutableStateOf(MarketTypeFilter.All)
     val activeTab: MutableState<NavTab> = mutableStateOf(NavTab.Markets)
     val showBetSheet: MutableState<Boolean> = mutableStateOf(false)
     val walletAddress: MutableState<String?> = mutableStateOf(null)

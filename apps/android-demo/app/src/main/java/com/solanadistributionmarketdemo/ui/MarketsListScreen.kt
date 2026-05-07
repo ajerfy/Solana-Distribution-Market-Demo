@@ -31,12 +31,18 @@ import com.solanadistributionmarketdemo.core.compactDecimal
 import com.solanadistributionmarketdemo.data.AppState
 import com.solanadistributionmarketdemo.data.MarketCategory
 import com.solanadistributionmarketdemo.data.MarketListing
+import com.solanadistributionmarketdemo.data.MarketType
+import com.solanadistributionmarketdemo.data.MarketTypeFilter
 
 @Composable
 fun MarketsListScreen(state: AppState) {
     val selectedCat = state.selectedCategory.value
-    val markets = if (selectedCat == MarketCategory.All) state.markets
-        else state.markets.filter { it.category == selectedCat }
+    val selectedType = state.selectedMarketTypeFilter.value
+    val markets = state.markets.filter { market ->
+        val categoryMatches = selectedCat == MarketCategory.All || market.category == selectedCat
+        val typeMatches = selectedType.marketType == null || market.marketType == selectedType.marketType
+        categoryMatches && typeMatches
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -53,6 +59,14 @@ fun MarketsListScreen(state: AppState) {
             )
         }
         item {
+            MarketTypeRail(
+                selected = selectedType,
+                onSelect = { state.selectedMarketTypeFilter.value = it },
+                markets = state.markets,
+                selectedCategory = selectedCat,
+            )
+        }
+        item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -61,11 +75,24 @@ fun MarketsListScreen(state: AppState) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SectionLabel("${markets.size} markets")
-                SectionLabel("sorted · trending")
+                SectionLabel(selectedType.summaryLabel())
             }
         }
-        items(markets, key = { it.id }) { market ->
-            MarketRow(market = market, onClick = { state.openMarket(market.id) }, modifier = Modifier.padding(horizontal = 20.dp))
+        if (markets.isEmpty()) {
+            item {
+                EmptyMarketFilterState(
+                    selectedCategory = selectedCat,
+                    selectedType = selectedType,
+                    onReset = {
+                        state.selectedCategory.value = MarketCategory.All
+                        state.selectedMarketTypeFilter.value = MarketTypeFilter.All
+                    },
+                )
+            }
+        } else {
+            items(markets, key = { it.id }) { market ->
+                MarketRow(market = market, onClick = { state.openMarket(market.id) }, modifier = Modifier.padding(horizontal = 20.dp))
+            }
         }
     }
 }
@@ -80,7 +107,7 @@ private fun Header(state: AppState) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "DISTRO",
+                "PARABOLA",
                 color = DemoColors.AccentYou,
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.titleSmall,
@@ -149,6 +176,54 @@ private fun CategoryRail(selected: MarketCategory, onSelect: (MarketCategory) ->
 }
 
 @Composable
+private fun MarketTypeRail(
+    selected: MarketTypeFilter,
+    onSelect: (MarketTypeFilter) -> Unit,
+    markets: List<MarketListing>,
+    selectedCategory: MarketCategory,
+) {
+    val categoryMarkets = markets.filter { selectedCategory == MarketCategory.All || it.category == selectedCategory }
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(MarketTypeFilter.entries) { filter ->
+            val count = categoryMarkets.count { filter.marketType == null || it.marketType == filter.marketType }
+            ChipPill(
+                label = "${filter.label} $count",
+                leading = filter.glyph,
+                selected = filter == selected,
+                onClick = { onSelect(filter) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyMarketFilterState(
+    selectedCategory: MarketCategory,
+    selectedType: MarketTypeFilter,
+    onReset: () -> Unit,
+) {
+    Card(modifier = Modifier.padding(horizontal = 20.dp), padding = PaddingValues(18.dp)) {
+        Text(
+            "No ${selectedType.label.lowercase()} in ${selectedCategory.label.lowercase()} yet.",
+            color = DemoColors.TextPrimary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Switch category or clear filters to see every active Parabola market.",
+            color = DemoColors.TextSecondary,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(14.dp))
+        GhostButton("Clear filters", onClick = onReset, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
 private fun MarketRow(market: MarketListing, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(modifier = modifier, onClick = onClick, padding = PaddingValues(16.dp)) {
         Row(
@@ -184,13 +259,20 @@ private fun MarketRow(market: MarketListing, onClick: () -> Unit, modifier: Modi
 @Composable
 private fun MarketTypeBadge(type: com.solanadistributionmarketdemo.data.MarketType) {
     when (type) {
-        com.solanadistributionmarketdemo.data.MarketType.Estimation ->
+        MarketType.Estimation ->
             TagPill("ESTIMATE", color = DemoColors.AccentCrowd)
-        com.solanadistributionmarketdemo.data.MarketType.RegimeIndex ->
-            TagPill("THEME", color = DemoColors.AccentLong)
-        com.solanadistributionmarketdemo.data.MarketType.Perp ->
+        MarketType.RegimeIndex ->
+            TagPill("REGIME", color = DemoColors.AccentLong)
+        MarketType.Perp ->
             TagPill("PERP", color = DemoColors.AccentWarn)
     }
+}
+
+private fun MarketTypeFilter.summaryLabel(): String = when (this) {
+    MarketTypeFilter.All -> "sorted · trending"
+    MarketTypeFilter.Estimates -> "filter · estimates"
+    MarketTypeFilter.Perps -> "filter · perps"
+    MarketTypeFilter.RegimeIndexes -> "filter · regime indexes"
 }
 
 @Composable

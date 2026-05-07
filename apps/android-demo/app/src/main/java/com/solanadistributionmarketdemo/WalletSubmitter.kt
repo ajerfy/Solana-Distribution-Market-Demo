@@ -33,7 +33,7 @@ import java.util.Locale
 
 private const val DEVNET_RPC_URL = "https://api.devnet.solana.com"
 private const val MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
-private const val IDENTITY_NAME = "Solana Distribution Market Demo"
+private const val IDENTITY_NAME = "Parabola"
 
 sealed class WalletSubmitResult {
     data class Success(
@@ -261,7 +261,7 @@ object WalletSubmitter {
             java.net.InetAddress.getAllByName("api.devnet.solana.com")
         } catch (host: java.net.UnknownHostException) {
             throw IllegalStateException(
-                "DNS resolution failed for api.devnet.solana.com from this app (UnknownHostException). The OS resolver may be restricting this app — check Settings → Apps → Solana Distribution Market Demo → Mobile data & WiFi → both on, and Battery → Unrestricted.",
+                "DNS resolution failed for api.devnet.solana.com from this app (UnknownHostException). The OS resolver may be restricting this app — check Settings → Apps → Parabola → Mobile data & WiFi → both on, and Battery → Unrestricted.",
                 host,
             )
         }
@@ -412,4 +412,3 @@ private fun walletMessage(message: String, memoLength: Int): String {
         else -> "${normalized.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }} (memo length: $memoLength bytes)"
     }
 }
-

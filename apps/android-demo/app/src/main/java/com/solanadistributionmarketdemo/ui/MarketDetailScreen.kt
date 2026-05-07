@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.solanadistributionmarketdemo.core.compactDecimal
 import com.solanadistributionmarketdemo.data.ActivityEvent
 import com.solanadistributionmarketdemo.data.AppState
@@ -133,8 +135,7 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
                         previewMu = market.crowdMu.toFloat()
                         previewSigma = market.crowdSigma.toFloat()
                     },
-                    showAdvanced = showAdvanced,
-                    onToggleAdvanced = { showAdvanced = !showAdvanced },
+                    onOpenAdvanced = { showAdvanced = true },
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
@@ -175,6 +176,14 @@ private fun EstimationDetailScreen(state: AppState, market: MarketListing) {
             isOnChain = market.isOnChain,
             marketType = market.marketType,
         )
+        if (showAdvanced) {
+            AdvancedSigmaSheet(
+                market = market,
+                sigma = previewSigma,
+                onSigma = { previewSigma = it },
+                onDismiss = { showAdvanced = false },
+            )
+        }
     }
 }
 
@@ -186,8 +195,7 @@ private fun DistributionSliderCard(
     onMu: (Float) -> Unit,
     onSigma: (Float) -> Unit,
     onResetToCrowd: () -> Unit,
-    showAdvanced: Boolean,
-    onToggleAdvanced: () -> Unit,
+    onOpenAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier) {
@@ -202,18 +210,16 @@ private fun DistributionSliderCard(
             )
             Spacer(Modifier.size(10.dp))
             Text(
-                if (showAdvanced) "hide σ" else "advanced",
-                color = if (showAdvanced) DemoColors.AccentLong else DemoColors.AccentCrowd,
+                "advanced",
+                color = DemoColors.AccentCrowd,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable(onClick = onToggleAdvanced),
+                modifier = Modifier.clickable(onClick = onOpenAdvanced),
             )
         }
         Spacer(Modifier.height(2.dp))
         Text(
-            if (showAdvanced)
-                "Average + confidence drive your bet. Standard deviation is the raw σ — moving it overrides confidence."
-            else "Slide your average and pick how confident you are.",
+            "Slide your average and pick how confident you are.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -246,18 +252,87 @@ private fun DistributionSliderCard(
             onChange = { c -> onSigma(sigmaMin + (1f - c) * span) },
             crowdAsPercentage = true,
         )
-        if (showAdvanced) {
-            Spacer(Modifier.height(10.dp))
-            SliderRow(
-                label = "Standard deviation",
-                value = sigma,
-                range = sigmaMin..sigmaMax,
-                display = sigma.toDouble().compactDecimal(3),
-                crowd = market.crowdSigma,
-                unit = "",
-                accent = DemoColors.AccentLong,
-                onChange = onSigma,
-            )
+        Spacer(Modifier.height(12.dp))
+        GhostButton(
+            label = "Advanced selection · σ ${sigma.toDouble().compactDecimal(3)}",
+            onClick = onOpenAdvanced,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun AdvancedSigmaSheet(
+    market: MarketListing,
+    sigma: Float,
+    onSigma: (Float) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sigmaMin = market.sigmaMin.toFloat()
+    val sigmaMax = market.sigmaMax.toFloat()
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                padding = PaddingValues(18.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Advanced selection",
+                            color = DemoColors.TextPrimary,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            "Raw standard deviation control",
+                            color = DemoColors.TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Text(
+                        "Done",
+                        color = DemoColors.AccentCrowd,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable(onClick = onDismiss),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Moving σ here updates the chart behind this popup. Lower σ means a tighter, more confident curve.",
+                    color = DemoColors.TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(12.dp))
+                SliderRow(
+                    label = "Standard deviation",
+                    value = sigma,
+                    range = sigmaMin..sigmaMax,
+                    display = sigma.toDouble().compactDecimal(3),
+                    crowd = market.crowdSigma,
+                    unit = "",
+                    accent = DemoColors.AccentLong,
+                    onChange = onSigma,
+                )
+                CompactDivider()
+                StatRow("Crowd σ", market.crowdSigma.compactDecimal(3), DemoColors.AccentCrowd)
+                StatRow("Your σ", sigma.toDouble().compactDecimal(3), DemoColors.AccentLong, strong = true)
+                Spacer(Modifier.height(8.dp))
+                PrimaryButton(
+                    label = "Done",
+                    onClick = onDismiss,
+                    accent = DemoColors.AccentYou,
+                )
+            }
         }
     }
 }
@@ -340,6 +415,8 @@ private fun LegendRow(unit: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
         LegendDot("Crowd belief", DemoColors.AccentCrowd)
         LegendDot("Your curve", DemoColors.AccentYou)
+        LegendDot("Make money", DemoColors.AccentLong)
+        LegendDot("Lose money", DemoColors.AccentShort)
         LegendDot("Realized", DemoColors.AccentWarn)
         Spacer(Modifier.weight(1f))
         Text("x = $unit", color = DemoColors.TextDim, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace)

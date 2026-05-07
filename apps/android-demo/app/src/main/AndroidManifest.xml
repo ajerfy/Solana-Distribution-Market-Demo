@@ -4,7 +4,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="Solana Distribution Market Demo"
+        android:label="@string/app_name"
         android:theme="@style/AppTheme"
         android:supportsRtl="true">
         <activity

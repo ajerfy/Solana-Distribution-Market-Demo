@@ -17,6 +17,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,9 +34,29 @@ import com.solanadistributionmarketdemo.data.AppState
 import com.solanadistributionmarketdemo.data.NavTab
 
 @Composable
-fun AppShell(state: AppState, walletSender: ActivityResultSender) {
+fun AppShell(
+    state: AppState,
+    walletSender: ActivityResultSender,
+    onboardingStore: OnboardingStore,
+    tutorialReplayToken: Int,
+) {
     Box(modifier = Modifier.fillMaxSize().background(DemoColors.Background)) {
         val selectedMarket = state.marketById(state.selectedMarketId.value)
+        var tutorialTab by remember { mutableStateOf<NavTab?>(null) }
+
+        LaunchedEffect(state.activeTab.value, selectedMarket?.id, state.showBetSheet.value, tutorialReplayToken) {
+            val activeTab = state.activeTab.value
+            tutorialTab = if (
+                selectedMarket == null &&
+                !state.showBetSheet.value &&
+                !onboardingStore.hasSeen(activeTab)
+            ) {
+                activeTab
+            } else {
+                null
+            }
+        }
+
         if (selectedMarket != null) {
             BackHandler(enabled = true) { state.closeMarket() }
             MarketDetailScreen(state, selectedMarket)
@@ -87,6 +112,20 @@ fun AppShell(state: AppState, walletSender: ActivityResultSender) {
                     }
                 }
             }
+        }
+
+        tutorialTab?.let { tab ->
+            BottomTabTutorialOverlay(
+                tab = tab,
+                onDone = {
+                    onboardingStore.markSeen(tab)
+                    tutorialTab = null
+                },
+                onSkipAll = {
+                    onboardingStore.markAllSeen()
+                    tutorialTab = null
+                },
+            )
         }
     }
 }

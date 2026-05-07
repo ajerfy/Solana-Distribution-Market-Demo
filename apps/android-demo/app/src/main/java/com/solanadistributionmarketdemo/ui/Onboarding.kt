@@ -29,15 +29,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.solanadistributionmarketdemo.data.NavTab
 
 private const val PREFS = "onboarding-store"
-private const val KEY_SEEN = "seen"
 
 class OnboardingStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    fun hasSeen(): Boolean = prefs.getBoolean(KEY_SEEN, false)
-    fun markSeen() { prefs.edit().putBoolean(KEY_SEEN, true).apply() }
-    fun reset() { prefs.edit().remove(KEY_SEEN).apply() }
+    fun hasSeen(tab: NavTab): Boolean = prefs.getBoolean(keyFor(tab), false)
+    fun markSeen(tab: NavTab) { prefs.edit().putBoolean(keyFor(tab), true).apply() }
+    fun markAllSeen() {
+        prefs.edit().apply {
+            NavTab.entries.forEach { putBoolean(keyFor(it), true) }
+        }.apply()
+    }
+    fun reset() {
+        prefs.edit().apply {
+            NavTab.entries.forEach { remove(keyFor(it)) }
+            remove("seen")
+        }.apply()
+    }
+
+    private fun keyFor(tab: NavTab): String = "seen_${tab.name.lowercase()}"
 }
 
 private data class OnboardingStep(
@@ -48,101 +60,77 @@ private data class OnboardingStep(
 )
 
 @Composable
-fun OnboardingOverlay(store: OnboardingStore, onDone: () -> Unit) {
-    val steps = listOf(
-        OnboardingStep(
-            glyph = "◆",
-            title = "Pick a market",
-            body = "Browse questions about real outcomes — CPI, BTC close, Coachella attendance, the weather. Tap one to see what the crowd thinks.",
-            accent = DemoColors.AccentCrowd,
-        ),
-        OnboardingStep(
-            glyph = "◯",
-            title = "Set your guess",
-            body = "Slide to your number, then slide to set how sure you are. A wider range covers more outcomes; a tighter one pays more if you're right.",
-            accent = DemoColors.AccentYou,
-        ),
-        OnboardingStep(
-            glyph = "◉",
-            title = "Win when reality lands close",
-            body = "Place a stake. The closer reality lands to your guess, the more you win. Sign on Solana devnet — the on-chain market is real.",
-            accent = DemoColors.AccentLong,
-        ),
-    )
+fun BottomTabTutorialOverlay(
+    tab: NavTab,
+    onDone: () -> Unit,
+    onSkipAll: () -> Unit,
+) {
+    val steps = tab.tutorialSteps()
     var step by remember { mutableStateOf(0) }
     val current = steps[step]
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DemoColors.Background.copy(alpha = 0.96f))
+            .background(DemoColors.Background.copy(alpha = 0.82f))
             .clickable(enabled = false) {},
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(horizontal = 22.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(DemoColors.Surface)
+                .border(1.dp, DemoColors.BorderStrong, RoundedCornerShape(20.dp))
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(current.accent.copy(alpha = 0.16f))
-                    .border(1.dp, current.accent.copy(alpha = 0.4f), RoundedCornerShape(24.dp)),
-                contentAlignment = Alignment.Center,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    current.glyph,
-                    color = current.accent,
+                    "PARABOLA",
+                    color = DemoColors.AccentYou,
+                    style = MaterialTheme.typography.titleSmall,
                     fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold,
                 )
+                TagPill("${tab.label} ${step + 1}/${steps.size}", color = current.accent)
             }
-            Text(
-                "${step + 1} of ${steps.size}",
-                color = DemoColors.TextDim,
-                style = MaterialTheme.typography.labelMedium,
-                fontFamily = FontFamily.Monospace,
-            )
-            Text(
-                current.title,
-                color = DemoColors.TextPrimary,
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                current.body,
-                color = DemoColors.TextSecondary,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-            Spacer(Modifier.height(8.dp))
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top,
             ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    GhostButton(
-                        label = "Skip",
-                        onClick = { store.markSeen(); onDone() },
-                        modifier = Modifier.fillMaxWidth(),
+                Box(
+                    modifier = Modifier
+                        .size(58.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(current.accent.copy(alpha = 0.16f))
+                        .border(1.dp, current.accent.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        current.glyph,
+                        color = current.accent,
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
-                Box(modifier = Modifier.weight(1f)) {
-                    PrimaryButton(
-                        label = if (step == steps.lastIndex) "Get started" else "Next",
-                        onClick = {
-                            if (step == steps.lastIndex) {
-                                store.markSeen(); onDone()
-                            } else {
-                                step += 1
-                            }
-                        },
-                        accent = current.accent,
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+                    Text(
+                        current.title,
+                        color = DemoColors.TextPrimary,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        current.body,
+                        color = DemoColors.TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -156,6 +144,79 @@ fun OnboardingOverlay(store: OnboardingStore, onDone: () -> Unit) {
                     )
                 }
             }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "These tutorials appear once per bottom tab. You can replay them from Wallet.",
+                color = DemoColors.TextDim,
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    GhostButton(
+                        label = "Skip all",
+                        onClick = onSkipAll,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    PrimaryButton(
+                        label = if (step == steps.lastIndex) "Done" else "Next",
+                        onClick = {
+                            if (step == steps.lastIndex) {
+                                onDone()
+                            } else {
+                                step += 1
+                            }
+                        },
+                        accent = current.accent,
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun NavTab.tutorialSteps(): List<OnboardingStep> = when (this) {
+    NavTab.Markets -> listOf(
+        OnboardingStep(
+            glyph = "◆",
+            title = "Browse the market board",
+            body = "The top rail filters by topic: Crypto, Macro, Weather, Sports, Events, and more. Tap any market card to open its chart, rules, and trade flow.",
+            accent = DemoColors.AccentCrowd,
+        ),
+        OnboardingStep(
+            glyph = "▦",
+            title = "Choose the market type",
+            body = "The second rail switches between Estimates, Perps, and Regime indexes. Use it with the category rail to show only the exact market structure you want.",
+            accent = DemoColors.AccentWarn,
+        ),
+    )
+    NavTab.Portfolio -> listOf(
+        OnboardingStep(
+            glyph = "▲",
+            title = "Track your positions",
+            body = "Portfolio shows open and resolved bets, stake, realized P/L, transaction hashes, and simulated resolution for demo positions.",
+            accent = DemoColors.AccentLong,
+        )
+    )
+    NavTab.Engine -> listOf(
+        OnboardingStep(
+            glyph = "▦",
+            title = "Inspect backend state",
+            body = "Engine shows what the program sees: maker pool, quote envelope, fee settings, regime baskets, perp funding, vault cash, and last submission receipt.",
+            accent = DemoColors.AccentChain,
+        )
+    )
+    NavTab.Wallet -> listOf(
+        OnboardingStep(
+            glyph = "◉",
+            title = "Manage wallet and help",
+            body = "Wallet shows connection status, devnet identity, theme controls, and the replay button for these bottom-tab tutorials.",
+            accent = DemoColors.AccentYou,
+        )
+    )
 }

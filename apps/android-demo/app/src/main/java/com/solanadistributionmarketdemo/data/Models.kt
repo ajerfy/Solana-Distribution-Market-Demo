@@ -83,6 +83,17 @@ enum class MarketCategory(val label: String, val emoji: String) {
 
 enum class MarketType { Estimation, RegimeIndex, Perp }
 
+enum class MarketTypeFilter(
+    val label: String,
+    val glyph: String,
+    val marketType: MarketType?,
+) {
+    All("All", "✦", null),
+    Estimates("Estimates", "◯", MarketType.Estimation),
+    Perps("Perps", "∞", MarketType.Perp),
+    RegimeIndexes("Regime indexes", "▦", MarketType.RegimeIndex),
+}
+
 data class MarketListing(
     val id: String,
     val title: String,

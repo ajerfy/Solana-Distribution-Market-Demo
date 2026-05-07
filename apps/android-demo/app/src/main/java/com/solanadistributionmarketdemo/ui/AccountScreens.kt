@@ -269,7 +269,7 @@ fun WalletScreen(state: AppState) {
                 SectionLabel("HELP")
                 Spacer(Modifier.height(8.dp))
                 GhostButton(
-                    label = "Replay intro",
+                    label = "Replay tutorials",
                     onClick = { state.replayOnboarding() },
                     modifier = Modifier.fillMaxWidth(),
                 )
