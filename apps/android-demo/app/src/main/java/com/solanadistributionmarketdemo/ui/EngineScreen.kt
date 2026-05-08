@@ -6,27 +6,51 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.solanadistributionmarketdemo.core.shortHash
 import com.solanadistributionmarketdemo.data.AppState
+import com.solanadistributionmarketdemo.data.DemoSimulation
+import com.solanadistributionmarketdemo.data.DemoSimulationTrade
+import com.solanadistributionmarketdemo.data.LiveMarketClient
+import com.solanadistributionmarketdemo.data.SubmitStatus
+import kotlinx.coroutines.launch
 
 @Composable
 fun EngineScreen(state: AppState) {
     val market = state.payload.market
     val regimes = state.payload.regimeIndexes
     val perp = state.payload.perp
+    val simulation = state.payload.simulation
     val feePercent = "%.2f%%".format(market.takerFeeBps / 100.0)
     val lastSubmit = state.lastSubmit.value
+    val scope = rememberCoroutineScope()
+    fun sendSimulationCommand(command: String) {
+        scope.launch {
+            LiveMarketClient.postSimulationCommand(command)
+                .onSuccess {
+                    state.lastSubmit.value = SubmitStatus("Simulation command sent: $command")
+                }
+                .onFailure { error ->
+                    state.lastSubmit.value = SubmitStatus(
+                        "Simulation command failed: ${error.message ?: "backend unavailable"}",
+                        isError = true,
+                    )
+                }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(DemoColors.Background),
@@ -79,6 +103,31 @@ fun EngineScreen(state: AppState) {
                 StatRow("Trading fee", feePercent)
                 CompactDivider()
                 StatRow("Status", market.status.uppercase(), DemoColors.AccentLong, strong = true)
+            }
+        }
+        item {
+            if (simulation != null) {
+                SimulationMovementCard(
+                    simulation = simulation,
+                    unit = market.unitLabel ?: "%",
+                    onCommand = ::sendSimulationCommand,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+            } else {
+                Card(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Text(
+                        "Live movement demo",
+                        color = DemoColors.TextPrimary,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Start the local backend to stream simulated crowd trades into this screen. The bundled asset still works, but it does not animate market movement.",
+                        color = DemoColors.TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
         }
         item {
@@ -170,6 +219,153 @@ fun EngineScreen(state: AppState) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SimulationMovementCard(
+    simulation: DemoSimulation,
+    unit: String,
+    onCommand: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val previousMu = simulation.previousMuDisplay.toDoubleOrNull()
+    val previousSigma = simulation.previousSigmaDisplay.toDoubleOrNull()
+    val currentMu = simulation.currentMuDisplay.toDoubleOrNull()
+    val currentSigma = simulation.currentSigmaDisplay.toDoubleOrNull()
+    Card(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Live market movement",
+                    color = DemoColors.TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${simulation.scenario} · ${simulation.speed}x",
+                    color = DemoColors.TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            TagPill(if (simulation.running) "RUNNING" else "PAUSED", color = if (simulation.running) DemoColors.AccentLong else DemoColors.TextDim)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            PrimaryButton(
+                label = if (simulation.running) "Pause" else "Start",
+                onClick = { onCommand(if (simulation.running) "pause" else "start") },
+                modifier = Modifier.weight(1f),
+                accent = if (simulation.running) DemoColors.AccentWarn else DemoColors.AccentYou,
+            )
+            GhostButton(
+                label = "Speed ${simulation.speed}x",
+                onClick = { onCommand("speed") },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            GhostButton(
+                label = "Reset",
+                onClick = { onCommand("reset") },
+                modifier = Modifier.weight(1f),
+            )
+            GhostButton(
+                label = "News shock",
+                onClick = { onCommand("shock") },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Simulated traders submit beliefs into the same quote engine. Accepted trades update the crowd curve, add fees to makers, and leave a tape below.",
+            color = DemoColors.TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (previousMu != null && previousSigma != null && currentMu != null && currentSigma != null) {
+            Spacer(Modifier.height(12.dp))
+            DistributionChart(
+                crowdMu = previousMu,
+                crowdSigma = previousSigma,
+                yourMu = currentMu,
+                yourSigma = currentSigma,
+                height = 150.dp,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            MetricPill("TRADES", simulation.tradeCount.toString(), DemoColors.AccentCrowd)
+            MetricPill("FEES", simulation.feesEarnedDisplay.take(8), DemoColors.AccentLong)
+            MetricPill("VOLUME", simulation.totalVolumeDisplay.take(8), DemoColors.AccentWarn)
+        }
+        if (simulation.tradeTape.isNotEmpty()) {
+            CompactDivider(Modifier.padding(vertical = 14.dp))
+            Text(
+                "Recent crowd trades",
+                color = DemoColors.TextPrimary,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                simulation.tradeTape.take(4).forEach { trade ->
+                    SimulationTradeRow(trade = trade, unit = unit)
+                }
+            }
+        }
+        simulation.lastError?.let { error ->
+            CompactDivider(Modifier.padding(vertical = 14.dp))
+            Text(
+                error,
+                color = DemoColors.AccentShort,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SimulationTradeRow(trade: DemoSimulationTrade, unit: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(DemoColors.SurfaceElevated, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "${trade.handle} · ${trade.agentType}",
+                color = DemoColors.TextPrimary,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                trade.action,
+                color = DemoColors.TextSecondary,
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Text(
+                "avg ${trade.targetMuDisplay.take(6)} $unit · confidence width ${trade.targetSigmaDisplay.take(6)}",
+                color = DemoColors.TextDim,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                trade.totalDebitDisplay.take(7),
+                color = if (trade.accepted) DemoColors.AccentLong else DemoColors.AccentShort,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "fee ${trade.feeDisplay.take(6)}",
+                color = DemoColors.TextDim,
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
     }
 }

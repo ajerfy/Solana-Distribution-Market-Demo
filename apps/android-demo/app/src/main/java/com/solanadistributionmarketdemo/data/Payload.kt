@@ -55,6 +55,7 @@ fun loadDemoPayload(json: String): DemoPayload {
         regimeIndexes = root.optJSONArray("regime_indexes")?.toRegimeIndexList().orEmpty(),
         perp = root.optJSONObject("perps")?.toPerpMarket(),
         liveFeed = root.optJSONObject("live_feed")?.toLiveFeed(),
+        simulation = root.optJSONObject("simulation")?.toSimulation(),
     )
 }
 
@@ -70,6 +71,64 @@ private fun JSONObject.toLiveFeed(): DemoLiveFeed = DemoLiveFeed(
     executionMode = optString("execution_mode").ifEmpty { null },
     message = optString("message").ifEmpty { null },
 )
+
+private fun JSONObject.toSimulation(): DemoSimulation = DemoSimulation(
+    running = optBoolean("running", false),
+    scenario = optString("scenario").ifEmpty { "Consensus drift" },
+    speed = optInt("speed").takeIf { it > 0 } ?: 1,
+    tick = optLong("tick"),
+    tradeCount = optLong("trade_count"),
+    acceptedCount = optLong("accepted_count"),
+    currentMuDisplay = optString("current_mu_display"),
+    currentSigmaDisplay = optString("current_sigma_display"),
+    previousMuDisplay = optString("previous_mu_display"),
+    previousSigmaDisplay = optString("previous_sigma_display"),
+    totalVolumeDisplay = optString("total_volume_display"),
+    feesEarnedDisplay = optString("fees_earned_display"),
+    lastError = optString("last_error").ifEmpty { null },
+    marketPath = optJSONArray("market_path")?.toSimulationPath().orEmpty(),
+    tradeTape = optJSONArray("trade_tape")?.toSimulationTrades().orEmpty(),
+)
+
+private fun JSONArray.toSimulationPath(): List<DemoSimulationPathPoint> {
+    val out = mutableListOf<DemoSimulationPathPoint>()
+    for (i in 0 until length()) {
+        val o = getJSONObject(i)
+        out += DemoSimulationPathPoint(
+            slot = o.optLong("slot"),
+            tick = o.optLong("tick"),
+            muDisplay = o.optString("mu_display"),
+            sigmaDisplay = o.optString("sigma_display"),
+            volumeDisplay = o.optString("volume_display"),
+            feesDisplay = o.optString("fees_display"),
+            reason = o.optString("reason"),
+        )
+    }
+    return out
+}
+
+private fun JSONArray.toSimulationTrades(): List<DemoSimulationTrade> {
+    val out = mutableListOf<DemoSimulationTrade>()
+    for (i in 0 until length()) {
+        val o = getJSONObject(i)
+        out += DemoSimulationTrade(
+            id = o.optString("id").ifEmpty { "sim-$i" },
+            slot = o.optLong("slot"),
+            tick = o.optLong("tick"),
+            agentType = o.optString("agent_type"),
+            handle = o.optString("handle"),
+            action = o.optString("action"),
+            targetMuDisplay = o.optString("target_mu_display"),
+            targetSigmaDisplay = o.optString("target_sigma_display"),
+            collateralDisplay = o.optString("collateral_display"),
+            feeDisplay = o.optString("fee_display"),
+            totalDebitDisplay = o.optString("total_debit_display"),
+            accepted = o.optBoolean("accepted", false),
+            reason = o.optString("reason"),
+        )
+    }
+    return out
+}
 
 private fun JSONArray.toRegimeIndexList(): List<DemoRegimeIndex> {
     val out = mutableListOf<DemoRegimeIndex>()

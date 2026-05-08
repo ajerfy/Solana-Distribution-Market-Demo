@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
+import com.solanadistributionmarketdemo.data.DemoPayload
 import com.solanadistributionmarketdemo.data.LiveMarketClient
 import com.solanadistributionmarketdemo.data.LiveSyncMode
 import com.solanadistributionmarketdemo.data.LiveSyncStatus
@@ -31,7 +32,9 @@ import com.solanadistributionmarketdemo.ui.DemoColors
 import com.solanadistributionmarketdemo.ui.DemoTheme
 import com.solanadistributionmarketdemo.ui.OnboardingStore
 import com.solanadistributionmarketdemo.ui.ParabolaEntranceScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private lateinit var walletSender: ActivityResultSender
@@ -41,92 +44,119 @@ class MainActivity : ComponentActivity() {
         walletSender = ActivityResultSender(this)
         setContent {
             val context = LocalContext.current
-            val payload = remember {
-                loadDemoPayload(
-                    context.assets.open("demo_market.json").bufferedReader().use { it.readText() }
-                )
-            }
             val store = remember { PositionStore(context) }
             val themeStore = remember { ThemeStore(context) }
             val onboardingStore = remember { OnboardingStore(context) }
-            val state = rememberAppState(payload, store, themeStore)
+            val initialTheme = remember { themeStore.load() }
+            var payload by remember { mutableStateOf<DemoPayload?>(null) }
             var entered by rememberSaveable { mutableStateOf(false) }
+            var enterRequested by rememberSaveable { mutableStateOf(false) }
             var tutorialReplayToken by remember { mutableStateOf(0) }
-            state.replayOnboarding = {
-                onboardingStore.reset()
-                tutorialReplayToken += 1
-            }
 
             LaunchedEffect(Unit) {
-                state.updateLiveSync(
-                    LiveSyncStatus(
-                        mode = LiveSyncMode.Connecting,
-                        source = "Parabola live backend",
-                        endpoint = LiveMarketClient.endpoint(),
-                        lastUpdatedMillis = null,
-                        message = "Looking for a live oracle backend.",
+                payload = withContext(Dispatchers.IO) {
+                    loadDemoPayload(
+                        context.assets.open("demo_market.json").bufferedReader().use { it.readText() }
                     )
-                )
-                while (true) {
-                    val now = System.currentTimeMillis()
-                    LiveMarketClient.fetchLatestPayload()
-                        .onSuccess { response ->
-                            state.updatePayload(response.payload)
-                            val liveFeed = response.payload.liveFeed
-                            val mode = when (liveFeed?.mode?.lowercase()) {
-                                "live" -> LiveSyncMode.Live
-                                "connecting" -> LiveSyncMode.Connecting
-                                "degraded", "error" -> LiveSyncMode.Error
-                                else -> LiveSyncMode.Demo
-                            }
-                            state.updateLiveSync(
-                                LiveSyncStatus(
-                                    mode = mode,
-                                    source = liveFeed?.source ?: "Parabola live backend",
-                                    endpoint = response.endpoint,
-                                    lastUpdatedMillis = liveFeed?.lastUpdateUnixMs?.takeIf { it > 0 } ?: now,
-                                    message = liveFeed?.message ?: "Oracle data is live.",
-                                )
-                            )
-                        }
-                        .onFailure { error ->
-                            if (state.liveSyncStatus.value.mode != LiveSyncMode.Live) {
-                                state.updateLiveSync(
-                                    LiveSyncStatus(
-                                        mode = LiveSyncMode.Demo,
-                                        source = "Bundled demo asset",
-                                        endpoint = LiveMarketClient.endpoint(),
-                                        lastUpdatedMillis = null,
-                                        message = "Live backend unavailable: ${error.message ?: "unknown error"}",
-                                    )
-                                )
-                            }
-                        }
-                    delay(3_000)
                 }
             }
 
-            DemoTheme(state.themeMode.value) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.systemBars),
-                    color = DemoColors.Background,
-                ) {
-                    Crossfade(
-                        targetState = entered,
-                        animationSpec = tween(durationMillis = 700),
-                        label = "Parabola entrance",
-                    ) { hasEntered ->
-                        if (hasEntered) {
-                            AppShell(
-                                state = state,
-                                walletSender = walletSender,
-                                onboardingStore = onboardingStore,
-                                tutorialReplayToken = tutorialReplayToken,
-                            )
-                        } else {
-                            ParabolaEntranceScreen(onEnter = { entered = true })
+            val loadedPayload = payload
+            if (loadedPayload == null) {
+                DemoTheme(initialTheme) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.systemBars),
+                        color = DemoColors.Background,
+                    ) {
+                        ParabolaEntranceScreen(onEnter = { enterRequested = true })
+                    }
+                }
+            } else {
+                val state = rememberAppState(loadedPayload, store, themeStore)
+                state.replayOnboarding = {
+                    onboardingStore.reset()
+                    tutorialReplayToken += 1
+                }
+
+                LaunchedEffect(loadedPayload) {
+                    if (enterRequested) {
+                        entered = true
+                    }
+                }
+
+                LaunchedEffect(state) {
+                    state.updateLiveSync(
+                        LiveSyncStatus(
+                            mode = LiveSyncMode.Connecting,
+                            source = "Parabola live backend",
+                            endpoint = LiveMarketClient.endpoint(),
+                            lastUpdatedMillis = null,
+                            message = "Looking for a live oracle backend.",
+                        )
+                    )
+                    while (true) {
+                        val now = System.currentTimeMillis()
+                        LiveMarketClient.fetchLatestPayload()
+                            .onSuccess { response ->
+                                state.updatePayload(response.payload)
+                                val liveFeed = response.payload.liveFeed
+                                val mode = when (liveFeed?.mode?.lowercase()) {
+                                    "live" -> LiveSyncMode.Live
+                                    "connecting" -> LiveSyncMode.Connecting
+                                    "degraded", "error" -> LiveSyncMode.Error
+                                    else -> LiveSyncMode.Demo
+                                }
+                                state.updateLiveSync(
+                                    LiveSyncStatus(
+                                        mode = mode,
+                                        source = liveFeed?.source ?: "Parabola live backend",
+                                        endpoint = response.endpoint,
+                                        lastUpdatedMillis = liveFeed?.lastUpdateUnixMs?.takeIf { it > 0 } ?: now,
+                                        message = liveFeed?.message ?: "Oracle data is live.",
+                                    )
+                                )
+                            }
+                            .onFailure { error ->
+                                if (state.liveSyncStatus.value.mode != LiveSyncMode.Live) {
+                                    state.updateLiveSync(
+                                        LiveSyncStatus(
+                                            mode = LiveSyncMode.Demo,
+                                            source = "Bundled demo asset",
+                                            endpoint = LiveMarketClient.endpoint(),
+                                            lastUpdatedMillis = null,
+                                            message = "Live backend unavailable: ${error.message ?: "unknown error"}",
+                                        )
+                                    )
+                                }
+                            }
+                        delay(3_000)
+                    }
+                }
+
+                DemoTheme(state.themeMode.value) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.systemBars),
+                        color = DemoColors.Background,
+                    ) {
+                        Crossfade(
+                            targetState = entered,
+                            animationSpec = tween(durationMillis = 700),
+                            label = "Parabola entrance",
+                        ) { hasEntered ->
+                            if (hasEntered) {
+                                AppShell(
+                                    state = state,
+                                    walletSender = walletSender,
+                                    onboardingStore = onboardingStore,
+                                    tutorialReplayToken = tutorialReplayToken,
+                                )
+                            } else {
+                                ParabolaEntranceScreen(onEnter = { entered = true })
+                            }
                         }
                     }
                 }

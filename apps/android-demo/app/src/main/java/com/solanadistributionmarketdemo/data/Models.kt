@@ -7,6 +7,7 @@ data class DemoPayload(
     val regimeIndexes: List<DemoRegimeIndex> = emptyList(),
     val perp: DemoPerpMarket? = null,
     val liveFeed: DemoLiveFeed? = null,
+    val simulation: DemoSimulation? = null,
 )
 
 data class DemoLiveFeed(
@@ -82,6 +83,50 @@ data class DemoPreset(
     val quoteExpirySlot: Long,
     val serializedInstructionHex: String,
     val curvePoints: List<DemoCurvePoint>,
+)
+
+data class DemoSimulation(
+    val running: Boolean,
+    val scenario: String,
+    val speed: Int,
+    val tick: Long,
+    val tradeCount: Long,
+    val acceptedCount: Long,
+    val currentMuDisplay: String,
+    val currentSigmaDisplay: String,
+    val previousMuDisplay: String,
+    val previousSigmaDisplay: String,
+    val totalVolumeDisplay: String,
+    val feesEarnedDisplay: String,
+    val lastError: String?,
+    val marketPath: List<DemoSimulationPathPoint>,
+    val tradeTape: List<DemoSimulationTrade>,
+)
+
+data class DemoSimulationPathPoint(
+    val slot: Long,
+    val tick: Long,
+    val muDisplay: String,
+    val sigmaDisplay: String,
+    val volumeDisplay: String,
+    val feesDisplay: String,
+    val reason: String,
+)
+
+data class DemoSimulationTrade(
+    val id: String,
+    val slot: Long,
+    val tick: Long,
+    val agentType: String,
+    val handle: String,
+    val action: String,
+    val targetMuDisplay: String,
+    val targetSigmaDisplay: String,
+    val collateralDisplay: String,
+    val feeDisplay: String,
+    val totalDebitDisplay: String,
+    val accepted: Boolean,
+    val reason: String,
 )
 
 data class ContinuousQuotePreview(

@@ -1,4 +1,6 @@
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
+use axum::{
+    Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::{get, post},
+};
 use distribution_markets::{
     Fixed, FixedNormalDistribution, fixed_calculate_f, fixed_calculate_lambda,
 };
@@ -32,6 +34,7 @@ const DEMO_QUOTE_EXPIRY_DELTA: u64 = 10;
 #[derive(Clone)]
 struct AppContext {
     snapshot: Arc<RwLock<BackendSnapshot>>,
+    simulation: Arc<RwLock<MarketSimulationState>>,
 }
 
 #[derive(Clone, Debug)]
@@ -105,6 +108,56 @@ struct PolyMarketSnapshot {
     best_ask: Option<f64>,
     spread: Option<f64>,
     updated_at_millis: u64,
+}
+
+#[derive(Clone, Debug)]
+struct MarketSimulationState {
+    initialized: bool,
+    running: bool,
+    scenario: String,
+    speed: u32,
+    tick: u64,
+    current_mu: f64,
+    current_sigma: f64,
+    previous_mu: f64,
+    previous_sigma: f64,
+    target_shift: f64,
+    shock_remaining: u32,
+    total_volume: f64,
+    fees_earned: f64,
+    trade_count: u64,
+    accepted_count: u64,
+    history: Vec<SimulationHistoryPoint>,
+    tape: Vec<SimulationTradeEvent>,
+    last_error: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct SimulationHistoryPoint {
+    slot: u64,
+    tick: u64,
+    mu: f64,
+    sigma: f64,
+    volume: f64,
+    fees: f64,
+    reason: String,
+}
+
+#[derive(Clone, Debug)]
+struct SimulationTradeEvent {
+    id: String,
+    slot: u64,
+    tick: u64,
+    agent_type: String,
+    handle: String,
+    action: String,
+    target_mu: f64,
+    target_sigma: f64,
+    collateral: f64,
+    fee: f64,
+    total_debit: f64,
+    accepted: bool,
+    reason: String,
 }
 
 #[derive(Clone, Deserialize)]
@@ -237,8 +290,10 @@ async fn main() -> Result<(), String> {
         payload: inject_status(base_payload.clone(), &initial_status),
         status: initial_status,
     }));
+    let simulation = Arc::new(RwLock::new(MarketSimulationState::new()));
 
     let update_state = snapshot.clone();
+    let update_simulation = simulation.clone();
     let update_client = client.clone();
     let update_base_payload = base_payload.clone();
     let update_feed = feed.clone();
@@ -251,6 +306,7 @@ async fn main() -> Result<(), String> {
                 &update_base_payload,
                 &update_poly,
                 &update_feed,
+                &update_simulation,
                 &mut history,
             )
             .await
@@ -287,7 +343,16 @@ async fn main() -> Result<(), String> {
         .route("/healthz", get(healthz))
         .route("/api/demo-payload", get(get_payload))
         .route("/api/live/status", get(get_status))
-        .with_state(AppContext { snapshot });
+        .route("/api/simulation/status", get(get_simulation_status))
+        .route("/api/simulation/start", post(start_simulation))
+        .route("/api/simulation/pause", post(pause_simulation))
+        .route("/api/simulation/reset", post(reset_simulation))
+        .route("/api/simulation/speed", post(cycle_simulation_speed))
+        .route("/api/simulation/shock", post(trigger_simulation_shock))
+        .with_state(AppContext {
+            snapshot,
+            simulation,
+        });
 
     let addr: SocketAddr = bind_addr
         .parse()
@@ -326,11 +391,59 @@ async fn get_status(State(context): State<AppContext>) -> impl IntoResponse {
     (StatusCode::OK, Json(json!(guard.status)))
 }
 
+async fn get_simulation_status(State(context): State<AppContext>) -> impl IntoResponse {
+    let guard = context.simulation.read().await;
+    (StatusCode::OK, Json(guard.status_json()))
+}
+
+async fn start_simulation(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.running = true;
+    guard.scenario = if guard.shock_remaining > 0 {
+        "Information shock".to_string()
+    } else {
+        "Consensus drift".to_string()
+    };
+    (StatusCode::OK, Json(guard.status_json()))
+}
+
+async fn pause_simulation(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.running = false;
+    (StatusCode::OK, Json(guard.status_json()))
+}
+
+async fn reset_simulation(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    *guard = MarketSimulationState::new();
+    (StatusCode::OK, Json(guard.status_json()))
+}
+
+async fn cycle_simulation_speed(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.speed = match guard.speed {
+        0 | 1 => 3,
+        3 => 8,
+        _ => 1,
+    };
+    (StatusCode::OK, Json(guard.status_json()))
+}
+
+async fn trigger_simulation_shock(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.running = true;
+    guard.scenario = "Information shock".to_string();
+    guard.shock_remaining = 12;
+    guard.target_shift = if guard.current_mu < 55.0 { 12.0 } else { -12.0 };
+    (StatusCode::OK, Json(guard.status_json()))
+}
+
 async fn refresh_snapshot(
     client: &Client,
     base_payload: &Value,
     poly: &PolyConfig,
     feed: &FeedConfig,
+    simulation: &Arc<RwLock<MarketSimulationState>>,
     history: &mut Vec<PerpFundingPoint>,
 ) -> Result<BackendSnapshot, String> {
     let live_event = fetch_polymarket_snapshot(client, poly).await?;
@@ -339,7 +452,18 @@ async fn refresh_snapshot(
         .await
         .unwrap_or(oracle.publish_time);
 
-    let live_payload = build_live_payload(base_payload, &live_event, feed, &oracle, slot, history)?;
+    let live_payload = {
+        let mut simulation_guard = simulation.write().await;
+        build_live_payload(
+            base_payload,
+            &live_event,
+            feed,
+            &oracle,
+            slot,
+            history,
+            &mut simulation_guard,
+        )?
+    };
     let status = StatusPayload {
         mode: "live".to_string(),
         status: "Connected".to_string(),
@@ -640,6 +764,7 @@ fn build_live_payload(
     oracle: &OracleSnapshot,
     slot: u64,
     history: &mut Vec<PerpFundingPoint>,
+    simulation: &mut MarketSimulationState,
 ) -> Result<Value, String> {
     let mut payload = base_payload.clone();
     let market_id_hex = payload
@@ -674,13 +799,18 @@ fn build_live_payload(
         history.drain(0..drop_count);
     }
 
-    let event_mu = live_event.probability * 100.0;
-    let event_sigma = live_event.sigma;
+    let simulation_payload = simulation.advance(live_event, slot)?;
+    let event_mu = simulation.current_mu;
+    let event_sigma = simulation.current_sigma;
+    let mut simulated_event = live_event.clone();
+    simulated_event.probability = (event_mu / 100.0).clamp(0.0, 1.0);
+    simulated_event.no_probability = (1.0 - simulated_event.probability).clamp(0.0, 1.0);
+    simulated_event.sigma = event_sigma;
     let mut event_program = seeded_demo_market()?;
     set_program_distribution(&mut event_program, event_mu, event_sigma)?;
     let event_presets =
-        build_live_event_presets(&event_program, live_event, slot)?;
-    let event_quote_grid = build_live_event_quote_grid(&event_program, live_event, slot)?;
+        build_live_event_presets(&event_program, &simulated_event, slot)?;
+    let event_quote_grid = build_live_event_quote_grid(&event_program, &simulated_event, slot)?;
 
     let mut program = seeded_demo_market()?;
     set_program_distribution(&mut program, amm_mu, amm_sigma)?;
@@ -754,20 +884,24 @@ fn build_live_payload(
         "positions": [],
     });
 
+    let total_trades = simulation.trade_count;
+    let maker_fees = (live_event.volume_usd * 0.0005).max(0.0) + simulation.fees_earned;
+    let backing = live_event.liquidity_usd.max(50.0) + simulation.total_volume;
+
     let live_market = json!({
         "title": live_event.title,
-        "status": if live_event.spread.unwrap_or(0.0) <= 0.02 { "Live consensus" } else { "Live market" },
+        "status": if simulation.running { "Live crowd simulation" } else if live_event.spread.unwrap_or(0.0) <= 0.02 { "Live consensus" } else { "Live market" },
         "market_id_hex": market_id_hex,
         "state_version": state_version,
         "current_mu_display": format9(event_mu),
         "current_sigma_display": format9(event_sigma),
         "k_display": "2.105026040",
-        "backing_display": format9(live_event.liquidity_usd.max(50.0)),
+        "backing_display": format9(backing),
         "taker_fee_bps": 100,
         "min_taker_fee_display": "0.001000000",
-        "maker_fees_earned_display": format9((live_event.volume_usd * 0.0005).max(0.0)),
+        "maker_fees_earned_display": format9(maker_fees),
         "maker_deposit_display": format9(live_event.liquidity_usd.max(50.0)),
-        "total_trades": 0,
+        "total_trades": total_trades,
         "max_open_trades": 64,
         "expiry_slot": 1_000_000,
         "demo_quote_slot": slot,
@@ -779,7 +913,7 @@ fn build_live_payload(
         "unit_label": "%",
         "resolves_at_label": live_event.resolves_at,
         "volume_usd": live_event.volume_usd,
-        "bettor_count": ((live_event.volume_usd / 1200.0).round() as i64).max(120),
+        "bettor_count": ((live_event.volume_usd / 1200.0).round() as i64).max(120) + total_trades as i64,
         "resolution_source_label": if live_event.resolution_source.is_empty() { "Polymarket" } else { &live_event.resolution_source },
         "resolution_rule_text": format!(
             "Parabola tracks the live Polymarket price for '{}'. You still trade a Normal curve around that probability, not a direct YES/NO order. Source context: {}",
@@ -792,6 +926,7 @@ fn build_live_payload(
         "outcome_label": live_event.outcome_label,
         "yes_price_display": format9(live_event.probability),
         "no_price_display": format9(live_event.no_probability),
+        "external_consensus_display": format9(live_event.probability * 100.0),
         "best_bid_display": live_event.best_bid.map(format9),
         "best_ask_display": live_event.best_ask.map(format9),
         "spread_display": live_event.spread.map(format9),
@@ -804,6 +939,7 @@ fn build_live_payload(
         root.insert("presets".to_string(), Value::Array(event_presets));
         root.insert("quote_grid".to_string(), Value::Array(event_quote_grid));
         root.insert("perps".to_string(), live_perp);
+        root.insert("simulation".to_string(), simulation_payload);
         root.insert(
             "live_feed".to_string(),
             json!({
@@ -977,6 +1113,309 @@ fn build_live_event_curve_points(
     }
 
     Ok(points)
+}
+
+impl MarketSimulationState {
+    fn new() -> Self {
+        Self {
+            initialized: false,
+            running: false,
+            scenario: "Consensus drift".to_string(),
+            speed: 1,
+            tick: 0,
+            current_mu: 50.0,
+            current_sigma: 10.0,
+            previous_mu: 50.0,
+            previous_sigma: 10.0,
+            target_shift: 0.0,
+            shock_remaining: 0,
+            total_volume: 0.0,
+            fees_earned: 0.0,
+            trade_count: 0,
+            accepted_count: 0,
+            history: Vec::new(),
+            tape: Vec::new(),
+            last_error: None,
+        }
+    }
+
+    fn status_json(&self) -> Value {
+        json!({
+            "running": self.running,
+            "scenario": self.scenario,
+            "speed": self.speed,
+            "tick": self.tick,
+            "trade_count": self.trade_count,
+            "accepted_count": self.accepted_count,
+            "current_mu_display": format9(self.current_mu),
+            "current_sigma_display": format9(self.current_sigma),
+            "last_error": &self.last_error,
+        })
+    }
+
+    fn advance(&mut self, live_event: &PolyMarketSnapshot, slot: u64) -> Result<Value, String> {
+        self.ensure_initialized(live_event, slot);
+        if self.running {
+            let steps = self.speed.clamp(1, 8);
+            for _ in 0..steps {
+                self.apply_trade_tick(live_event, slot)?;
+            }
+        }
+        Ok(self.to_payload())
+    }
+
+    fn ensure_initialized(&mut self, live_event: &PolyMarketSnapshot, slot: u64) {
+        if self.initialized {
+            return;
+        }
+        self.initialized = true;
+        self.current_mu = (live_event.probability * 100.0).clamp(1.0, 99.0);
+        self.current_sigma = live_event.sigma.clamp(4.0, 18.0);
+        self.previous_mu = self.current_mu;
+        self.previous_sigma = self.current_sigma;
+        self.history.clear();
+        self.tape.clear();
+        self.push_history(slot, "Starting live consensus");
+    }
+
+    fn apply_trade_tick(&mut self, live_event: &PolyMarketSnapshot, slot: u64) -> Result<(), String> {
+        self.tick += 1;
+        let external_mu = (live_event.probability * 100.0).clamp(1.0, 99.0);
+        let external_sigma = live_event.sigma.clamp(4.0, 18.0);
+        let shock = if self.shock_remaining > 0 {
+            self.shock_remaining -= 1;
+            if self.shock_remaining == 0 {
+                self.scenario = "Consensus drift".to_string();
+                self.target_shift = 0.0;
+            }
+            self.target_shift
+        } else {
+            0.0
+        };
+        let target_consensus = (external_mu + shock).clamp(1.0, 99.0);
+        let (agent_type, handle, action, reason, target_mu, target_sigma) =
+            self.agent_proposal(target_consensus, external_sigma);
+
+        match self.quote_transition(target_mu, target_sigma, slot) {
+            Ok((collateral, fee, total_debit)) => {
+                self.previous_mu = self.current_mu;
+                self.previous_sigma = self.current_sigma;
+                self.current_mu = target_mu;
+                self.current_sigma = target_sigma;
+                self.total_volume += total_debit;
+                self.fees_earned += fee;
+                self.trade_count += 1;
+                self.accepted_count += 1;
+                self.last_error = None;
+                self.push_tape(SimulationTradeEvent {
+                    id: format!("sim-{}", self.tick),
+                    slot,
+                    tick: self.tick,
+                    agent_type,
+                    handle,
+                    action,
+                    target_mu,
+                    target_sigma,
+                    collateral,
+                    fee,
+                    total_debit,
+                    accepted: true,
+                    reason: reason.clone(),
+                });
+                self.push_history(slot, &reason);
+            }
+            Err(error) => {
+                self.last_error = Some(error.clone());
+                self.push_tape(SimulationTradeEvent {
+                    id: format!("sim-{}", self.tick),
+                    slot,
+                    tick: self.tick,
+                    agent_type,
+                    handle,
+                    action,
+                    target_mu,
+                    target_sigma,
+                    collateral: 0.0,
+                    fee: 0.0,
+                    total_debit: 0.0,
+                    accepted: false,
+                    reason: error,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    fn agent_proposal(
+        &self,
+        target_consensus: f64,
+        external_sigma: f64,
+    ) -> (String, String, String, String, f64, f64) {
+        let noise = pseudo_unit(self.tick + 17) - 0.5;
+        let momentum = self.current_mu - self.previous_mu;
+        let agent_index = (self.tick % 5) as usize;
+        let (agent, handle, action, raw_mu, raw_sigma, reason) = match agent_index {
+            0 => (
+                "Informed",
+                "model_alpha",
+                "leans toward fresh information",
+                self.current_mu + (target_consensus - self.current_mu) * 0.46 + noise * 1.2,
+                self.current_sigma * 0.92 + external_sigma * 0.08,
+                "An informed trader pulls the curve toward the latest consensus.",
+            ),
+            1 => (
+                "Momentum",
+                "trend_721",
+                "follows the last move",
+                self.current_mu + momentum * 1.25 + noise * 1.7,
+                self.current_sigma * (0.98 + pseudo_unit(self.tick + 3) * 0.08),
+                "A momentum trader extends the recent direction.",
+            ),
+            2 => (
+                "Noisy",
+                "anon_noise",
+                "adds disagreement",
+                self.current_mu + noise * 5.2,
+                self.current_sigma * (0.88 + pseudo_unit(self.tick + 5) * 0.28),
+                "A noisy trader adds short-term disagreement to the market.",
+            ),
+            3 => (
+                "Contrarian",
+                "fade_shop",
+                "fades the crowd",
+                self.current_mu + (target_consensus - self.current_mu) * 0.18 - momentum * 0.75,
+                self.current_sigma * 1.04,
+                "A contrarian trader fades the last move.",
+            ),
+            _ => (
+                "Risk-limited",
+                "small_size",
+                "nudges within budget",
+                self.current_mu + (target_consensus - self.current_mu) * 0.22 + noise * 0.8,
+                self.current_sigma * 0.98 + external_sigma * 0.02,
+                "A smaller trader nudges the curve without taking much risk.",
+            ),
+        };
+
+        let mut target_mu = raw_mu.clamp(1.0, 99.0);
+        let mut target_sigma = raw_sigma.clamp(4.0, 18.0);
+        if (target_mu - self.current_mu).abs() < 0.12
+            && (target_sigma - self.current_sigma).abs() < 0.08
+        {
+            let sign = if target_consensus >= self.current_mu { 1.0 } else { -1.0 };
+            target_mu = (target_mu + sign * 0.35).clamp(1.0, 99.0);
+            target_sigma = (target_sigma * 1.015).clamp(4.0, 18.0);
+        }
+
+        (
+            agent.to_string(),
+            handle.to_string(),
+            action.to_string(),
+            reason.to_string(),
+            target_mu,
+            target_sigma,
+        )
+    }
+
+    fn quote_transition(
+        &self,
+        target_mu: f64,
+        target_sigma: f64,
+        slot: u64,
+    ) -> Result<(f64, f64, f64), String> {
+        let mut program = seeded_demo_market()?;
+        set_program_distribution(&mut program, self.current_mu, self.current_sigma)?;
+        let target_distribution = FixedNormalDistribution::new(
+            Fixed::from_f64(target_mu)?,
+            Fixed::from_f64(target_sigma)?,
+        )?;
+        let envelope = build_trade_quote(
+            &program,
+            TradeQuoteRequestV1 {
+                trader: [8_u8; 32],
+                market: DEMO_MARKET_ID,
+                target_distribution,
+                quote_slot: slot,
+                quote_expiry_slot: slot + DEMO_QUOTE_EXPIRY_DELTA,
+            },
+        )?;
+        Ok((
+            envelope.collateral_required.to_f64(),
+            envelope.fee_paid.to_f64(),
+            envelope.total_debit.to_f64(),
+        ))
+    }
+
+    fn push_history(&mut self, slot: u64, reason: &str) {
+        self.history.push(SimulationHistoryPoint {
+            slot,
+            tick: self.tick,
+            mu: self.current_mu,
+            sigma: self.current_sigma,
+            volume: self.total_volume,
+            fees: self.fees_earned,
+            reason: reason.to_string(),
+        });
+        if self.history.len() > 64 {
+            let drop_count = self.history.len() - 64;
+            self.history.drain(0..drop_count);
+        }
+    }
+
+    fn push_tape(&mut self, event: SimulationTradeEvent) {
+        self.tape.insert(0, event);
+        if self.tape.len() > 18 {
+            self.tape.truncate(18);
+        }
+    }
+
+    fn to_payload(&self) -> Value {
+        json!({
+            "running": self.running,
+            "scenario": self.scenario,
+            "speed": self.speed,
+            "tick": self.tick,
+            "trade_count": self.trade_count,
+            "accepted_count": self.accepted_count,
+            "current_mu_display": format9(self.current_mu),
+            "current_sigma_display": format9(self.current_sigma),
+            "previous_mu_display": format9(self.previous_mu),
+            "previous_sigma_display": format9(self.previous_sigma),
+            "total_volume_display": format9(self.total_volume),
+            "fees_earned_display": format9(self.fees_earned),
+            "last_error": &self.last_error,
+            "market_path": self.history.iter().map(|point| json!({
+                "slot": point.slot,
+                "tick": point.tick,
+                "mu_display": format9(point.mu),
+                "sigma_display": format9(point.sigma),
+                "volume_display": format9(point.volume),
+                "fees_display": format9(point.fees),
+                "reason": &point.reason,
+            })).collect::<Vec<_>>(),
+            "trade_tape": self.tape.iter().map(|trade| json!({
+                "id": &trade.id,
+                "slot": trade.slot,
+                "tick": trade.tick,
+                "agent_type": &trade.agent_type,
+                "handle": &trade.handle,
+                "action": &trade.action,
+                "target_mu_display": format9(trade.target_mu),
+                "target_sigma_display": format9(trade.target_sigma),
+                "collateral_display": format9(trade.collateral),
+                "fee_display": format9(trade.fee),
+                "total_debit_display": format9(trade.total_debit),
+                "accepted": trade.accepted,
+                "reason": &trade.reason,
+            })).collect::<Vec<_>>(),
+        })
+    }
+}
+
+fn pseudo_unit(seed: u64) -> f64 {
+    let raw = ((seed as f64 + 1.0) * 12.9898).sin() * 43_758.5453;
+    raw - raw.floor()
 }
 
 fn clamp_probability_percent(value: f64) -> f64 {

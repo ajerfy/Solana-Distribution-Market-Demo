@@ -5,9 +5,15 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 object MockMarkets {
-    fun build(payload: DemoPayload): List<MarketListing> = build(payload.market, payload.regimeIndexes, payload.perp)
+    fun build(payload: DemoPayload): List<MarketListing> =
+        build(payload.market, payload.regimeIndexes, payload.perp, payload.simulation)
 
-    fun build(onChain: DemoMarket, regimeIndexes: List<DemoRegimeIndex> = emptyList(), perp: DemoPerpMarket? = null): List<MarketListing> {
+    fun build(
+        onChain: DemoMarket,
+        regimeIndexes: List<DemoRegimeIndex> = emptyList(),
+        perp: DemoPerpMarket? = null,
+        simulation: DemoSimulation? = null,
+    ): List<MarketListing> {
         val category = categoryFromLabel(onChain.categoryLabel) ?: MarketCategory.Crypto
         val unit = onChain.unitLabel ?: "%"
         val marketId = onChain.marketSlug?.let { "event-$it" } ?: "market-${onChain.marketIdHex.take(8)}"
@@ -59,7 +65,10 @@ object MockMarkets {
             sigmaMax = currentSigma * 2.0,
             volumeUsd = onChain.volumeUsd ?: onChain.backingDisplay.toDouble() * 1_000.0,
             bettorCount = onChain.bettorCount ?: onChain.totalTrades.toInt().coerceAtLeast(1),
-            crowdHistory = synthHistory(currentMu, currentSigma * 0.15, seed = 11),
+            crowdHistory = simulation?.marketPath
+                ?.mapNotNull { it.muDisplay.toDoubleOrNull() }
+                ?.takeIf { it.size >= 4 }
+                ?: synthHistory(currentMu, currentSigma * 0.15, seed = 11),
             isOnChain = !comesFromLiveSource,
             resolutionSource = resolutionSource,
             resolutionRule = resolutionRule,
