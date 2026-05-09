@@ -35,6 +35,7 @@ import com.solanadistributionmarketdemo.ui.ParabolaEntranceScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collect
 
 class MainActivity : ComponentActivity() {
     private lateinit var walletSender: ActivityResultSender
@@ -132,6 +133,24 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         delay(3_000)
+                    }
+                }
+
+                LaunchedEffect(state) {
+                    LiveMarketClient.streamSimulation().collect { response ->
+                        state.updateSimulation(response.simulation)
+                        val currentStatus = state.liveSyncStatus.value
+                        if (currentStatus.mode != LiveSyncMode.Live) {
+                            state.updateLiveSync(
+                                LiveSyncStatus(
+                                    mode = LiveSyncMode.Live,
+                                    source = currentStatus.source,
+                                    endpoint = response.endpoint,
+                                    lastUpdatedMillis = System.currentTimeMillis(),
+                                    message = "Simulation stream is live.",
+                                )
+                            )
+                        }
                     }
                 }
 

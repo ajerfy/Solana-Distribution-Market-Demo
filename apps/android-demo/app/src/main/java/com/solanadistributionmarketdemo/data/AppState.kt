@@ -48,10 +48,50 @@ class AppState(
     fun marketById(id: String?): MarketListing? = id?.let { markets.firstOrNull { m -> m.id == it } }
 
     fun updatePayload(next: DemoPayload) {
-        payloadState.value = next
+        val current = payloadState.value
+        val currentSimulation = current.simulation
+        val nextSimulation = next.simulation
+        val shouldKeepCurrentSimulation = currentSimulation != null &&
+            (nextSimulation == null || nextSimulation.isOlderThan(currentSimulation))
+        val mergedPayload = if (shouldKeepCurrentSimulation) {
+            next.copy(
+                market = next.market.copy(
+                    status = if (currentSimulation.running) "Live crowd simulation" else next.market.status,
+                    currentMuDisplay = currentSimulation.currentMuDisplay,
+                    currentSigmaDisplay = currentSimulation.currentSigmaDisplay,
+                    totalTrades = currentSimulation.tradeCount,
+                ),
+                simulation = currentSimulation,
+            )
+        } else {
+            next
+        }
+        payloadState.value = mergedPayload
         if (selectedMarketId.value != null && marketById(selectedMarketId.value) == null) {
             closeMarket()
         }
+    }
+
+    fun updateSimulation(next: DemoSimulation) {
+        val current = payloadState.value
+        val previousSimulation = current.simulation
+        if (previousSimulation != null && next.isOlderThan(previousSimulation)) {
+            return
+        }
+        val feeDelta = displayDelta(previousSimulation?.feesEarnedDisplay, next.feesEarnedDisplay)
+        val volumeDelta = displayDelta(previousSimulation?.totalVolumeDisplay, next.totalVolumeDisplay)
+        val nextMarket = current.market.copy(
+            status = if (next.running) "Live crowd simulation" else current.market.status,
+            currentMuDisplay = next.currentMuDisplay,
+            currentSigmaDisplay = next.currentSigmaDisplay,
+            backingDisplay = addDisplayValue(current.market.backingDisplay, volumeDelta),
+            makerFeesEarnedDisplay = addDisplayValue(current.market.makerFeesEarnedDisplay, feeDelta),
+            totalTrades = next.tradeCount,
+        )
+        payloadState.value = current.copy(
+            market = nextMarket,
+            simulation = next,
+        )
     }
 
     fun updateLiveSync(status: LiveSyncStatus) {
@@ -89,6 +129,20 @@ class AppState(
         bets.clear()
         positionStore.clear()
     }
+}
+
+private fun DemoSimulation.isOlderThan(current: DemoSimulation): Boolean =
+    revision < current.revision || (revision == current.revision && tick < current.tick)
+
+private fun displayDelta(previous: String?, next: String): Double {
+    val nextValue = next.toDoubleOrNull() ?: return 0.0
+    val previousValue = previous?.toDoubleOrNull() ?: nextValue
+    return nextValue - previousValue
+}
+
+private fun addDisplayValue(current: String, delta: Double): String {
+    val currentValue = current.toDoubleOrNull() ?: return current
+    return "%.9f".format((currentValue + delta).coerceAtLeast(0.0))
 }
 
 enum class NavTab(val label: String) {

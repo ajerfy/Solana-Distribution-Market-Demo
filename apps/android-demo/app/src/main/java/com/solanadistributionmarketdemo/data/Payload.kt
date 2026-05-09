@@ -59,6 +59,9 @@ fun loadDemoPayload(json: String): DemoPayload {
     )
 }
 
+fun loadSimulationPayload(json: String): DemoSimulation =
+    JSONObject(json).toSimulation()
+
 private fun JSONObject.toLiveFeed(): DemoLiveFeed = DemoLiveFeed(
     mode = optString("mode"),
     source = optString("source"),
@@ -74,15 +77,19 @@ private fun JSONObject.toLiveFeed(): DemoLiveFeed = DemoLiveFeed(
 
 private fun JSONObject.toSimulation(): DemoSimulation = DemoSimulation(
     running = optBoolean("running", false),
+    regime = optString("regime").ifEmpty { "drift" },
     scenario = optString("scenario").ifEmpty { "Consensus drift" },
     speed = optInt("speed").takeIf { it > 0 } ?: 1,
     tick = optLong("tick"),
+    revision = optLong("revision", optLong("tick")),
     tradeCount = optLong("trade_count"),
     acceptedCount = optLong("accepted_count"),
     currentMuDisplay = optString("current_mu_display"),
     currentSigmaDisplay = optString("current_sigma_display"),
+    currentSkewDisplay = optString("current_skew_display").ifEmpty { "0.000000000" },
     previousMuDisplay = optString("previous_mu_display"),
     previousSigmaDisplay = optString("previous_sigma_display"),
+    previousSkewDisplay = optString("previous_skew_display").ifEmpty { "0.000000000" },
     totalVolumeDisplay = optString("total_volume_display"),
     feesEarnedDisplay = optString("fees_earned_display"),
     lastError = optString("last_error").ifEmpty { null },

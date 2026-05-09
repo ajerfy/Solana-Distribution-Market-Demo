@@ -1,5 +1,7 @@
 package com.solanadistributionmarketdemo.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,7 +17,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -37,10 +43,14 @@ fun EngineScreen(state: AppState) {
     val feePercent = "%.2f%%".format(market.takerFeeBps / 100.0)
     val lastSubmit = state.lastSubmit.value
     val scope = rememberCoroutineScope()
+    var pendingSimulationCommand by remember { mutableStateOf<String?>(null) }
     fun sendSimulationCommand(command: String) {
+        if (pendingSimulationCommand != null) return
         scope.launch {
+            pendingSimulationCommand = command
             LiveMarketClient.postSimulationCommand(command)
-                .onSuccess {
+                .onSuccess { response ->
+                    state.updateSimulation(response.simulation)
                     state.lastSubmit.value = SubmitStatus("Simulation command sent: $command")
                 }
                 .onFailure { error ->
@@ -49,6 +59,7 @@ fun EngineScreen(state: AppState) {
                         isError = true,
                     )
                 }
+            pendingSimulationCommand = null
         }
     }
 
@@ -71,6 +82,32 @@ fun EngineScreen(state: AppState) {
                     color = DemoColors.TextSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+        }
+        item {
+            if (simulation != null) {
+                SimulationMovementCard(
+                    simulation = simulation,
+                    unit = market.unitLabel ?: "%",
+                    pendingCommand = pendingSimulationCommand,
+                    onCommand = ::sendSimulationCommand,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+            } else {
+                Card(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Text(
+                        "Live movement demo",
+                        color = DemoColors.TextPrimary,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Start the local backend to stream simulated crowd trades into this screen. The bundled asset still works, but it does not animate market movement.",
+                        color = DemoColors.TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
         }
         item {
@@ -103,31 +140,6 @@ fun EngineScreen(state: AppState) {
                 StatRow("Trading fee", feePercent)
                 CompactDivider()
                 StatRow("Status", market.status.uppercase(), DemoColors.AccentLong, strong = true)
-            }
-        }
-        item {
-            if (simulation != null) {
-                SimulationMovementCard(
-                    simulation = simulation,
-                    unit = market.unitLabel ?: "%",
-                    onCommand = ::sendSimulationCommand,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-            } else {
-                Card(modifier = Modifier.padding(horizontal = 20.dp)) {
-                    Text(
-                        "Live movement demo",
-                        color = DemoColors.TextPrimary,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Start the local backend to stream simulated crowd trades into this screen. The bundled asset still works, but it does not animate market movement.",
-                        color = DemoColors.TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
             }
         }
         item {
@@ -227,13 +239,55 @@ fun EngineScreen(state: AppState) {
 private fun SimulationMovementCard(
     simulation: DemoSimulation,
     unit: String,
+    pendingCommand: String?,
     onCommand: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val previousMu = simulation.previousMuDisplay.toDoubleOrNull()
     val previousSigma = simulation.previousSigmaDisplay.toDoubleOrNull()
+    val previousSkew = simulation.previousSkewDisplay.toDoubleOrNull() ?: 0.0
     val currentMu = simulation.currentMuDisplay.toDoubleOrNull()
     val currentSigma = simulation.currentSigmaDisplay.toDoubleOrNull()
+    val currentSkew = simulation.currentSkewDisplay.toDoubleOrNull() ?: 0.0
+    val chartFallbackMu = currentMu ?: previousMu ?: 50.0
+    val chartFallbackSigma = currentSigma ?: previousSigma ?: 10.0
+    val regimeLabel = when (simulation.regime) {
+        "bullish" -> "bullish"
+        "bearish" -> "bearish"
+        "volatile" -> "volatile"
+        "shock" -> "shock"
+        else -> "drift"
+    }
+    val animatedPreviousMu = animateFloatAsState(
+        targetValue = (previousMu ?: chartFallbackMu).toFloat(),
+        animationSpec = tween(durationMillis = 450),
+        label = "simulation previous mean",
+    ).value.toDouble()
+    val animatedPreviousSigma = animateFloatAsState(
+        targetValue = (previousSigma ?: chartFallbackSigma).toFloat(),
+        animationSpec = tween(durationMillis = 450),
+        label = "simulation previous confidence",
+    ).value.toDouble()
+    val animatedCurrentMu = animateFloatAsState(
+        targetValue = (currentMu ?: chartFallbackMu).toFloat(),
+        animationSpec = tween(durationMillis = 650),
+        label = "simulation current mean",
+    ).value.toDouble()
+    val animatedCurrentSigma = animateFloatAsState(
+        targetValue = (currentSigma ?: chartFallbackSigma).toFloat(),
+        animationSpec = tween(durationMillis = 650),
+        label = "simulation current confidence",
+    ).value.toDouble()
+    val animatedPreviousSkew = animateFloatAsState(
+        targetValue = previousSkew.toFloat(),
+        animationSpec = tween(durationMillis = 450),
+        label = "simulation previous skew",
+    ).value.toDouble()
+    val animatedCurrentSkew = animateFloatAsState(
+        targetValue = currentSkew.toFloat(),
+        animationSpec = tween(durationMillis = 650),
+        label = "simulation current skew",
+    ).value.toDouble()
     Card(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -244,7 +298,7 @@ private fun SimulationMovementCard(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "${simulation.scenario} · ${simulation.speed}x",
+                    "${simulation.scenario} · $regimeLabel · ${simulation.speed}x",
                     color = DemoColors.TextSecondary,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -257,12 +311,14 @@ private fun SimulationMovementCard(
                 label = if (simulation.running) "Pause" else "Start",
                 onClick = { onCommand(if (simulation.running) "pause" else "start") },
                 modifier = Modifier.weight(1f),
+                enabled = pendingCommand == null,
                 accent = if (simulation.running) DemoColors.AccentWarn else DemoColors.AccentYou,
             )
             GhostButton(
                 label = "Speed ${simulation.speed}x",
                 onClick = { onCommand("speed") },
                 modifier = Modifier.weight(1f),
+                enabled = pendingCommand == null,
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -271,26 +327,59 @@ private fun SimulationMovementCard(
                 label = "Reset",
                 onClick = { onCommand("reset") },
                 modifier = Modifier.weight(1f),
+                enabled = pendingCommand == null,
             )
             GhostButton(
                 label = "News shock",
                 onClick = { onCommand("shock") },
                 modifier = Modifier.weight(1f),
+                enabled = pendingCommand == null,
             )
         }
         Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            RegimeModeButton(
+                label = "Bullish",
+                selected = simulation.regime == "bullish",
+                accent = DemoColors.AccentLong,
+                onClick = { onCommand("regime/bullish") },
+                modifier = Modifier.weight(1f),
+                enabled = pendingCommand == null,
+            )
+            RegimeModeButton(
+                label = "Bearish",
+                selected = simulation.regime == "bearish",
+                accent = DemoColors.AccentShort,
+                onClick = { onCommand("regime/bearish") },
+                modifier = Modifier.weight(1f),
+                enabled = pendingCommand == null,
+            )
+            RegimeModeButton(
+                label = "Volatile",
+                selected = simulation.regime == "volatile",
+                accent = DemoColors.AccentWarn,
+                onClick = { onCommand("regime/volatile") },
+                modifier = Modifier.weight(1f),
+                enabled = pendingCommand == null,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
         Text(
-            "Simulated traders submit beliefs into the same quote engine. Accepted trades update the crowd curve, add fees to makers, and leave a tape below.",
+            "Pick a regime to show clustered higher beliefs, clustered lower beliefs, or aggressive two-sided flow. The asymmetric shading is a visual pressure layer; settlement still uses the Normal quote engine.",
             color = DemoColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
         if (previousMu != null && previousSigma != null && currentMu != null && currentSigma != null) {
             Spacer(Modifier.height(12.dp))
             DistributionChart(
-                crowdMu = previousMu,
-                crowdSigma = previousSigma,
-                yourMu = currentMu,
-                yourSigma = currentSigma,
+                crowdMu = animatedPreviousMu,
+                crowdSigma = animatedPreviousSigma,
+                yourMu = animatedCurrentMu,
+                yourSigma = animatedCurrentSigma,
+                crowdSkew = animatedPreviousSkew,
+                yourSkew = animatedCurrentSkew,
+                domainMin = 0.0,
+                domainMax = 100.0,
                 height = 150.dp,
             )
         }
@@ -323,6 +412,22 @@ private fun SimulationMovementCard(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+    }
+}
+
+@Composable
+private fun RegimeModeButton(
+    label: String,
+    selected: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    if (selected) {
+        PrimaryButton(label = label, onClick = onClick, modifier = modifier, enabled = enabled, accent = accent)
+    } else {
+        GhostButton(label = label, onClick = onClick, modifier = modifier, enabled = enabled)
     }
 }
 

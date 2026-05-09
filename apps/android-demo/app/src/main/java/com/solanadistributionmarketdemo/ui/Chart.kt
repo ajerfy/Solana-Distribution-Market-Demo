@@ -19,8 +19,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.solanadistributionmarketdemo.core.normalPdf
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.PI
+import kotlin.math.sqrt
 
 @Composable
 fun DistributionChart(
@@ -28,6 +31,10 @@ fun DistributionChart(
     crowdSigma: Double,
     yourMu: Double?,
     yourSigma: Double?,
+    crowdSkew: Double = 0.0,
+    yourSkew: Double = 0.0,
+    domainMin: Double? = null,
+    domainMax: Double? = null,
     realizedOutcome: Double? = null,
     height: Dp = 240.dp,
     modifier: Modifier = Modifier,
@@ -35,8 +42,8 @@ fun DistributionChart(
     val muMin = listOfNotNull(crowdMu, yourMu).min()
     val muMax = listOfNotNull(crowdMu, yourMu).max()
     val widestSigma = max(crowdSigma, yourSigma ?: crowdSigma)
-    val xLow = muMin - widestSigma * 4.0
-    val xHigh = muMax + widestSigma * 4.0
+    val xLow = domainMin ?: (muMin - widestSigma * 4.0)
+    val xHigh = domainMax ?: (muMax + widestSigma * 4.0)
 
     val plotBg = DemoColors.SurfaceElevated
     val gridLine = if (DemoColors.isLight) Color(0x141B2034) else Color(0x10FFFFFF)
@@ -70,9 +77,9 @@ fun DistributionChart(
         for (i in 0 until samples) {
             val t = i.toDouble() / (samples - 1)
             val x = xLow + (xHigh - xLow) * t
-            crowdPts[i] = normalPdf(x, crowdMu, crowdSigma)
+            crowdPts[i] = visualDistributionPdf(x, crowdMu, crowdSigma, crowdSkew)
             if (yourPts != null && yourMu != null && yourSigma != null) {
-                yourPts[i] = normalPdf(x, yourMu, yourSigma)
+                yourPts[i] = visualDistributionPdf(x, yourMu, yourSigma, yourSkew)
                 if (yourPts[i] > maxY) maxY = yourPts[i]
             }
             if (crowdPts[i] > maxY) maxY = crowdPts[i]
@@ -175,4 +182,18 @@ fun DistributionChart(
             drawCircle(color = warnLine, radius = 6f, center = Offset(rx, padTop + plotH))
         }
     }
+}
+
+private fun visualDistributionPdf(x: Double, mu: Double, sigma: Double, skew: Double): Double {
+    if (abs(skew) < 0.01) return normalPdf(x, mu, sigma)
+    val safeSigma = sigma.coerceAtLeast(0.000001)
+    val skewAmount = (abs(skew) / 7.0).coerceIn(0.0, 1.0)
+    val tailSigma = safeSigma * (1.0 + 1.35 * skewAmount)
+    val tightSigma = safeSigma * (1.0 - 0.35 * skewAmount)
+    val leftSigma = if (skew < 0.0) tailSigma else tightSigma
+    val rightSigma = if (skew < 0.0) tightSigma else tailSigma
+    val sideSigma = if (x < mu) leftSigma else rightSigma
+    val z = (x - mu) / sideSigma
+    val normalizer = sqrt(2.0 / PI) / (leftSigma + rightSigma)
+    return normalizer * exp(-0.5 * z * z)
 }

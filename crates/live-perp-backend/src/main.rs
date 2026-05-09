@@ -1,5 +1,12 @@
 use axum::{
-    Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::{get, post},
+    Json, Router,
+    extract::State,
+    http::StatusCode,
+    response::{
+        IntoResponse,
+        sse::{Event, KeepAlive, Sse},
+    },
+    routing::{get, post},
 };
 use distribution_markets::{
     Fixed, FixedNormalDistribution, fixed_calculate_f, fixed_calculate_lambda,
@@ -11,12 +18,14 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
+    convert::Infallible,
     env, fs,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{net::TcpListener, sync::RwLock, time::sleep};
+use tokio_stream::{Stream, StreamExt, wrappers::IntervalStream};
 
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8787";
 const DEFAULT_ASSET_PATH: &str = "apps/android-demo/app/src/main/assets/demo_ufc328.json";
@@ -111,16 +120,26 @@ struct PolyMarketSnapshot {
 }
 
 #[derive(Clone, Debug)]
+struct SimulationSourceState {
+    live_event: PolyMarketSnapshot,
+    slot: u64,
+}
+
+#[derive(Clone, Debug)]
 struct MarketSimulationState {
     initialized: bool,
     running: bool,
+    regime: String,
     scenario: String,
     speed: u32,
     tick: u64,
+    revision: u64,
     current_mu: f64,
     current_sigma: f64,
+    current_skew: f64,
     previous_mu: f64,
     previous_sigma: f64,
+    previous_skew: f64,
     target_shift: f64,
     shock_remaining: u32,
     total_volume: f64,
@@ -237,8 +256,8 @@ async fn main() -> Result<(), String> {
         env::var("PARABOLA_PYTH_SYMBOL").unwrap_or_else(|_| DEFAULT_SOL_QUERY.to_string());
     let solana_rpc =
         env::var("PARABOLA_SOLANA_RPC").unwrap_or_else(|_| DEFAULT_SOLANA_RPC.to_string());
-    let poly_gamma_base =
-        env::var("PARABOLA_POLY_GAMMA_BASE").unwrap_or_else(|_| DEFAULT_POLY_GAMMA_BASE.to_string());
+    let poly_gamma_base = env::var("PARABOLA_POLY_GAMMA_BASE")
+        .unwrap_or_else(|_| DEFAULT_POLY_GAMMA_BASE.to_string());
     let poly_clob_base =
         env::var("PARABOLA_POLY_CLOB_BASE").unwrap_or_else(|_| DEFAULT_POLY_CLOB_BASE.to_string());
     let poly_market_slug =
@@ -291,9 +310,11 @@ async fn main() -> Result<(), String> {
         status: initial_status,
     }));
     let simulation = Arc::new(RwLock::new(MarketSimulationState::new()));
+    let simulation_source = Arc::new(RwLock::new(None::<SimulationSourceState>));
 
     let update_state = snapshot.clone();
     let update_simulation = simulation.clone();
+    let update_simulation_source = simulation_source.clone();
     let update_client = client.clone();
     let update_base_payload = base_payload.clone();
     let update_feed = feed.clone();
@@ -307,6 +328,7 @@ async fn main() -> Result<(), String> {
                 &update_poly,
                 &update_feed,
                 &update_simulation,
+                &update_simulation_source,
                 &mut history,
             )
             .await
@@ -321,8 +343,14 @@ async fn main() -> Result<(), String> {
                         mode: "degraded".to_string(),
                         status: "Degraded".to_string(),
                         source: "Polymarket + Pyth Hermes".to_string(),
-                        symbol: format!("{} + {}", update_poly.market_slug, update_feed.symbol_query),
-                        endpoint: format!("{} | {}", update_poly.gamma_base, update_feed.hermes_base),
+                        symbol: format!(
+                            "{} + {}",
+                            update_poly.market_slug, update_feed.symbol_query
+                        ),
+                        endpoint: format!(
+                            "{} | {}",
+                            update_poly.gamma_base, update_feed.hermes_base
+                        ),
                         chain: "Solana devnet".to_string(),
                         feed_id: Some(update_feed.feed_id.clone()),
                         slot: guard.status.slot,
@@ -339,16 +367,37 @@ async fn main() -> Result<(), String> {
         }
     });
 
+    let simulation_loop_state = simulation.clone();
+    let simulation_loop_source = simulation_source.clone();
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_millis(450));
+        loop {
+            ticker.tick().await;
+            let source = simulation_loop_source.read().await.clone();
+            if let Some(source) = source {
+                let mut guard = simulation_loop_state.write().await;
+                if let Err(error) = guard.advance_background(&source.live_event, source.slot) {
+                    guard.last_error = Some(error);
+                }
+            }
+        }
+    });
+
     let app = Router::new()
         .route("/healthz", get(healthz))
         .route("/api/demo-payload", get(get_payload))
         .route("/api/live/status", get(get_status))
         .route("/api/simulation/status", get(get_simulation_status))
+        .route("/api/simulation/stream", get(stream_simulation))
         .route("/api/simulation/start", post(start_simulation))
         .route("/api/simulation/pause", post(pause_simulation))
         .route("/api/simulation/reset", post(reset_simulation))
         .route("/api/simulation/speed", post(cycle_simulation_speed))
         .route("/api/simulation/shock", post(trigger_simulation_shock))
+        .route("/api/simulation/regime/drift", post(set_drift_regime))
+        .route("/api/simulation/regime/bullish", post(set_bullish_regime))
+        .route("/api/simulation/regime/bearish", post(set_bearish_regime))
+        .route("/api/simulation/regime/volatile", post(set_volatile_regime))
         .with_state(AppContext {
             snapshot,
             simulation,
@@ -396,46 +445,107 @@ async fn get_simulation_status(State(context): State<AppContext>) -> impl IntoRe
     (StatusCode::OK, Json(guard.status_json()))
 }
 
+async fn stream_simulation(
+    State(context): State<AppContext>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let simulation = context.simulation.clone();
+    let stream =
+        IntervalStream::new(tokio::time::interval(Duration::from_millis(250))).then(move |_| {
+            let simulation = simulation.clone();
+            async move {
+                let payload = {
+                    let guard = simulation.read().await;
+                    guard.to_payload()
+                };
+                let data = serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string());
+                Ok::<Event, Infallible>(Event::default().event("simulation").data(data))
+            }
+        });
+
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(5))
+            .text("keep-alive"),
+    )
+}
+
 async fn start_simulation(State(context): State<AppContext>) -> impl IntoResponse {
     let mut guard = context.simulation.write().await;
     guard.running = true;
     guard.scenario = if guard.shock_remaining > 0 {
         "Information shock".to_string()
+    } else if guard.regime == "bullish" {
+        "Bullish conviction".to_string()
+    } else if guard.regime == "bearish" {
+        "Bearish conviction".to_string()
+    } else if guard.regime == "volatile" {
+        "Two-sided volatility".to_string()
     } else {
         "Consensus drift".to_string()
     };
-    (StatusCode::OK, Json(guard.status_json()))
+    guard.bump_revision();
+    (StatusCode::OK, Json(guard.to_payload()))
 }
 
 async fn pause_simulation(State(context): State<AppContext>) -> impl IntoResponse {
     let mut guard = context.simulation.write().await;
     guard.running = false;
-    (StatusCode::OK, Json(guard.status_json()))
+    guard.bump_revision();
+    (StatusCode::OK, Json(guard.to_payload()))
 }
 
 async fn reset_simulation(State(context): State<AppContext>) -> impl IntoResponse {
     let mut guard = context.simulation.write().await;
+    let next_revision = guard.revision + 1;
     *guard = MarketSimulationState::new();
-    (StatusCode::OK, Json(guard.status_json()))
+    guard.revision = next_revision;
+    (StatusCode::OK, Json(guard.to_payload()))
 }
 
 async fn cycle_simulation_speed(State(context): State<AppContext>) -> impl IntoResponse {
     let mut guard = context.simulation.write().await;
     guard.speed = match guard.speed {
-        0 | 1 => 3,
-        3 => 8,
+        0 | 1 => 4,
+        4 => 12,
         _ => 1,
     };
-    (StatusCode::OK, Json(guard.status_json()))
+    guard.bump_revision();
+    (StatusCode::OK, Json(guard.to_payload()))
 }
 
 async fn trigger_simulation_shock(State(context): State<AppContext>) -> impl IntoResponse {
     let mut guard = context.simulation.write().await;
     guard.running = true;
+    guard.regime = "shock".to_string();
     guard.scenario = "Information shock".to_string();
-    guard.shock_remaining = 12;
-    guard.target_shift = if guard.current_mu < 55.0 { 12.0 } else { -12.0 };
-    (StatusCode::OK, Json(guard.status_json()))
+    guard.shock_remaining = 24;
+    guard.target_shift = if guard.current_mu < 55.0 { 24.0 } else { -24.0 };
+    guard.bump_revision();
+    (StatusCode::OK, Json(guard.to_payload()))
+}
+
+async fn set_drift_regime(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.set_regime("drift");
+    (StatusCode::OK, Json(guard.to_payload()))
+}
+
+async fn set_bullish_regime(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.toggle_regime("bullish");
+    (StatusCode::OK, Json(guard.to_payload()))
+}
+
+async fn set_bearish_regime(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.toggle_regime("bearish");
+    (StatusCode::OK, Json(guard.to_payload()))
+}
+
+async fn set_volatile_regime(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.toggle_regime("volatile");
+    (StatusCode::OK, Json(guard.to_payload()))
 }
 
 async fn refresh_snapshot(
@@ -444,6 +554,7 @@ async fn refresh_snapshot(
     poly: &PolyConfig,
     feed: &FeedConfig,
     simulation: &Arc<RwLock<MarketSimulationState>>,
+    simulation_source: &Arc<RwLock<Option<SimulationSourceState>>>,
     history: &mut Vec<PerpFundingPoint>,
 ) -> Result<BackendSnapshot, String> {
     let live_event = fetch_polymarket_snapshot(client, poly).await?;
@@ -451,6 +562,14 @@ async fn refresh_snapshot(
     let slot = fetch_solana_slot(client, &feed.solana_rpc)
         .await
         .unwrap_or(oracle.publish_time);
+
+    {
+        let mut source_guard = simulation_source.write().await;
+        *source_guard = Some(SimulationSourceState {
+            live_event: live_event.clone(),
+            slot,
+        });
+    }
 
     let live_payload = {
         let mut simulation_guard = simulation.write().await;
@@ -633,9 +752,13 @@ async fn fetch_polymarket_snapshot(
 
     let token_id = &token_ids[config.outcome_index];
     let midpoint = fetch_clob_midpoint(client, &config.clob_base, token_id).await?;
-    let spread = fetch_clob_spread(client, &config.clob_base, token_id).await.ok();
+    let spread = fetch_clob_spread(client, &config.clob_base, token_id)
+        .await
+        .ok();
     let (best_bid, best_ask) = fetch_clob_best_bid_ask(client, &config.clob_base, token_id).await?;
-    let probability = midpoint.unwrap_or(prices[config.outcome_index]).clamp(0.0, 1.0);
+    let probability = midpoint
+        .unwrap_or(prices[config.outcome_index])
+        .clamp(0.0, 1.0);
     let no_probability = (1.0 - probability).clamp(0.0, 1.0);
     let spread_value = spread.or_else(|| match (best_bid, best_ask) {
         (Some(bid), Some(ask)) => Some((ask - bid).max(0.0)),
@@ -799,7 +922,8 @@ fn build_live_payload(
         history.drain(0..drop_count);
     }
 
-    let simulation_payload = simulation.advance(live_event, slot)?;
+    simulation.ensure_initialized(live_event, slot);
+    let simulation_payload = simulation.to_payload();
     let event_mu = simulation.current_mu;
     let event_sigma = simulation.current_sigma;
     let mut simulated_event = live_event.clone();
@@ -808,8 +932,7 @@ fn build_live_payload(
     simulated_event.sigma = event_sigma;
     let mut event_program = seeded_demo_market()?;
     set_program_distribution(&mut event_program, event_mu, event_sigma)?;
-    let event_presets =
-        build_live_event_presets(&event_program, &simulated_event, slot)?;
+    let event_presets = build_live_event_presets(&event_program, &simulated_event, slot)?;
     let event_quote_grid = build_live_event_quote_grid(&event_program, &simulated_event, slot)?;
 
     let mut program = seeded_demo_market()?;
@@ -1035,7 +1158,8 @@ fn build_live_event_quote_grid(
             let mu = clamp_probability_percent(center_mu + mu_offset);
             let id = format!("grid-{mu:.1}-{sigma:.1}");
             let label = format!("Grid quote for mu {mu:.1}, sigma {sigma:.1}");
-            if let Ok(quote) = build_live_event_quote_preset(program, &id, &label, mu, sigma, slot) {
+            if let Ok(quote) = build_live_event_quote_preset(program, &id, &label, mu, sigma, slot)
+            {
                 grid.push(quote);
             }
         }
@@ -1120,13 +1244,17 @@ impl MarketSimulationState {
         Self {
             initialized: false,
             running: false,
+            regime: "drift".to_string(),
             scenario: "Consensus drift".to_string(),
             speed: 1,
             tick: 0,
+            revision: 0,
             current_mu: 50.0,
             current_sigma: 10.0,
+            current_skew: 0.0,
             previous_mu: 50.0,
             previous_sigma: 10.0,
+            previous_skew: 0.0,
             target_shift: 0.0,
             shock_remaining: 0,
             total_volume: 0.0,
@@ -1142,49 +1270,93 @@ impl MarketSimulationState {
     fn status_json(&self) -> Value {
         json!({
             "running": self.running,
+            "regime": self.regime,
             "scenario": self.scenario,
             "speed": self.speed,
             "tick": self.tick,
+            "revision": self.revision,
             "trade_count": self.trade_count,
             "accepted_count": self.accepted_count,
             "current_mu_display": format9(self.current_mu),
             "current_sigma_display": format9(self.current_sigma),
+            "current_skew_display": format9(self.current_skew),
+            "previous_skew_display": format9(self.previous_skew),
             "last_error": &self.last_error,
         })
     }
 
-    fn advance(&mut self, live_event: &PolyMarketSnapshot, slot: u64) -> Result<Value, String> {
-        self.ensure_initialized(live_event, slot);
-        if self.running {
-            let steps = self.speed.clamp(1, 8);
-            for _ in 0..steps {
-                self.apply_trade_tick(live_event, slot)?;
-            }
-        }
-        Ok(self.to_payload())
+    fn set_regime(&mut self, regime: &str) {
+        self.running = true;
+        self.regime = regime.to_string();
+        self.shock_remaining = 0;
+        self.target_shift = 0.0;
+        self.scenario = match regime {
+            "bullish" => "Bullish conviction".to_string(),
+            "bearish" => "Bearish conviction".to_string(),
+            "volatile" => "Two-sided volatility".to_string(),
+            _ => "Consensus drift".to_string(),
+        };
+        let target_skew = self.regime_target_skew();
+        self.current_skew = target_skew;
+        self.previous_skew = target_skew;
+        self.bump_revision();
     }
 
-    fn ensure_initialized(&mut self, live_event: &PolyMarketSnapshot, slot: u64) {
+    fn bump_revision(&mut self) {
+        self.revision = self.revision.saturating_add(1);
+    }
+
+    fn toggle_regime(&mut self, regime: &str) {
+        if self.regime == regime {
+            self.set_regime("drift");
+        } else {
+            self.set_regime(regime);
+        }
+    }
+
+    fn advance_background(
+        &mut self,
+        live_event: &PolyMarketSnapshot,
+        slot: u64,
+    ) -> Result<(), String> {
+        self.ensure_initialized(live_event, slot);
+        if self.running {
+            let steps = self.speed.clamp(1, 12);
+            for _ in 0..steps {
+                self.apply_trade_tick(live_event, slot + self.tick)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn ensure_initialized(&mut self, _live_event: &PolyMarketSnapshot, slot: u64) {
         if self.initialized {
             return;
         }
         self.initialized = true;
-        self.current_mu = (live_event.probability * 100.0).clamp(1.0, 99.0);
-        self.current_sigma = live_event.sigma.clamp(4.0, 18.0);
+        self.current_mu = 50.0;
+        self.current_sigma = 10.0;
+        self.current_skew = 0.0;
         self.previous_mu = self.current_mu;
         self.previous_sigma = self.current_sigma;
+        self.previous_skew = self.current_skew;
         self.history.clear();
         self.tape.clear();
-        self.push_history(slot, "Starting live consensus");
+        self.push_history(slot, "Neutral market baseline");
     }
 
-    fn apply_trade_tick(&mut self, live_event: &PolyMarketSnapshot, slot: u64) -> Result<(), String> {
+    fn apply_trade_tick(
+        &mut self,
+        live_event: &PolyMarketSnapshot,
+        slot: u64,
+    ) -> Result<(), String> {
         self.tick += 1;
         let external_mu = (live_event.probability * 100.0).clamp(1.0, 99.0);
         let external_sigma = live_event.sigma.clamp(4.0, 18.0);
         let shock = if self.shock_remaining > 0 {
             self.shock_remaining -= 1;
             if self.shock_remaining == 0 {
+                self.regime = "drift".to_string();
                 self.scenario = "Consensus drift".to_string();
                 self.target_shift = 0.0;
             }
@@ -1192,16 +1364,19 @@ impl MarketSimulationState {
         } else {
             0.0
         };
-        let target_consensus = (external_mu + shock).clamp(1.0, 99.0);
+        let target_consensus = self.regime_target_consensus(external_mu + shock);
         let (agent_type, handle, action, reason, target_mu, target_sigma) =
             self.agent_proposal(target_consensus, external_sigma);
+        let target_skew = self.regime_target_skew();
 
         match self.quote_transition(target_mu, target_sigma, slot) {
             Ok((collateral, fee, total_debit)) => {
                 self.previous_mu = self.current_mu;
                 self.previous_sigma = self.current_sigma;
+                self.previous_skew = self.current_skew;
                 self.current_mu = target_mu;
                 self.current_sigma = target_sigma;
+                self.current_skew = target_skew;
                 self.total_volume += total_debit;
                 self.fees_earned += fee;
                 self.trade_count += 1;
@@ -1243,8 +1418,49 @@ impl MarketSimulationState {
                 });
             }
         }
+        self.bump_revision();
 
         Ok(())
+    }
+
+    fn regime_target_consensus(&self, base_consensus: f64) -> f64 {
+        match self.regime.as_str() {
+            "bullish" => (base_consensus + 24.0).clamp(70.0, 96.0),
+            "bearish" => (base_consensus - 45.0).clamp(4.0, 35.0),
+            "volatile" => {
+                let wave = if (self.tick / 4) % 2 == 0 {
+                    30.0
+                } else {
+                    -30.0
+                };
+                let pulse = (pseudo_unit(self.tick + 91) - 0.5) * 10.0;
+                (base_consensus + wave + pulse).clamp(1.0, 99.0)
+            }
+            _ => base_consensus.clamp(1.0, 99.0),
+        }
+    }
+
+    fn regime_target_skew(&self) -> f64 {
+        match self.regime.as_str() {
+            // Visual pressure layer only: settlement pricing remains Normal-only.
+            "bullish" => -7.0,
+            "bearish" => 7.0,
+            "volatile" => {
+                if (self.tick / 3) % 2 == 0 {
+                    -6.0
+                } else {
+                    6.0
+                }
+            }
+            "shock" => {
+                if self.target_shift >= 0.0 {
+                    -5.0
+                } else {
+                    5.0
+                }
+            }
+            _ => 0.0,
+        }
     }
 
     fn agent_proposal(
@@ -1255,46 +1471,84 @@ impl MarketSimulationState {
         let noise = pseudo_unit(self.tick + 17) - 0.5;
         let momentum = self.current_mu - self.previous_mu;
         let agent_index = (self.tick % 5) as usize;
+        if self.regime == "bullish" {
+            let breath = (pseudo_unit(self.tick + 31) - 0.5) * 4.5;
+            return (
+                "Bullish".to_string(),
+                format!("bull_{}", 100 + agent_index),
+                "bids higher with confidence".to_string(),
+                "Bullish traders are clustered above the live consensus, tightening confidence and leaving a left-tail risk shadow.".to_string(),
+                (self.current_mu * 0.25 + target_consensus * 0.75 + breath).clamp(70.0, 96.0),
+                (4.4 + pseudo_unit(self.tick + 37) * 2.4).clamp(4.0, 8.0),
+            );
+        }
+        if self.regime == "bearish" {
+            let breath = (pseudo_unit(self.tick + 43) - 0.5) * 4.5;
+            return (
+                "Bearish".to_string(),
+                format!("bear_{}", 100 + agent_index),
+                "offers lower with confidence".to_string(),
+                "Bearish traders are clustered below the live consensus, tightening confidence and leaving a right-tail risk shadow.".to_string(),
+                (self.current_mu * 0.25 + target_consensus * 0.75 + breath).clamp(4.0, 35.0),
+                (4.4 + pseudo_unit(self.tick + 47) * 2.4).clamp(4.0, 8.0),
+            );
+        }
+        if self.regime == "volatile" {
+            let direction = if (self.tick / 4) % 2 == 0 { 1.0 } else { -1.0 };
+            return (
+                "Volatile".to_string(),
+                format!("vol_{}", 100 + agent_index),
+                "hits both sides aggressively".to_string(),
+                "Two-sided flow keeps dragging the estimate back and forth while confidence widens.".to_string(),
+                (self.current_mu
+                    + (target_consensus - self.current_mu) * 1.05
+                    + direction * (5.0 + pseudo_unit(self.tick + 53) * 6.0))
+                    .clamp(1.0, 99.0),
+                (self.current_sigma * 1.20 + 4.0 + pseudo_unit(self.tick + 59) * 4.0)
+                    .clamp(10.0, 18.0),
+            );
+        }
         let (agent, handle, action, raw_mu, raw_sigma, reason) = match agent_index {
             0 => (
                 "Informed",
                 "model_alpha",
                 "leans toward fresh information",
-                self.current_mu + (target_consensus - self.current_mu) * 0.46 + noise * 1.2,
-                self.current_sigma * 0.92 + external_sigma * 0.08,
+                self.current_mu + (target_consensus - self.current_mu) * 0.88 + noise * 3.5,
+                self.current_sigma * 0.78 + external_sigma * 0.22,
                 "An informed trader pulls the curve toward the latest consensus.",
             ),
             1 => (
                 "Momentum",
                 "trend_721",
                 "follows the last move",
-                self.current_mu + momentum * 1.25 + noise * 1.7,
-                self.current_sigma * (0.98 + pseudo_unit(self.tick + 3) * 0.08),
+                self.current_mu + momentum * 2.15 + noise * 5.0,
+                self.current_sigma * (0.90 + pseudo_unit(self.tick + 3) * 0.22),
                 "A momentum trader extends the recent direction.",
             ),
             2 => (
                 "Noisy",
                 "anon_noise",
                 "adds disagreement",
-                self.current_mu + noise * 5.2,
-                self.current_sigma * (0.88 + pseudo_unit(self.tick + 5) * 0.28),
+                self.current_mu + noise * 16.0,
+                self.current_sigma * (0.72 + pseudo_unit(self.tick + 5) * 0.70),
                 "A noisy trader adds short-term disagreement to the market.",
             ),
             3 => (
                 "Contrarian",
                 "fade_shop",
                 "fades the crowd",
-                self.current_mu + (target_consensus - self.current_mu) * 0.18 - momentum * 0.75,
-                self.current_sigma * 1.04,
+                self.current_mu + (target_consensus - self.current_mu) * 0.42 - momentum * 1.35
+                    + noise * 4.0,
+                self.current_sigma * 1.18,
                 "A contrarian trader fades the last move.",
             ),
             _ => (
                 "Risk-limited",
                 "small_size",
                 "nudges within budget",
-                self.current_mu + (target_consensus - self.current_mu) * 0.22 + noise * 0.8,
-                self.current_sigma * 0.98 + external_sigma * 0.02,
-                "A smaller trader nudges the curve without taking much risk.",
+                self.current_mu + (target_consensus - self.current_mu) * 0.55 + noise * 2.5,
+                self.current_sigma * 0.88 + external_sigma * 0.12,
+                "A smaller trader still moves the curve visibly.",
             ),
         };
 
@@ -1303,9 +1557,13 @@ impl MarketSimulationState {
         if (target_mu - self.current_mu).abs() < 0.12
             && (target_sigma - self.current_sigma).abs() < 0.08
         {
-            let sign = if target_consensus >= self.current_mu { 1.0 } else { -1.0 };
-            target_mu = (target_mu + sign * 0.35).clamp(1.0, 99.0);
-            target_sigma = (target_sigma * 1.015).clamp(4.0, 18.0);
+            let sign = if target_consensus >= self.current_mu {
+                1.0
+            } else {
+                -1.0
+            };
+            target_mu = (target_mu + sign * 2.5).clamp(1.0, 99.0);
+            target_sigma = (target_sigma * 1.08).clamp(4.0, 18.0);
         }
 
         (
@@ -1325,6 +1583,9 @@ impl MarketSimulationState {
         slot: u64,
     ) -> Result<(f64, f64, f64), String> {
         let mut program = seeded_demo_market()?;
+        program.state.core_market.config.max_collateral_per_trade = Fixed::from_f64(100.0)?;
+        program.state.market_account.max_collateral_per_trade =
+            program.state.core_market.config.max_collateral_per_trade;
         set_program_distribution(&mut program, self.current_mu, self.current_sigma)?;
         let target_distribution = FixedNormalDistribution::new(
             Fixed::from_f64(target_mu)?,
@@ -1373,15 +1634,19 @@ impl MarketSimulationState {
     fn to_payload(&self) -> Value {
         json!({
             "running": self.running,
+            "regime": self.regime,
             "scenario": self.scenario,
             "speed": self.speed,
             "tick": self.tick,
+            "revision": self.revision,
             "trade_count": self.trade_count,
             "accepted_count": self.accepted_count,
             "current_mu_display": format9(self.current_mu),
             "current_sigma_display": format9(self.current_sigma),
+            "current_skew_display": format9(self.current_skew),
             "previous_mu_display": format9(self.previous_mu),
             "previous_sigma_display": format9(self.previous_sigma),
+            "previous_skew_display": format9(self.previous_skew),
             "total_volume_display": format9(self.total_volume),
             "fees_earned_display": format9(self.fees_earned),
             "last_error": &self.last_error,
