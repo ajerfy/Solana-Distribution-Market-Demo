@@ -1,0 +1,75 @@
+.app {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.panel {
+  background: #161b26;
+  border: 1px solid #2a3344;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.panel h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #9aa3b5;
+  word-break: break-all;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+button {
+  cursor: pointer;
+  background: #2b6cff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #ff8a8a;
+  font-size: 0.9rem;
+}
+
+.success {
+  color: #8dd4a0;
+  font-size: 0.9rem;
+}
+
+dl.grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
+dl.grid dt {
+  color: #9aa3b5;
+  margin: 0;
+}
+
+dl.grid dd {
+  margin: 0;
+}

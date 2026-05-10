@@ -92,3 +92,16 @@ To run the live backend locally:
 cd "/Users/your-username/Solana Distribution Market Demo"
 source $HOME/.cargo/env
 cargo run -p live-perp-backend
+```
+
+## Web app (scaffold)
+
+A Vite + React client lives in [`apps/web`](apps/web). It calls the same `GET /api/demo-payload` and `GET /healthz` as the mobile app. The backend enables **CORS** for local dev (`http://localhost:5173` by default); override with **`PARABOLA_CORS_ORIGINS`** (comma-separated) when you deploy.
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Set **`VITE_PARABOLA_API_BASE`** in `apps/web/.env` if the API is not at `http://127.0.0.1:8787`

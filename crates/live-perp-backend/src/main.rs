@@ -1,7 +1,7 @@
 use axum::{
     Json, Router,
     extract::State,
-    http::StatusCode,
+    http::{HeaderValue, Method, StatusCode},
     response::{
         IntoResponse,
         sse::{Event, KeepAlive, Sse},
@@ -26,6 +26,7 @@ use std::{
 };
 use tokio::{net::TcpListener, sync::RwLock, time::sleep};
 use tokio_stream::{Stream, StreamExt, wrappers::IntervalStream};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8787";
 const DEFAULT_ASSET_PATH: &str = "apps/android-demo/app/src/main/assets/demo_ufc328.json";
@@ -244,6 +245,34 @@ struct RpcSlotResponse {
     result: Option<u64>,
 }
 
+/// Browsers enforce CORS; the Android app does not. Comma-separated allowed `Origin` header values.
+fn parabola_cors_layer() -> CorsLayer {
+    const DEFAULT_ORIGINS: &str =
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000";
+    let raw = env::var("PARABOLA_CORS_ORIGINS").unwrap_or_else(|_| DEFAULT_ORIGINS.to_string());
+    let origins: Vec<HeaderValue> = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| HeaderValue::from_str(s).ok())
+        .collect();
+    let effective = if origins.is_empty() {
+        DEFAULT_ORIGINS
+            .split(',')
+            .filter_map(|s| HeaderValue::from_str(s.trim()).ok())
+            .collect()
+    } else {
+        origins
+    };
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(effective))
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+        ])
+}
+
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let bind_addr =
@@ -401,7 +430,8 @@ async fn main() -> Result<(), String> {
         .with_state(AppContext {
             snapshot,
             simulation,
-        });
+        })
+        .layer(parabola_cors_layer());
 
     let addr: SocketAddr = bind_addr
         .parse()
@@ -411,6 +441,13 @@ async fn main() -> Result<(), String> {
         .map_err(|error| format!("failed to bind {addr}: {error}"))?;
 
     println!("Parabola live perp backend listening on http://{addr}");
+    println!(
+        "CORS allowed origins (PARABOLA_CORS_ORIGINS): {}",
+        env::var("PARABOLA_CORS_ORIGINS").unwrap_or_else(|_| {
+            "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+                .to_string()
+        })
+    );
     println!("Using Polymarket market slug {poly_market_slug}");
     println!("Using Hermes feed {symbol_query} ({feed_id})");
 
