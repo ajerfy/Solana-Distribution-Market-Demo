@@ -30,8 +30,21 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.channels.UnresolvedAddressException
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicReference
 
-private const val DEVNET_RPC_URL = "https://api.devnet.solana.com"
+/**
+ * Devnet JSON-RPC bases to try in order. Some devices/OEM builds fail DNS for the official
+ * hostname only; Chrome can still work because it may use a different resolver path or DNS-over-HTTPS.
+ * See: https://docs.solana.com/cluster/rpc-endpoints (official) and public alternates such as Ankr.
+ */
+private val DEVNET_RPC_CANDIDATES = listOf(
+    "https://api.devnet.solana.com",
+    "https://rpc.ankr.com/solana_devnet",
+)
+
+/** Remember which base URL worked so blockhash, send, and confirm stay consistent. */
+private val activeDevnetRpcBase = AtomicReference<String?>(null)
+
 private const val MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
 private const val IDENTITY_NAME = "Parabola"
 
@@ -145,14 +158,17 @@ object WalletSubmitter {
         // Confirmation is best-effort. We use HttpURLConnection (system stack) instead of
         // SolanaRpcClient + KtorNetworkDriver because Ktor's CIO engine fails DNS on Seeker.
         try {
-            withContext(Dispatchers.IO) { confirmSignatureViaHttpURLConnection(signatureBase58) }
+            withContext(Dispatchers.IO) {
+                val base = activeDevnetRpcBase.get() ?: DEVNET_RPC_CANDIDATES.first()
+                confirmSignatureViaHttpURLConnection(signatureBase58, base)
+            }
         } catch (_: Exception) {
             // Already broadcast; UI shows success with the signature. Confirmation isn't critical.
         }
     }
 
-    private fun confirmSignatureViaHttpURLConnection(signatureBase58: String) {
-        val conn = (URL(DEVNET_RPC_URL).openConnection() as HttpURLConnection).apply {
+    private fun confirmSignatureViaHttpURLConnection(signatureBase58: String, rpcBaseUrl: String) {
+        val conn = (URL(rpcBaseUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 6_000
             readTimeout = 6_000
@@ -256,59 +272,78 @@ object WalletSubmitter {
      * CIO's NIO selector throws UnresolvedAddressException for hosts the OS resolves fine.
      */
     private suspend fun fetchRecentBlockhashWithRetry(): String = withContext(Dispatchers.IO) {
-        // Try a plain DNS resolve first so we can tell DNS-vs-connect apart in the error.
-        try {
-            java.net.InetAddress.getAllByName("api.devnet.solana.com")
-        } catch (host: java.net.UnknownHostException) {
-            throw IllegalStateException(
-                "DNS resolution failed for api.devnet.solana.com from this app (UnknownHostException). The OS resolver may be restricting this app — check Settings → Apps → Parabola → Mobile data & WiFi → both on, and Battery → Unrestricted.",
-                host,
-            )
-        }
+        val preferred = activeDevnetRpcBase.get()
+        val ordered =
+            if (preferred != null) {
+                listOf(preferred) + DEVNET_RPC_CANDIDATES.filter { it != preferred }
+            } else {
+                DEVNET_RPC_CANDIDATES
+            }
 
+        val failures = mutableListOf<String>()
         var lastError: Throwable? = null
-        repeat(3) { attempt ->
-            try {
-                return@withContext fetchBlockhashViaHttpURLConnection()
-            } catch (error: UnresolvedAddressException) {
-                lastError = error
-                delay(200L * (attempt + 1))
-            } catch (error: java.net.UnknownHostException) {
-                lastError = error
-                delay(200L * (attempt + 1))
-            } catch (error: java.net.ConnectException) {
-                lastError = error
-                delay(200L * (attempt + 1))
-            } catch (error: java.net.SocketTimeoutException) {
-                lastError = error
-                delay(200L * (attempt + 1))
+        for (baseUrl in ordered) {
+            repeat(3) { attempt ->
+                try {
+                    val hash = fetchBlockhashViaHttpURLConnection(baseUrl)
+                    activeDevnetRpcBase.set(baseUrl)
+                    return@withContext hash
+                } catch (error: UnresolvedAddressException) {
+                    lastError = error
+                    failures += "$baseUrl: ${error.javaClass.simpleName}"
+                    delay(200L * (attempt + 1))
+                } catch (error: java.net.UnknownHostException) {
+                    lastError = error
+                    failures += "$baseUrl: UnknownHostException"
+                    delay(200L * (attempt + 1))
+                } catch (error: java.net.ConnectException) {
+                    lastError = error
+                    failures += "$baseUrl: ConnectException"
+                    delay(200L * (attempt + 1))
+                } catch (error: java.net.SocketTimeoutException) {
+                    lastError = error
+                    failures += "$baseUrl: SocketTimeoutException"
+                    delay(200L * (attempt + 1))
+                }
             }
         }
-        throw lastError ?: IllegalStateException("Could not fetch a recent blockhash from devnet.")
+        val detail = failures.distinct().joinToString("; ").ifBlank { lastError?.message ?: "unknown" }
+        throw IllegalStateException(
+            "Could not reach any devnet RPC (${DEVNET_RPC_CANDIDATES.joinToString()}). Tried: $detail. " +
+                "If Chrome works but this app does not, disable Private DNS (Settings → Network), allow unrestricted battery/data for Parabola, or switch Wi‑Fi.",
+            lastError,
+        )
     }
 
     private suspend fun sendSignedTransactionWithRetry(signedTxBytes: ByteArray): String =
         withContext(Dispatchers.IO) {
+            val primary = activeDevnetRpcBase.get() ?: DEVNET_RPC_CANDIDATES.first()
+            val ordered =
+                listOf(primary) + DEVNET_RPC_CANDIDATES.filter { it != primary }
             var lastError: Throwable? = null
-            repeat(3) { attempt ->
-                try {
-                    return@withContext sendSignedTransactionViaHttpURLConnection(signedTxBytes)
-                } catch (error: UnresolvedAddressException) {
-                    lastError = error; delay(200L * (attempt + 1))
-                } catch (error: java.net.UnknownHostException) {
-                    lastError = error; delay(200L * (attempt + 1))
-                } catch (error: java.net.ConnectException) {
-                    lastError = error; delay(200L * (attempt + 1))
-                } catch (error: java.net.SocketTimeoutException) {
-                    lastError = error; delay(200L * (attempt + 1))
+            for (baseUrl in ordered) {
+                repeat(3) { attempt ->
+                    try {
+                        val sig = sendSignedTransactionViaHttpURLConnection(signedTxBytes, baseUrl)
+                        activeDevnetRpcBase.set(baseUrl)
+                        return@withContext sig
+                    } catch (error: UnresolvedAddressException) {
+                        lastError = error; delay(200L * (attempt + 1))
+                    } catch (error: java.net.UnknownHostException) {
+                        lastError = error; delay(200L * (attempt + 1))
+                    } catch (error: java.net.ConnectException) {
+                        lastError = error; delay(200L * (attempt + 1))
+                    } catch (error: java.net.SocketTimeoutException) {
+                        lastError = error; delay(200L * (attempt + 1))
+                    }
                 }
             }
             throw lastError ?: IllegalStateException("Could not broadcast the signed transaction to devnet.")
         }
 
-    private fun sendSignedTransactionViaHttpURLConnection(signedTxBytes: ByteArray): String {
+    private fun sendSignedTransactionViaHttpURLConnection(signedTxBytes: ByteArray, rpcBaseUrl: String): String {
         val base64 = android.util.Base64.encodeToString(signedTxBytes, android.util.Base64.NO_WRAP)
-        val conn = (URL(DEVNET_RPC_URL).openConnection() as HttpURLConnection).apply {
+        val conn = (URL(rpcBaseUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 8_000
             readTimeout = 12_000
@@ -337,8 +372,8 @@ object WalletSubmitter {
         }
     }
 
-    private fun fetchBlockhashViaHttpURLConnection(): String {
-        val conn = (URL(DEVNET_RPC_URL).openConnection() as HttpURLConnection).apply {
+    private fun fetchBlockhashViaHttpURLConnection(rpcBaseUrl: String): String {
+        val conn = (URL(rpcBaseUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 8_000
             readTimeout = 8_000
@@ -379,8 +414,9 @@ private fun walletMessage(message: String, memoLength: Int): String {
             "The wallet returned no error details and the demo memo was not confirmed. We attempted a short $memoLength-byte devnet memo. Try opening the wallet first, then retry. If it persists, the wallet likely signed nothing or dropped the send handoff."
 
         normalized.contains("UnresolvedAddressException", ignoreCase = true) ||
-            normalized.contains("UnknownHostException", ignoreCase = true) ->
-            "Couldn't reach api.devnet.solana.com — DNS resolution failed for the app even though Chrome works. Diagnostic: $normalized"
+            normalized.contains("UnknownHostException", ignoreCase = true) ||
+            normalized.contains("Could not reach any devnet RPC", ignoreCase = true) ->
+            "Couldn't reach a devnet RPC (tried public mirrors). Chrome can still work if it uses a different DNS path. Try: disable Private DNS, set Parabola to unrestricted battery + allow background data, or switch network. Diagnostic: $normalized"
 
         normalized.contains("ConnectException", ignoreCase = true) ||
             normalized.contains("SocketTimeoutException", ignoreCase = true) ->
