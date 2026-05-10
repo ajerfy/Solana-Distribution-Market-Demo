@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parabola Markets — Bet the Distribution</title>
+  <meta name="description" content="The first on-chain prediction market where you bet a full probability distribution, not just yes or no. Built on Solana." />
+  <meta property="og:title" content="Parabola Markets" />
+  <meta property="og:description" content="Bet the distribution, not the binary." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://parabolamarkets.xyz" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Grain filter -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <filter id="grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+    </defs>
+  </svg>
+
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #07070e;
+      color: #e8e8f0;
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── CSS variables ───────────────────────────────────────────────── */
+    :root {
+      --violet: #7c3aed;
+      --violet-bright: #a78bfa;
+      --teal: #0d9488;
+      --teal-bright: #2dd4bf;
+      --bg: #07070e;
+      --bg-el: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.07);
+      --border-strong: rgba(255,255,255,0.12);
+      --text: #e8e8f0;
+      --text-sec: rgba(232,232,240,0.55);
+      --text-dim: rgba(232,232,240,0.30);
+    }
+
+    /* ── Grain overlay (entire page) ────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      filter: url(#grain);
+      opacity: 0.045;
+      pointer-events: none;
+      z-index: 0;
+      mix-blend-mode: overlay;
+    }
+
+    /* ── Background gradient ─────────────────────────────────────────── */
+    .bg-gradient {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(109,40,217,0.22) 0%, transparent 70%),
+                  radial-gradient(ellipse 60% 50% at 85% 60%, rgba(13,148,136,0.12) 0%, transparent 60%),
+                  radial-gradient(ellipse 70% 40% at 15% 80%, rgba(109,40,217,0.08) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Orbs ────────────────────────────────────────────────────────── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+      animation: orb-drift 14s ease-in-out infinite;
+    }
+    .orb-1 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(124,58,237,0.28) 0%, transparent 70%);
+      top: -200px; left: -100px;
+      animation-delay: 0s;
+    }
+    .orb-2 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(13,148,136,0.22) 0%, transparent 70%);
+      bottom: 10%; right: -80px;
+      animation-delay: -7s;
+    }
+    @keyframes orb-drift {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33%       { transform: translate(30px, -40px) scale(1.05); }
+      66%       { transform: translate(-20px, 30px) scale(0.97); }
+    }
+
+    /* ── All page content sits above z-index 0 overlays ─────────────── */
+    nav, main, footer { position: relative; z-index: 1; }
+
+    /* ── Navigation ──────────────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 48px;
+      backdrop-filter: blur(20px) saturate(1.4);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      background: rgba(7,7,14,0.65);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+    }
+    .nav-logo {
+      display: flex; align-items: baseline; gap: 6px;
+      text-decoration: none;
+    }
+    .nav-logo-word {
+      font-size: 18px; font-weight: 600; letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 30%, rgba(167,139,250,0.9) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .nav-logo-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 400; letter-spacing: 0.1em;
+      color: var(--teal-bright); opacity: 0.8; text-transform: uppercase;
+    }
+    .nav-links {
+      display: flex; align-items: center; gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 13px; font-weight: 400; color: var(--text-sec);
+      text-decoration: none; letter-spacing: 0.01em;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      font-size: 13px; font-weight: 500;
+      background: rgba(124,58,237,0.15);
+      border: 1px solid rgba(124,58,237,0.3);
+      color: var(--violet-bright) !important;
+      padding: 8px 18px; border-radius: 8px;
+      transition: background 0.2s, border-color 0.2s !important;
+    }
+    .nav-cta:hover {
+      background: rgba(124,58,237,0.25) !important;
+      border-color: rgba(124,58,237,0.5) !important;
+    }
+    @media (max-width: 640px) {
+      nav { padding: 16px 24px; }
+      .nav-links { display: none; }
+    }
+
+    /* ── Section wrapper ─────────────────────────────────────────────── */
+    .section { padding: 120px 48px; max-width: 1100px; margin: 0 auto; }
+    @media (max-width: 640px) { .section { padding: 80px 24px; } }
+
+    /* ── Hero ────────────────────────────────────────────────────────── */
+    #hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center;
+      padding: 140px 48px 100px;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--teal-bright);
+      background: rgba(13,148,136,0.08);
+      border: 1px solid rgba(13,148,136,0.2);
+      padding: 6px 14px; border-radius: 100px;
+      margin-bottom: 40px;
+      opacity: 0; animation: fade-up 0.8s cubic-bezier(0.22,1,0.36,1) 0.1s both;
+    }
+    .hero-eyebrow::before {
+      content: '';
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--teal-bright);
+      animation: blink 1.6s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .hero-headline {
+      font-size: clamp(44px, 8vw, 88px);
+      font-weight: 200; letter-spacing: -0.04em; line-height: 1.05;
+      max-width: 820px;
+      opacity: 0; animation: fade-up 0.9s cubic-bezier(0.22,1,0.36,1) 0.25s both;
+    }
+    .hero-headline em {
+      font-style: normal;
+      background: linear-gradient(125deg, var(--violet-bright) 0%, var(--teal-bright) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      margin-top: 28px;
+      font-size: clamp(15px, 2vw, 18px);
+      font-weight: 300; color: var(--text-sec);
+      max-width: 520px; line-height: 1.7;
+      opacity: 0; animation: fade-up 0.9s cubic-bezier(0.22,1,0.36,1) 0.4s both;
+    }
+
+    /* ── Bell curve SVG ──────────────────────────────────────────────── */
+    .hero-curve {
+      margin-top: 60px; margin-bottom: 16px;
+      opacity: 0; animation: fade-up 1s cubic-bezier(0.22,1,0.36,1) 0.55s both;
+    }
+    .curve-path {
+      stroke-dasharray: 600;
+      stroke-dashoffset: 600;
+      animation: draw-curve 2.2s cubic-bezier(0.22,1,0.36,1) 0.9s both;
+    }
+    .fill-curve {
+      opacity: 0;
+      animation: fill-in 1.4s ease-out 2.6s both;
+    }
+    @keyframes draw-curve {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes fill-in {
+      to { opacity: 1; }
+    }
+
+    .hero-curve-label {
+      display: flex; justify-content: center; gap: 32px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--text-dim); letter-spacing: 0.06em;
+      opacity: 0; animation: fade-up 0.8s ease 2.8s both;
+    }
+    .curve-label-mu { color: var(--violet-bright); opacity: 0.8; }
+    .curve-label-sigma { color: var(--teal-bright); opacity: 0.8; }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Divider ─────────────────────────────────────────────────────── */
+    .divider {
+      max-width: 1100px; margin: 0 auto;
+      height: 1px; background: var(--border);
+    }
+
+    /* ── Section labels ──────────────────────────────────────────────── */
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--text-dim);
+      margin-bottom: 24px;
+    }
+
+    /* ── Problem section ─────────────────────────────────────────────── */
+    #problem .two-col {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center;
+    }
+    @media (max-width: 720px) { #problem .two-col { grid-template-columns: 1fr; gap: 40px; } }
+    #problem h2 {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 200; letter-spacing: -0.03em; line-height: 1.15;
+    }
+    #problem h2 strong { font-weight: 500; color: #fff; }
+    #problem p {
+      margin-top: 20px; font-size: 16px;
+      font-weight: 300; color: var(--text-sec); line-height: 1.75;
+    }
+
+    /* comparison cards */
+    .compare-grid { display: flex; flex-direction: column; gap: 12px; }
+    .compare-card {
+      padding: 18px 20px; border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg-el);
+      backdrop-filter: blur(12px);
+    }
+    .compare-card.bad { border-color: rgba(239,68,68,0.2); }
+    .compare-card.good { border-color: rgba(13,148,136,0.25); background: rgba(13,148,136,0.04); }
+    .compare-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .compare-card.bad .compare-label { color: rgba(239,68,68,0.7); }
+    .compare-card.good .compare-label { color: var(--teal-bright); }
+    .compare-title { font-size: 15px; font-weight: 400; margin-bottom: 4px; }
+    .compare-sub { font-size: 13px; color: var(--text-dim); }
+
+    /* ── How it works ────────────────────────────────────────────────── */
+    #how h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 200; letter-spacing: -0.03em; margin-bottom: 56px;
+    }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+    @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+
+    .step {
+      padding: 36px 32px 40px;
+      border: 1px solid var(--border);
+      background: var(--bg-el);
+      backdrop-filter: blur(12px);
+      transition: border-color 0.3s, background 0.3s, transform 0.3s;
+      position: relative; overflow: hidden;
+    }
+    .step:first-child { border-radius: 16px 0 0 16px; }
+    .step:last-child  { border-radius: 0 16px 16px 0; }
+    @media (max-width: 720px) {
+      .step { border-radius: 0; }
+      .step:first-child { border-radius: 16px 16px 0 0; }
+      .step:last-child  { border-radius: 0 0 16px 16px; }
+    }
+    .step:hover {
+      border-color: var(--border-strong);
+      background: rgba(255,255,255,0.045);
+      transform: translateY(-2px);
+    }
+    .step::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(167,139,250,0.35), transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .step:hover::before { opacity: 1; }
+
+    .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em;
+      margin-bottom: 20px;
+    }
+    .step-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; font-size: 22px;
+    }
+    .step-icon-1 { background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.2); }
+    .step-icon-2 { background: rgba(13,148,136,0.12); border: 1px solid rgba(13,148,136,0.2); }
+    .step-icon-3 { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.15); }
+
+    .step h3 { font-size: 18px; font-weight: 500; letter-spacing: -0.01em; margin-bottom: 10px; }
+    .step p  { font-size: 14px; color: var(--text-sec); line-height: 1.7; }
+    .step-formula {
+      margin-top: 18px; padding: 10px 14px; border-radius: 8px;
+      background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      color: var(--violet-bright);
+    }
+
+    /* ── Stats strip ─────────────────────────────────────────────────── */
+    #stats {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    #stats .section {
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 0;
+      padding: 64px 48px;
+    }
+    @media (max-width: 640px) { #stats .section { grid-template-columns: 1fr; gap: 32px; } }
+
+    .stat-item { text-align: center; position: relative; }
+    .stat-item:not(:last-child)::after {
+      content: '';
+      position: absolute; right: 0; top: 20%; height: 60%;
+      width: 1px; background: var(--border);
+    }
+    @media (max-width: 640px) { .stat-item:not(:last-child)::after { display: none; } }
+
+    .stat-number {
+      font-size: clamp(40px, 6vw, 64px);
+      font-weight: 200; letter-spacing: -0.04em; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-number span {
+      background: linear-gradient(135deg, #fff 40%, rgba(167,139,250,0.85) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .stat-label {
+      margin-top: 8px; font-size: 13px;
+      font-weight: 300; color: var(--text-dim);
+    }
+
+    /* ── Why distributions section ───────────────────────────────────── */
+    #why h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 200; letter-spacing: -0.03em; margin-bottom: 12px;
+    }
+    #why .lead {
+      font-size: 16px; color: var(--text-sec); font-weight: 300;
+      max-width: 500px; line-height: 1.75; margin-bottom: 52px;
+    }
+    .why-grid {
+      display: grid; grid-template-columns: repeat(2,1fr); gap: 16px;
+    }
+    @media (max-width: 640px) { .why-grid { grid-template-columns: 1fr; } }
+
+    .why-card {
+      padding: 28px 28px 32px;
+      border: 1px solid var(--border); border-radius: 16px;
+      background: var(--bg-el); backdrop-filter: blur(12px);
+      transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    }
+    .why-card:hover {
+      border-color: rgba(167,139,250,0.2);
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px -12px rgba(124,58,237,0.15);
+    }
+    .why-card-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+    }
+    .why-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .why-card h3 { font-size: 16px; font-weight: 500; letter-spacing: -0.01em; }
+    .why-card p  { font-size: 14px; color: var(--text-sec); line-height: 1.7; }
+    .why-card .mono-tag {
+      display: inline-block; margin-top: 14px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--text-dim); letter-spacing: 0.04em;
+    }
+
+    /* ── Team ────────────────────────────────────────────────────────── */
+    #team h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 200; letter-spacing: -0.03em; margin-bottom: 8px;
+    }
+    #team .lead {
+      font-size: 15px; color: var(--text-sec); margin-bottom: 52px;
+    }
+    .team-grid {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 2px;
+    }
+    @media (max-width: 720px) { .team-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 420px) { .team-grid { grid-template-columns: 1fr; } }
+
+    .team-card {
+      padding: 32px 24px 36px;
+      border: 1px solid var(--border);
+      background: var(--bg-el); backdrop-filter: blur(12px);
+      transition: border-color 0.3s, background 0.3s;
+      position: relative; overflow: hidden;
+    }
+    .team-card:first-child { border-radius: 16px 0 0 16px; }
+    .team-card:last-child  { border-radius: 0 16px 16px 0; }
+    @media (max-width: 720px) {
+      .team-card:first-child { border-radius: 16px 0 0 0; }
+      .team-card:nth-child(2) { border-radius: 0 16px 0 0; }
+      .team-card:nth-child(3) { border-radius: 0 0 0 16px; }
+      .team-card:last-child   { border-radius: 0 0 16px 0; }
+    }
+    .team-card:hover {
+      border-color: var(--border-strong);
+      background: rgba(255,255,255,0.04);
+    }
+    .team-card-glow {
+      position: absolute; width: 120px; height: 120px;
+      border-radius: 50%; filter: blur(50px);
+      top: -20px; right: -20px; opacity: 0.12;
+      transition: opacity 0.4s;
+    }
+    .team-card:hover .team-card-glow { opacity: 0.22; }
+
+    .team-initials {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
+      margin-bottom: 18px;
+    }
+    .team-name {
+      font-size: 16px; font-weight: 500; letter-spacing: -0.01em;
+      margin-bottom: 6px;
+    }
+    .team-role {
+      font-size: 12px; color: var(--text-dim);
+      font-weight: 400; letter-spacing: 0.03em;
+    }
+    .team-school {
+      margin-top: 14px; padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em;
+    }
+
+    /* ── Solana badge ────────────────────────────────────────────────── */
+    #solana-banner {
+      background: linear-gradient(135deg, rgba(124,58,237,0.08) 0%, rgba(13,148,136,0.08) 100%);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    #solana-banner .section {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 48px 48px; flex-wrap: wrap; gap: 24px;
+    }
+    .solana-text h3 {
+      font-size: 22px; font-weight: 300; letter-spacing: -0.02em; margin-bottom: 6px;
+    }
+    .solana-text p { font-size: 14px; color: var(--text-sec); }
+    .solana-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      padding: 6px 14px; border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500; letter-spacing: 0.06em;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-sec);
+    }
+    .pill.violet { border-color: rgba(124,58,237,0.3); color: var(--violet-bright); background: rgba(124,58,237,0.07); }
+    .pill.teal   { border-color: rgba(13,148,136,0.3); color: var(--teal-bright); background: rgba(13,148,136,0.07); }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    footer {
+      padding: 48px 48px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .footer-logo {
+      font-size: 15px; font-weight: 600; letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 30%, rgba(167,139,250,0.8) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .footer-right {
+      font-size: 12px; color: var(--text-dim); text-align: right;
+    }
+    .footer-right a { color: var(--text-dim); text-decoration: none; }
+    .footer-right a:hover { color: var(--text-sec); }
+
+    /* ── Scroll reveal ───────────────────────────────────────────────── */
+    .reveal {
+      opacity: 0; transform: translateY(28px);
+      transition: opacity 0.8s cubic-bezier(0.22,1,0.36,1), transform 0.8s cubic-bezier(0.22,1,0.36,1);
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-d1 { transition-delay: 0.05s; }
+    .reveal-d2 { transition-delay: 0.12s; }
+    .reveal-d3 { transition-delay: 0.19s; }
+    .reveal-d4 { transition-delay: 0.26s; }
+  </style>
+</head>
+
+<body>
+  <div class="bg-gradient" aria-hidden="true"></div>
+  <div class="orb orb-1"  aria-hidden="true"></div>
+  <div class="orb orb-2"  aria-hidden="true"></div>
+
+  <!-- ── Nav ── -->
+  <nav>
+    <a class="nav-logo" href="#">
+      <span class="nav-logo-word">Parabola</span>
+      <span class="nav-logo-tag">Markets</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#how">How It Works</a></li>
+      <li><a href="#why">Why Distributions</a></li>
+      <li><a href="#team">Team</a></li>
+      <li><a href="https://github.com/ajerfy/Parabola" target="_blank" rel="noopener" class="nav-cta">GitHub</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <!-- ── Hero ── -->
+    <section id="hero">
+      <div class="hero-eyebrow">Built on Solana · Distribution Markets</div>
+
+      <h1 class="hero-headline">
+        You don't pick<br>
+        <em>yes or no.</em><br>
+        You bet the curve.
+      </h1>
+
+      <p class="hero-sub">
+        Parabola is a prediction market where you submit a full probability distribution —
+        your mean estimate <em>and</em> your confidence — not just a direction.
+      </p>
+
+      <!-- Animated bell curve -->
+      <div class="hero-curve">
+        <svg width="480" height="120" viewBox="0 0 480 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="curve-grad" x1="0" y1="0" x2="480" y2="0">
+              <stop offset="0%"   stop-color="#7c3aed" stop-opacity="0" />
+              <stop offset="20%"  stop-color="#7c3aed" stop-opacity="1" />
+              <stop offset="50%"  stop-color="#a78bfa" stop-opacity="1" />
+              <stop offset="80%"  stop-color="#2dd4bf" stop-opacity="1" />
+              <stop offset="100%" stop-color="#0d9488" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="fill-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stop-color="#7c3aed" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="#07070e" stop-opacity="0" />
+            </linearGradient>
+            <mask id="curve-mask">
+              <path d="M10,110 C40,110 80,108 110,100 C140,92 155,70 170,50 C185,30 200,12 240,10 C280,8 295,30 310,50 C325,70 340,92 370,100 C400,108 440,110 470,110 Z" fill="white"/>
+            </mask>
+          </defs>
+
+          <!-- Fill under curve -->
+          <path class="fill-curve"
+            d="M10,110 C40,110 80,108 110,100 C140,92 155,70 170,50 C185,30 200,12 240,10 C280,8 295,30 310,50 C325,70 340,92 370,100 C400,108 440,110 470,110 Z"
+            fill="url(#fill-grad)" />
+
+          <!-- Curve stroke -->
+          <path class="curve-path"
+            d="M10,110 C40,110 80,108 110,100 C140,92 155,70 170,50 C185,30 200,12 240,10 C280,8 295,30 310,50 C325,70 340,92 370,100 C400,108 440,110 470,110"
+            stroke="url(#curve-grad)" stroke-width="2" stroke-linecap="round" fill="none" />
+
+          <!-- μ tick -->
+          <line x1="240" y1="10" x2="240" y2="110"
+            stroke="rgba(167,139,250,0.3)" stroke-width="1" stroke-dasharray="3 4" />
+
+          <!-- ±1σ lines -->
+          <line x1="170" y1="50" x2="170" y2="110"
+            stroke="rgba(45,212,191,0.2)" stroke-width="1" stroke-dasharray="3 4" />
+          <line x1="310" y1="50" x2="310" y2="110"
+            stroke="rgba(45,212,191,0.2)" stroke-width="1" stroke-dasharray="3 4" />
+        </svg>
+      </div>
+
+      <div class="hero-curve-label">
+        <span class="curve-label-mu">μ — mean estimate</span>
+        <span style="color:var(--border-strong)">·</span>
+        <span class="curve-label-sigma">σ — confidence (std dev)</span>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── Problem ── -->
+    <section id="problem">
+      <div class="section">
+        <div class="two-col">
+          <div class="reveal">
+            <div class="section-label">The Problem</div>
+            <h2>Binary markets<br><strong>collapse nuance</strong><br>into a coin flip.</h2>
+            <p>
+              A 72¢ YES on Polymarket hides everything you actually know —
+              your conviction level, your uncertainty, your tail risk. Parabola makes
+              all of that tradeable.
+            </p>
+          </div>
+          <div class="compare-grid reveal reveal-d2">
+            <div class="compare-card bad">
+              <div class="compare-label">Binary Market</div>
+              <div class="compare-title">Chimaev wins the fight</div>
+              <div class="compare-sub">YES · 0.72¢ &nbsp;/&nbsp; NO · 0.28¢</div>
+            </div>
+            <div class="compare-card good">
+              <div class="compare-label">Parabola</div>
+              <div class="compare-title">P(Chimaev wins) ~ Normal(72%, σ=9%)</div>
+              <div class="compare-sub">
+                Your mean: 68% &nbsp;·&nbsp; Your conviction: σ = 6% &nbsp;·&nbsp;
+                Collateral priced by KL-divergence from crowd
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── How it works ── -->
+    <section id="how">
+      <div class="section">
+        <div class="section-label reveal">Mechanism</div>
+        <h2 class="reveal reveal-d1">How it works</h2>
+        <div class="steps">
+          <div class="step reveal reveal-d1">
+            <div class="step-num">01</div>
+            <div class="step-icon step-icon-1">𝒩</div>
+            <h3>Submit a distribution</h3>
+            <p>
+              Instead of a binary vote, you submit Normal(μ, σ).
+              μ is where you think the outcome lands. σ is how sure you are.
+            </p>
+            <div class="step-formula">target: Normal(μ=68, σ=6)</div>
+          </div>
+          <div class="step reveal reveal-d2">
+            <div class="step-num">02</div>
+            <div class="step-icon step-icon-2">𝒟</div>
+            <h3>Collateral from divergence</h3>
+            <p>
+              Your collateral requirement is computed from the KL-divergence between
+              your distribution and the crowd's. High conviction = higher stake.
+            </p>
+            <div class="step-formula">cost ∝ KL(yours ‖ crowd)</div>
+          </div>
+          <div class="step reveal reveal-d3">
+            <div class="step-num">03</div>
+            <div class="step-icon step-icon-3">✓</div>
+            <h3>Settle on outcomes</h3>
+            <p>
+              At resolution, an oracle posts the realized value.
+              Payout is scored by how close your distribution was to the truth.
+            </p>
+            <div class="step-formula">payout = f(x_true | μ, σ)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Stats ── -->
+    <div id="stats">
+      <div class="section">
+        <div class="stat-item reveal">
+          <div class="stat-number"><span class="count" data-target="∞">∞</span></div>
+          <div class="stat-label">Resolution states (vs. binary's 2)</div>
+        </div>
+        <div class="stat-item reveal reveal-d2">
+          <div class="stat-number"><span class="count" data-target="100" data-suffix="%">0%</span></div>
+          <div class="stat-label">Collateral computed on-chain, trustlessly</div>
+        </div>
+        <div class="stat-item reveal reveal-d3">
+          <div class="stat-number"><span>~450ms</span></div>
+          <div class="stat-label">Simulation tick rate</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ── Why distributions ── -->
+    <section id="why">
+      <div class="section">
+        <div class="section-label reveal">The Insight</div>
+        <h2 class="reveal reveal-d1">Why distributions<br>unlock better markets</h2>
+        <p class="lead reveal reveal-d2">
+          When you can trade uncertainty itself, markets become more efficient — and more honest.
+        </p>
+        <div class="why-grid">
+          <div class="why-card reveal reveal-d1">
+            <div class="why-card-header">
+              <div class="why-dot" style="background:var(--violet-bright)"></div>
+              <h3>Expressive positions</h3>
+            </div>
+            <p>
+              A trader who thinks 65% but is very uncertain and a trader who thinks 65%
+              with total conviction should not pay the same price. Now they don't.
+            </p>
+            <span class="mono-tag">σ encodes conviction</span>
+          </div>
+          <div class="why-card reveal reveal-d2">
+            <div class="why-card-header">
+              <div class="why-dot" style="background:var(--teal-bright)"></div>
+              <h3>Truthful incentives</h3>
+            </div>
+            <p>
+              KL-divergence pricing means the only way to minimize your expected cost
+              is to report your true belief — including your uncertainty.
+            </p>
+            <span class="mono-tag">proper scoring rule</span>
+          </div>
+          <div class="why-card reveal reveal-d3">
+            <div class="why-card-header">
+              <div class="why-dot" style="background:#fbbf24"></div>
+              <h3>Continuous resolution</h3>
+            </div>
+            <p>
+              Settlement isn't binary. The payout function is smooth — a distribution
+              centered 1% off still gets partial credit. No more all-or-nothing cliff.
+            </p>
+            <span class="mono-tag">f(x_true | μ, σ)</span>
+          </div>
+          <div class="why-card reveal reveal-d4">
+            <div class="why-card-header">
+              <div class="why-dot" style="background:#f472b6"></div>
+              <h3>Crowd σ as consensus</h3>
+            </div>
+            <p>
+              The aggregate σ across all traders is itself a market signal — a live,
+              on-chain measure of how certain the crowd is. Better than any sentiment index.
+            </p>
+            <span class="mono-tag">crowd σ → VIX-like index</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── Team ── -->
+    <section id="team">
+      <div class="section">
+        <div class="section-label reveal">The Team</div>
+        <h2 class="reveal reveal-d1">Built by four people<br>obsessed with the problem</h2>
+        <p class="lead reveal reveal-d2">University of Chicago</p>
+        <div class="team-grid">
+
+          <div class="team-card reveal reveal-d1">
+            <div class="team-card-glow" style="background:var(--violet)"></div>
+            <div class="team-initials" style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.2);color:var(--violet-bright)">SS</div>
+            <div class="team-name">Shikhar Sehgal</div>
+            <div class="team-role">Co-founder</div>
+            <div class="team-school">UChicago</div>
+          </div>
+
+          <div class="team-card reveal reveal-d2">
+            <div class="team-card-glow" style="background:var(--teal)"></div>
+            <div class="team-initials" style="background:rgba(13,148,136,0.12);border:1px solid rgba(13,148,136,0.2);color:var(--teal-bright)">AJ</div>
+            <div class="team-name">Aadit Jerfy</div>
+            <div class="team-role">Co-founder</div>
+            <div class="team-school">UChicago</div>
+          </div>
+
+          <div class="team-card reveal reveal-d3">
+            <div class="team-card-glow" style="background:#7c3aed"></div>
+            <div class="team-initials" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);color:#fbbf24">PB</div>
+            <div class="team-name">Prashanth Bhaskara</div>
+            <div class="team-role">Co-founder</div>
+            <div class="team-school">UChicago</div>
+          </div>
+
+          <div class="team-card reveal reveal-d4">
+            <div class="team-card-glow" style="background:#ec4899"></div>
+            <div class="team-initials" style="background:rgba(244,114,182,0.08);border:1px solid rgba(244,114,182,0.2);color:#f472b6">ML</div>
+            <div class="team-name">Matthew Lin</div>
+            <div class="team-role">Co-founder</div>
+            <div class="team-school">UChicago</div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Solana banner ── -->
+    <div id="solana-banner">
+      <div class="section">
+        <div class="solana-text reveal">
+          <h3>Live on Solana devnet</h3>
+          <p>PD-AMM settlement · Pyth oracle feeds · Mobile Wallet Adapter signing</p>
+        </div>
+        <div class="solana-pills reveal reveal-d2">
+          <span class="pill violet">Normal(μ, σ)</span>
+          <span class="pill teal">KL-divergence pricing</span>
+          <span class="pill">Solana devnet</span>
+          <span class="pill">Pyth Hermes</span>
+          <span class="pill">Polymarket feeds</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="footer-logo">Parabola Markets</div>
+    <div class="footer-right">
+      <a href="https://github.com/ajerfy/Parabola" target="_blank" rel="noopener">GitHub</a>
+      &nbsp;·&nbsp; parabolamarkets.xyz &nbsp;·&nbsp; © 2025
+    </div>
+  </footer>
+
+  <!-- ── Scroll reveal + counter JS ── -->
+  <script>
+    // Scroll reveal
+    const revealEls = document.querySelectorAll('.reveal');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    revealEls.forEach(el => io.observe(el));
+
+    // Count-up animation
+    function animateCount(el) {
+      const target = el.dataset.target;
+      const suffix = el.dataset.suffix || '';
+      if (target === '∞') return;
+      const end = parseInt(target, 10);
+      let start = 0;
+      const duration = 1400;
+      const step = (ts) => {
+        if (!start) start = ts;
+        const progress = Math.min((ts - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.floor(ease * end) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+        else el.textContent = end + suffix;
+      };
+      requestAnimationFrame(step);
+    }
+
+    const statIo = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const counter = e.target.querySelector('.count[data-target]');
+          if (counter && counter.dataset.target !== '∞') animateCount(counter);
+          statIo.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.stat-item').forEach(el => statIo.observe(el));
+  </script>
+</body>
+</html>
