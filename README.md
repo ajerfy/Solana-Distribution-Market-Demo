@@ -104,4 +104,4 @@ npm install
 npm run dev
 ```
 
-Set **`VITE_PARABOLA_API_BASE`** in `apps/web/.env` if the API is not at `http://127.0.0.1:8787`
+During **`npm run dev`**, omit **`VITE_PARABOLA_API_BASE`** so Vite proxies to `http://127.0.0.1:8787`. Set it only for a remote API or production builds.
