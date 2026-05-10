@@ -1,12 +1,28 @@
 import type { DemoPayload } from "../types/demoPayload";
 
+/**
+ * In `vite dev`, use same-origin URLs so the dev server proxy can reach the Rust backend.
+ * Set `VITE_PARABOLA_API_BASE` to override (e.g. remote staging API).
+ */
 function apiBase(): string {
-  const raw = import.meta.env.VITE_PARABOLA_API_BASE ?? "http://127.0.0.1:8787";
-  return raw.replace(/\/$/, "");
+  const explicit = import.meta.env.VITE_PARABOLA_API_BASE?.trim();
+  if (explicit) {
+    return explicit.replace(/\/$/, "");
+  }
+  if (import.meta.env.DEV) {
+    return "";
+  }
+  return "http://127.0.0.1:8787".replace(/\/$/, "");
 }
 
+/** Label for UI: what URL is effectively used for demo JSON. */
 export function demoPayloadUrl(): string {
-  return `${apiBase()}/api/demo-payload`;
+  const base = apiBase();
+  const path = `${base}/api/demo-payload`;
+  if (import.meta.env.DEV && base === "") {
+    return `${path} (via Vite proxy → http://127.0.0.1:8787)`;
+  }
+  return path;
 }
 
 export async function fetchDemoPayload(): Promise<DemoPayload> {

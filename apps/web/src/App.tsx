@@ -3,6 +3,17 @@ import "./App.css";
 import { demoPayloadUrl, fetchDemoPayload, fetchHealthz } from "./api/client";
 import type { DemoPayload } from "./types/demoPayload";
 
+function friendlyLoadError(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  if (raw === "Failed to fetch" || raw.includes("NetworkError")) {
+    return (
+      `${raw} — Start the API from the repo root: cargo run -p live-perp-backend ` +
+      `(listening on http://127.0.0.1:8787). Then refresh.`
+    );
+  }
+  return raw;
+}
+
 export default function App() {
   const [payload, setPayload] = useState<DemoPayload | null>(null);
   const [healthOk, setHealthOk] = useState<boolean | null>(null);
@@ -19,7 +30,7 @@ export default function App() {
     } catch (e) {
       setHealthOk(null);
       setPayload(null);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyLoadError(e));
     } finally {
       setLoading(false);
     }

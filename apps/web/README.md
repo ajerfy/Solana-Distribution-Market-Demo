@@ -15,11 +15,11 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` if the API is not on `http://127.0.0.1:8787`.
+During **`npm run dev`**, leave **`VITE_PARABOLA_API_BASE` unset** so requests go to the same origin and **Vite proxies** `/api` and `/healthz` to `http://127.0.0.1:8787` (no CORS friction). Only set `VITE_PARABOLA_API_BASE` if you want the browser to call a different host directly.
 
 ## Run
 
-Terminal 1 — from repo root:
+Terminal 1 — from repo root (the backend must be running or the UI shows “Failed to fetch”):
 
 ```bash
 cargo run -p live-perp-backend
@@ -32,7 +32,9 @@ cd apps/web
 npm run dev
 ```
 
-Open **http://localhost:5173**. The backend allows this origin via `PARABOLA_CORS_ORIGINS` (defaults include `http://localhost:5173`).
+Open **http://localhost:5173**.
+
+For **`npm run build`** / production hosting, set **`VITE_PARABOLA_API_BASE`** to your deployed API and add your web origin to the backend’s **`PARABOLA_CORS_ORIGINS`**.
 
 ## Production API URL
 
