@@ -3,8 +3,8 @@ import { compactDecimal } from "../domain/format";
 import { BetPrefill } from "../domain/betPrefill";
 import { useParabolaStore } from "../state/parabolaStore";
 import {
-  Card, CompactDivider, DetailBackBar, DistBar,
-  HeroMetric, MetricPill, MiniDistCurve, PrimaryButton, SectionLabel, StatRow, TagPill,
+  Card, DetailBackBar, DistBar,
+  HeroMetric, MetricPill, MiniDistCurve, PrimaryButton, TagPill,
 } from "./shared";
 import { Sparkline } from "./Sparkline";
 

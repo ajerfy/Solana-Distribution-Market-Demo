@@ -9,8 +9,7 @@ import { DistributionChart } from "./DistributionChart";
 import { Sparkline } from "./Sparkline";
 import {
   BackBar, Card, CompactDivider, DistBar, GhostButton, HeroMetric,
-  MetricPill, MiniDistCurve, PrimaryButton, SectionLabel, StatRow,
-  StatusBlockSimple, TagPill,
+  MetricPill, MiniDistCurve, PrimaryButton, SectionLabel, StatRow, TagPill,
 } from "./shared";
 
 type DetailTab = "Bet" | "Stats" | "Flow" | "Rules";

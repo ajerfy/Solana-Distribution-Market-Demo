@@ -4,7 +4,7 @@ import { compactDecimal } from "../domain/format";
 import { useParabolaStore } from "../state/parabolaStore";
 import {
   Card, CompactDivider, DetailBackBar, DistBar,
-  HeroMetric, MetricPill, MiniDistCurve, PrimaryButton, StatRow, TagPill,
+  HeroMetric, MetricPill, MiniDistCurve, PrimaryButton, TagPill,
 } from "./shared";
 import { Sparkline } from "./Sparkline";
 
@@ -54,7 +54,6 @@ export function PerpDetail({ market, perp }: { market: MarketListing; perp: Demo
   const funding      = Number.parseFloat(perp.spot_funding_rate_display) || 0;
   const fundingColor = funding > 0 ? "var(--pb-long)" : "var(--pb-short)";
   const mark         = Number.parseFloat(perp.mark_price_display) || 0;
-  const anchorMu     = Number.parseFloat(perp.anchor_mu_display) || 0;
   const ammSigma     = Number.parseFloat(perp.amm_sigma_display) || Number.parseFloat(perp.anchor_sigma_display) || 8;
 
   const fundingPts = perp.funding_path
