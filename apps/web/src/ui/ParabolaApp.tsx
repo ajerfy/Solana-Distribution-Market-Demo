@@ -1,4 +1,4 @@
-import { Component, useEffect } from "react";
+import { Component, useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useBackendSync } from "../hooks/useBackendSync";
 import { useParabolaStore } from "../state/parabolaStore";
@@ -64,6 +64,8 @@ class BetSheetErrorBoundary extends Component<
   }
 }
 
+const TRANSITION_MS = 480;
+
 export default function ParabolaApp() {
   const entered = useParabolaStore((s) => s.entered);
   const setEntered = useParabolaStore((s) => s.setEntered);
@@ -71,6 +73,7 @@ export default function ParabolaApp() {
   const activeTab = useParabolaStore((s) => s.activeTab);
   const setActiveTab = useParabolaStore((s) => s.setActiveTab);
   const selectedMarketId = useParabolaStore((s) => s.selectedMarketId);
+  const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
@@ -78,31 +81,52 @@ export default function ParabolaApp() {
 
   useBackendSync(entered);
 
-  if (!entered) {
-    return (
-      <div className="pb-root">
-        <Entrance onEnter={() => setEntered(true)} />
-      </div>
-    );
-  }
+  const handleEnter = useCallback(() => {
+    setExiting(true);
+    setTimeout(() => setEntered(true), TRANSITION_MS);
+  }, [setEntered]);
 
   return (
-    <div className="pb-root">
-      {selectedMarketId ? (
-        <>
-          <MarketDetail />
-          <BetSheetErrorBoundary>
-            <BetSheetHost />
-          </BetSheetErrorBoundary>
-        </>
-      ) : (
-        <>
-          {activeTab === "markets" ? <MarketsList /> : null}
-          {activeTab === "portfolio" ? <Portfolio /> : null}
-          {activeTab === "engine" ? <Engine /> : null}
-          {activeTab === "wallet" ? <Wallet /> : null}
-          <BottomNav active={activeTab} onSelect={setActiveTab} />
-        </>
+    <div className="pb-root" style={{ position: "relative", overflow: "hidden" }}>
+      {!entered && (
+        <div
+          key="entrance"
+          style={{
+            position: "absolute",
+            inset: 0,
+            animation: exiting ? `pb-exit ${TRANSITION_MS}ms ease forwards` : undefined,
+            zIndex: 10,
+          }}
+        >
+          <Entrance onEnter={handleEnter} />
+        </div>
+      )}
+
+      {(entered || exiting) && (
+        <div
+          key="main"
+          style={{
+            animation: `pb-enter ${TRANSITION_MS}ms ease forwards`,
+            animationDelay: exiting && !entered ? "120ms" : "0ms",
+          }}
+        >
+          {selectedMarketId ? (
+            <>
+              <MarketDetail />
+              <BetSheetErrorBoundary>
+                <BetSheetHost />
+              </BetSheetErrorBoundary>
+            </>
+          ) : (
+            <>
+              {activeTab === "markets" ? <MarketsList /> : null}
+              {activeTab === "portfolio" ? <Portfolio /> : null}
+              {activeTab === "engine" ? <Engine /> : null}
+              {activeTab === "wallet" ? <Wallet /> : null}
+              <BottomNav active={activeTab} onSelect={setActiveTab} />
+            </>
+          )}
+        </div>
       )}
     </div>
   );
