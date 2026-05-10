@@ -98,30 +98,41 @@ export function MarketsList() {
 
   return (
     <div className="pb-scroll">
-      <header style={{ padding: "24px 20px 12px" }}>
+      <header style={{ padding: "28px 20px 16px" }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
             flexWrap: "wrap",
-            marginBottom: 8,
+            marginBottom: 14,
           }}
         >
-          <span className="pb-mono" style={{ color: "var(--pb-you)", fontWeight: 700, fontSize: 13 }}>
+          <span
+            className="pb-mono"
+            style={{
+              background: "linear-gradient(135deg, var(--pb-you) 0%, var(--pb-crowd) 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              fontWeight: 800,
+              fontSize: 15,
+              letterSpacing: "0.12em",
+            }}
+          >
             PARABOLA
           </span>
-          <span className="pb-tag" style={{ background: `${tagColor(liveSync.mode)}22`, color: tagColor(liveSync.mode) }}>
+          <span className="pb-tag" style={{ background: `${tagColor(liveSync.mode)}20`, color: tagColor(liveSync.mode), border: `1px solid ${tagColor(liveSync.mode)}40` }}>
             {tagLabel(liveSync.mode)}
           </span>
-          <span className="pb-tag" style={{ background: "var(--pb-chain)22", color: "var(--pb-chain)" }}>
+          <span className="pb-tag" style={{ background: "var(--pb-chain)18", color: "var(--pb-chain)", border: "1px solid var(--pb-chain)33" }}>
             DEVNET
           </span>
           <button
             type="button"
             className="pb-chip"
             data-selected="false"
-            style={{ marginLeft: "auto", fontSize: 12 }}
+            style={{ marginLeft: "auto", fontSize: 12, padding: "6px 12px" }}
             onClick={() =>
               setThemeMode(themeMode === "dark" ? "light" : "dark")
             }
@@ -129,16 +140,18 @@ export function MarketsList() {
             {themeMode === "light" ? "☀ Light" : "☾ Dark"}
           </button>
         </div>
-        <h2 style={{ fontSize: 24, fontWeight: 600, margin: "6px 0" }}>
-          Bet on the shape, not the side.
+        <h2 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 8px", lineHeight: 1.25, letterSpacing: "-0.02em" }}>
+          Bet on the shape,{" "}
+          <span style={{ color: "var(--pb-text-sec)", fontWeight: 500 }}>not the side.</span>
         </h2>
-        <p style={{ color: "var(--pb-text-sec)", fontSize: 14, margin: 0 }}>
-          Track one live Polymarket event, one live SOL perp, and the broader
-          estimation market sandbox from the same terminal.
+        <p style={{ color: "var(--pb-text-sec)", fontSize: 14, margin: 0, lineHeight: 1.6 }}>
+          Trade conviction and uncertainty across live events, perps, and estimation markets.
         </p>
-        <p style={{ color: "var(--pb-text-dim)", fontSize: 11, marginTop: 8 }}>
-          {liveSync.message}
-        </p>
+        {liveSync.message ? (
+          <p style={{ color: "var(--pb-text-dim)", fontSize: 11, marginTop: 8, fontFamily: "var(--pb-mono, monospace)" }}>
+            {liveSync.message}
+          </p>
+        ) : null}
       </header>
 
       <div
@@ -378,15 +391,16 @@ function MarketRow({
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
         <div
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            background: "var(--pb-surface-muted)",
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            background: "linear-gradient(135deg, var(--pb-surface-muted) 0%, var(--pb-surface-el) 100%)",
+            border: "1px solid var(--pb-border-strong)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 18,
-            color: "var(--pb-you)",
+            fontSize: 20,
+            flexShrink: 0,
           }}
         >
           {CATEGORY_META[market.category]?.emoji ?? "✦"}

@@ -1,7 +1,7 @@
 import type { NavTab } from "../domain/types";
 
 const TABS: { id: NavTab; label: string; icon: string }[] = [
-  { id: "markets", label: "Markets", icon: "📈" },
+  { id: "markets", label: "Markets", icon: "⬡" },
   { id: "portfolio", label: "Portfolio", icon: "◎" },
   { id: "engine", label: "Engine", icon: "⚡" },
   { id: "wallet", label: "Wallet", icon: "◈" },
@@ -24,7 +24,7 @@ export function BottomNav({ active, onSelect }: Props) {
             data-active={active === t.id}
             onClick={() => onSelect(t.id)}
           >
-            <span aria-hidden>{t.icon}</span>
+            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>{t.icon}</span>
             {t.label}
           </button>
         ))}

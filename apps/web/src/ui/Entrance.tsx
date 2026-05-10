@@ -163,18 +163,29 @@ export function Entrance({ onEnter }: Props) {
       <div style={{ textAlign: "center" }}>
         <h1
           style={{
-            fontSize: "30px",
-            fontWeight: 600,
-            marginBottom: "18px",
-            color: "var(--pb-text)",
+            fontSize: "36px",
+            fontWeight: 800,
+            marginBottom: "6px",
+            letterSpacing: "-0.03em",
+            background: "linear-gradient(135deg, var(--pb-you) 0%, var(--pb-crowd) 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
           }}
         >
           Parabola
         </h1>
+        <p style={{ color: "var(--pb-text-sec)", fontSize: 15, margin: "0 0 24px", lineHeight: 1.5 }}>
+          Bet on the shape, not the side.
+        </p>
         <button
           type="button"
           className="pb-primary-btn"
-          style={{ background: "var(--pb-you)", color: "var(--pb-on-accent)" }}
+          style={{
+            background: "linear-gradient(135deg, var(--pb-you) 0%, #80e830 100%)",
+            color: "var(--pb-on-accent)",
+            boxShadow: "0 4px 24px rgba(182, 255, 96, 0.35)",
+          }}
           onClick={onEnter}
         >
           Trade on estimation markets
