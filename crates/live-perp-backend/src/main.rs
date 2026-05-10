@@ -1,3 +1,5 @@
+mod simulation;
+
 use axum::{
     Json, Router,
     extract::State,
@@ -8,15 +10,16 @@ use axum::{
     },
     routing::{get, post},
 };
-use distribution_markets::{
-    Fixed, FixedNormalDistribution, fixed_calculate_f, fixed_calculate_lambda,
-};
+use distribution_markets::{Fixed, FixedNormalDistribution, fixed_calculate_f};
 use normal_v1_sdk::{
     TradeQuoteRequestV1, android_trade_intent, build_trade_quote, seeded_demo_market,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use simulation::{
+    MarketSimulationState, SimulationSourceState, set_program_distribution,
+};
 use std::{
     convert::Infallible,
     env, fs,
@@ -28,6 +31,9 @@ use tokio::{net::TcpListener, sync::RwLock, time::sleep};
 use tokio_stream::{Stream, StreamExt, wrappers::IntervalStream};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
+pub(crate) const DEMO_MARKET_ID: [u8; 32] = [4_u8; 32];
+pub(crate) const DEMO_QUOTE_EXPIRY_DELTA: u64 = 10;
+
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8787";
 const DEFAULT_ASSET_PATH: &str = "apps/android-demo/app/src/main/assets/demo_ufc328.json";
 const DEFAULT_HERMES_BASE: &str = "https://hermes.pyth.network";
@@ -38,8 +44,8 @@ const DEFAULT_POLY_CLOB_BASE: &str = "https://clob.polymarket.com";
 const DEFAULT_POLY_SLUG: &str = "ufc-sea2-kha7-2026-05-09";
 const DEFAULT_POLY_OUTCOME_INDEX: usize = 1;
 const DEFAULT_FUNDING_INTERVAL_SLOTS: u64 = 20;
-const DEMO_MARKET_ID: [u8; 32] = [4_u8; 32];
-const DEMO_QUOTE_EXPIRY_DELTA: u64 = 10;
+/// Pyth price is considered stale if older than this many seconds.
+const PYTH_STALENESS_THRESHOLD_SECS: u64 = 30;
 
 #[derive(Clone)]
 struct AppContext {
@@ -66,6 +72,10 @@ struct StatusPayload {
     last_update_unix_ms: Option<u64>,
     execution_mode: Option<String>,
     message: String,
+    /// Age of the most recent Pyth price in seconds. 0 when unavailable.
+    oracle_age_seconds: u64,
+    /// μ / σ ratio of the live event — higher means the market is more certain.
+    consensus_confidence: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -90,6 +100,9 @@ struct OracleSnapshot {
     confidence: f64,
     ema_price: f64,
     publish_time: u64,
+    /// True when `now - publish_time > PYTH_STALENESS_THRESHOLD_SECS`.
+    is_stale: bool,
+    age_seconds: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -102,82 +115,22 @@ struct PerpFundingPoint {
 }
 
 #[derive(Clone, Debug)]
-struct PolyMarketSnapshot {
-    title: String,
-    slug: String,
-    description: String,
-    resolution_source: String,
-    resolves_at: String,
-    probability: f64,
-    no_probability: f64,
-    sigma: f64,
-    outcome_label: String,
-    volume_usd: f64,
-    liquidity_usd: f64,
-    best_bid: Option<f64>,
-    best_ask: Option<f64>,
-    spread: Option<f64>,
-    updated_at_millis: u64,
-}
-
-#[derive(Clone, Debug)]
-struct SimulationSourceState {
-    live_event: PolyMarketSnapshot,
-    slot: u64,
-}
-
-#[derive(Clone, Debug)]
-struct MarketSimulationState {
-    initialized: bool,
-    running: bool,
-    regime: String,
-    scenario: String,
-    speed: u32,
-    tick: u64,
-    revision: u64,
-    current_mu: f64,
-    current_sigma: f64,
-    current_skew: f64,
-    previous_mu: f64,
-    previous_sigma: f64,
-    previous_skew: f64,
-    target_shift: f64,
-    shock_remaining: u32,
-    total_volume: f64,
-    fees_earned: f64,
-    trade_count: u64,
-    accepted_count: u64,
-    history: Vec<SimulationHistoryPoint>,
-    tape: Vec<SimulationTradeEvent>,
-    last_error: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-struct SimulationHistoryPoint {
-    slot: u64,
-    tick: u64,
-    mu: f64,
-    sigma: f64,
-    volume: f64,
-    fees: f64,
-    reason: String,
-}
-
-#[derive(Clone, Debug)]
-struct SimulationTradeEvent {
-    id: String,
-    slot: u64,
-    tick: u64,
-    agent_type: String,
-    handle: String,
-    action: String,
-    target_mu: f64,
-    target_sigma: f64,
-    collateral: f64,
-    fee: f64,
-    total_debit: f64,
-    accepted: bool,
-    reason: String,
+pub struct PolyMarketSnapshot {
+    pub title: String,
+    pub slug: String,
+    pub description: String,
+    pub resolution_source: String,
+    pub resolves_at: String,
+    pub probability: f64,
+    pub no_probability: f64,
+    pub sigma: f64,
+    pub outcome_label: String,
+    pub volume_usd: f64,
+    pub liquidity_usd: f64,
+    pub best_bid: Option<f64>,
+    pub best_ask: Option<f64>,
+    pub spread: Option<f64>,
+    pub updated_at_millis: u64,
 }
 
 #[derive(Clone, Deserialize)]
@@ -238,6 +191,8 @@ struct ClobBookResponse {
 #[derive(Deserialize)]
 struct ClobBookLevel {
     price: String,
+    /// Size at this price level. Used for volume-weighted spread estimation.
+    size: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -333,6 +288,8 @@ async fn main() -> Result<(), String> {
         last_update_unix_ms: None,
         execution_mode: Some("demo_memo".to_string()),
         message: "Resolving live Polymarket and perp snapshots.".to_string(),
+        oracle_age_seconds: 0,
+        consensus_confidence: 0.0,
     };
     let snapshot = Arc::new(RwLock::new(BackendSnapshot {
         payload: inject_status(base_payload.clone(), &initial_status),
@@ -386,6 +343,8 @@ async fn main() -> Result<(), String> {
                         last_update_unix_ms: guard.status.last_update_unix_ms,
                         execution_mode: Some("demo_memo".to_string()),
                         message: format!("Live update failed: {error}"),
+                        oracle_age_seconds: guard.status.oracle_age_seconds,
+                        consensus_confidence: guard.status.consensus_confidence,
                     };
                     let next_payload = inject_status(guard.payload.clone(), &error_status);
                     guard.status = error_status;
@@ -423,6 +382,7 @@ async fn main() -> Result<(), String> {
         .route("/api/simulation/reset", post(reset_simulation))
         .route("/api/simulation/speed", post(cycle_simulation_speed))
         .route("/api/simulation/shock", post(trigger_simulation_shock))
+        .route("/api/simulation/distribution", post(cycle_distribution_family))
         .route("/api/simulation/regime/drift", post(set_drift_regime))
         .route("/api/simulation/regime/bullish", post(set_bullish_regime))
         .route("/api/simulation/regime/bearish", post(set_bearish_regime))
@@ -561,6 +521,15 @@ async fn trigger_simulation_shock(State(context): State<AppContext>) -> impl Int
     (StatusCode::OK, Json(guard.to_payload()))
 }
 
+/// Cycles through Normal → CauchyOverlay → StudentT → Normal.
+/// Allows the simulation to demonstrate fat-tail / Black Swan μ jumps without
+/// changing the on-chain quoting model (which remains Normal throughout).
+async fn cycle_distribution_family(State(context): State<AppContext>) -> impl IntoResponse {
+    let mut guard = context.simulation.write().await;
+    guard.cycle_distribution_family();
+    (StatusCode::OK, Json(guard.to_payload()))
+}
+
 async fn set_drift_regime(State(context): State<AppContext>) -> impl IntoResponse {
     let mut guard = context.simulation.write().await;
     guard.set_regime("drift");
@@ -593,9 +562,11 @@ async fn refresh_snapshot(
     simulation: &Arc<RwLock<MarketSimulationState>>,
     simulation_source: &Arc<RwLock<Option<SimulationSourceState>>>,
     history: &mut Vec<PerpFundingPoint>,
-) -> Result<BackendSnapshot, String> {
-    let live_event = fetch_polymarket_snapshot(client, poly).await?;
-    let oracle = fetch_latest_price(client, &feed.hermes_base, &feed.feed_id).await?;
+) -> anyhow::Result<BackendSnapshot> {
+    let live_event = fetch_polymarket_snapshot(client, poly).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let oracle = fetch_latest_price(client, &feed.hermes_base, &feed.feed_id).await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
     let slot = fetch_solana_slot(client, &feed.solana_rpc)
         .await
         .unwrap_or(oracle.publish_time);
@@ -618,11 +589,37 @@ async fn refresh_snapshot(
             slot,
             history,
             &mut simulation_guard,
-        )?
+        ).map_err(|e| anyhow::anyhow!("{e}"))?
     };
+
+    // μ/σ confidence index: higher ratio means the market has a tighter, more
+    // certain distribution relative to the probability level being estimated.
+    let consensus_confidence = if live_event.sigma > 0.0 {
+        (live_event.probability * 100.0) / live_event.sigma
+    } else {
+        0.0
+    };
+
+    let (mode, status_label, message) = if oracle.is_stale {
+        (
+            "degraded",
+            "Degraded",
+            format!(
+                "Pyth price is stale ({} s old). Last known data is shown.",
+                oracle.age_seconds
+            ),
+        )
+    } else {
+        (
+            "live",
+            "Connected",
+            "Featured Polymarket event and SOL perp are live.".to_string(),
+        )
+    };
+
     let status = StatusPayload {
-        mode: "live".to_string(),
-        status: "Connected".to_string(),
+        mode: mode.to_string(),
+        status: status_label.to_string(),
         source: "Polymarket + Pyth Hermes".to_string(),
         symbol: format!("{} + {}", poly.market_slug, feed.symbol_query),
         endpoint: format!("{} | {}", poly.gamma_base, feed.hermes_base),
@@ -631,7 +628,9 @@ async fn refresh_snapshot(
         slot: Some(slot),
         last_update_unix_ms: Some(now_unix_ms()),
         execution_mode: Some("demo_memo".to_string()),
-        message: "Featured Polymarket event and SOL perp are live.".to_string(),
+        message,
+        oracle_age_seconds: oracle.age_seconds,
+        consensus_confidence,
     };
 
     Ok(BackendSnapshot {
@@ -715,11 +714,20 @@ async fn fetch_latest_price(
         .next()
         .ok_or_else(|| "Hermes returned no price data".to_string())?;
 
+    let now_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let age_seconds = now_secs.saturating_sub(latest.price.publish_time);
+    let is_stale = age_seconds > PYTH_STALENESS_THRESHOLD_SECS;
+
     Ok(OracleSnapshot {
         price: scaled_component_to_f64(&latest.price)?,
         confidence: scaled_confidence_to_f64(&latest.price)?,
         ema_price: scaled_component_to_f64(&latest.ema_price)?,
         publish_time: latest.price.publish_time,
+        is_stale,
+        age_seconds,
     })
 }
 
@@ -792,16 +800,23 @@ async fn fetch_polymarket_snapshot(
     let spread = fetch_clob_spread(client, &config.clob_base, token_id)
         .await
         .ok();
-    let (best_bid, best_ask) = fetch_clob_best_bid_ask(client, &config.clob_base, token_id).await?;
+    let (best_bid, best_ask, depth_spread) =
+        fetch_clob_book_depth(client, &config.clob_base, token_id).await?;
+
     let probability = midpoint
         .unwrap_or(prices[config.outcome_index])
         .clamp(0.0, 1.0);
     let no_probability = (1.0 - probability).clamp(0.0, 1.0);
-    let spread_value = spread.or_else(|| match (best_bid, best_ask) {
-        (Some(bid), Some(ask)) => Some((ask - bid).max(0.0)),
-        _ => None,
-    });
-    let sigma = estimate_probability_sigma(probability, spread_value.unwrap_or(0.02));
+
+    // Prefer depth-weighted spread (more informative) over raw spread, fall back to bid/ask diff.
+    let effective_spread = depth_spread
+        .or(spread)
+        .or_else(|| match (best_bid, best_ask) {
+            (Some(bid), Some(ask)) => Some((ask - bid).max(0.0)),
+            _ => None,
+        });
+
+    let sigma = estimate_probability_sigma(probability, effective_spread.unwrap_or(0.02));
 
     Ok(PolyMarketSnapshot {
         title: market.question,
@@ -817,7 +832,7 @@ async fn fetch_polymarket_snapshot(
         liquidity_usd: market.liquidity_num.unwrap_or_default(),
         best_bid,
         best_ask,
-        spread: spread_value,
+        spread: effective_spread,
         updated_at_millis: now_unix_ms(),
     })
 }
@@ -866,11 +881,15 @@ async fn fetch_clob_spread(
         .map_err(|error| format!("invalid Polymarket spread {}: {error}", body.spread))
 }
 
-async fn fetch_clob_best_bid_ask(
+/// Fetches the top-5 bid and ask levels and returns (best_bid, best_ask, volume_weighted_spread).
+///
+/// Volume-weighting uses size at each level so that deep, liquid books produce a tighter
+/// effective spread than thin books — which directly feeds into σ estimation.
+async fn fetch_clob_book_depth(
     client: &Client,
     clob_base: &str,
     token_id: &str,
-) -> Result<(Option<f64>, Option<f64>), String> {
+) -> Result<(Option<f64>, Option<f64>, Option<f64>), String> {
     let response = client
         .get(format!("{clob_base}/book"))
         .query(&[("token_id", token_id)])
@@ -878,21 +897,47 @@ async fn fetch_clob_best_bid_ask(
         .await
         .map_err(|error| format!("failed to fetch Polymarket order book: {error}"))?;
     if !response.status().is_success() {
-        return Ok((None, None));
+        return Ok((None, None, None));
     }
     let book: ClobBookResponse = response
         .json()
         .await
         .map_err(|error| format!("invalid Polymarket order book response: {error}"))?;
-    let best_bid = book
-        .bids
-        .last()
-        .and_then(|level| level.price.parse::<f64>().ok());
-    let best_ask = book
-        .asks
-        .last()
-        .and_then(|level| level.price.parse::<f64>().ok());
-    Ok((best_bid, best_ask))
+
+    let best_bid = book.bids.last().and_then(|l| l.price.parse::<f64>().ok());
+    let best_ask = book.asks.last().and_then(|l| l.price.parse::<f64>().ok());
+
+    // Volume-weighted price across the top 5 levels on each side.
+    fn vw_price(levels: &[ClobBookLevel], top_n: usize, from_end: bool) -> Option<f64> {
+        let slice: Vec<&ClobBookLevel> = if from_end {
+            levels.iter().rev().take(top_n).collect()
+        } else {
+            levels.iter().take(top_n).collect()
+        };
+        let mut sum_pv = 0.0_f64;
+        let mut sum_v = 0.0_f64;
+        for level in &slice {
+            if let Ok(p) = level.price.parse::<f64>() {
+                let v = level
+                    .size
+                    .as_deref()
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .unwrap_or(1.0); // uniform weight when size absent
+                sum_pv += p * v;
+                sum_v += v;
+            }
+        }
+        if sum_v > 0.0 { Some(sum_pv / sum_v) } else { None }
+    }
+
+    let vw_bid = vw_price(&book.bids, 5, true);
+    let vw_ask = vw_price(&book.asks, 5, true);
+    let depth_spread = match (vw_bid, vw_ask) {
+        (Some(b), Some(a)) if a > b => Some((a - b).max(0.0)),
+        _ => None,
+    };
+
+    Ok((best_bid, best_ask, depth_spread))
 }
 
 fn parse_embedded_string_array(raw: &str) -> Result<Vec<String>, String> {
@@ -912,9 +957,15 @@ fn parse_embedded_number_array(raw: &str) -> Result<Vec<f64>, String> {
         .collect()
 }
 
+/// Estimates σ for the event market distribution from the binary probability and book spread.
+///
+/// Deeper books (low spread) produce lower σ — the market has conviction.
+/// Thin books (high spread) inflate σ — the crowd is uncertain.
 fn estimate_probability_sigma(probability: f64, spread: f64) -> f64 {
     let center_weight = 0.5 - (probability - 0.5).abs();
-    (8.0 + center_weight * 8.0 + spread * 125.0).clamp(4.0, 18.0)
+    // Spread contributes more weight (150× vs the previous 125×) because we now supply the
+    // volume-weighted spread, which is a better signal of true book depth.
+    (8.0 + center_weight * 8.0 + spread * 150.0).clamp(4.0, 18.0)
 }
 
 fn build_live_payload(
@@ -1031,6 +1082,8 @@ fn build_live_payload(
         "available_lp_cash_display": format9(available_lp_cash),
         "open_positions": 0,
         "total_lp_shares_display": format9(50.0),
+        "oracle_age_seconds": oracle.age_seconds,
+        "oracle_stale": oracle.is_stale,
         "curve_points": build_curve_points(amm_mu, amm_sigma, anchor_mu, anchor_sigma)?,
         "funding_path": history.iter().map(|point| json!({
             "slot": point.slot,
@@ -1276,466 +1329,36 @@ fn build_live_event_curve_points(
     Ok(points)
 }
 
-impl MarketSimulationState {
-    fn new() -> Self {
-        Self {
-            initialized: false,
-            running: false,
-            regime: "drift".to_string(),
-            scenario: "Consensus drift".to_string(),
-            speed: 1,
-            tick: 0,
-            revision: 0,
-            current_mu: 50.0,
-            current_sigma: 10.0,
-            current_skew: 0.0,
-            previous_mu: 50.0,
-            previous_sigma: 10.0,
-            previous_skew: 0.0,
-            target_shift: 0.0,
-            shock_remaining: 0,
-            total_volume: 0.0,
-            fees_earned: 0.0,
-            trade_count: 0,
-            accepted_count: 0,
-            history: Vec::new(),
-            tape: Vec::new(),
-            last_error: None,
-        }
+fn build_curve_points(
+    amm_mu: f64,
+    amm_sigma: f64,
+    anchor_mu: f64,
+    anchor_sigma: f64,
+) -> Result<Vec<Value>, String> {
+    let amm_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(amm_mu)?, Fixed::from_f64(amm_sigma)?)?;
+    let anchor_distribution =
+        FixedNormalDistribution::new(Fixed::from_f64(anchor_mu)?, Fixed::from_f64(anchor_sigma)?)?;
+    let k = Fixed::from_f64(21.05026039569057)?;
+    let lower = amm_mu.min(anchor_mu) - amm_sigma.max(anchor_sigma) * 4.0;
+    let upper = amm_mu.max(anchor_mu) + amm_sigma.max(anchor_sigma) * 4.0;
+    let samples = 56_usize;
+    let mut points = Vec::with_capacity(samples + 1);
+
+    for step in 0..=samples {
+        let x = lower + (upper - lower) * step as f64 / samples as f64;
+        let x_fixed = Fixed::from_f64(x)?;
+        let amm_value = fixed_calculate_f(x_fixed, amm_distribution, k)?.to_f64();
+        let anchor_value = fixed_calculate_f(x_fixed, anchor_distribution, k)?.to_f64();
+        points.push(json!({
+            "x": format9(x),
+            "amm": format9(amm_value),
+            "anchor": format9(anchor_value),
+            "edge": format9(amm_value - anchor_value),
+        }));
     }
 
-    fn status_json(&self) -> Value {
-        json!({
-            "running": self.running,
-            "regime": self.regime,
-            "scenario": self.scenario,
-            "speed": self.speed,
-            "tick": self.tick,
-            "revision": self.revision,
-            "trade_count": self.trade_count,
-            "accepted_count": self.accepted_count,
-            "current_mu_display": format9(self.current_mu),
-            "current_sigma_display": format9(self.current_sigma),
-            "current_skew_display": format9(self.current_skew),
-            "previous_skew_display": format9(self.previous_skew),
-            "last_error": &self.last_error,
-        })
-    }
-
-    fn set_regime(&mut self, regime: &str) {
-        self.running = true;
-        self.regime = regime.to_string();
-        self.shock_remaining = 0;
-        self.target_shift = 0.0;
-        self.scenario = match regime {
-            "bullish" => "Bullish conviction".to_string(),
-            "bearish" => "Bearish conviction".to_string(),
-            "volatile" => "Two-sided volatility".to_string(),
-            _ => "Consensus drift".to_string(),
-        };
-        let target_skew = self.regime_target_skew();
-        self.current_skew = target_skew;
-        self.previous_skew = target_skew;
-        self.bump_revision();
-    }
-
-    fn bump_revision(&mut self) {
-        self.revision = self.revision.saturating_add(1);
-    }
-
-    fn toggle_regime(&mut self, regime: &str) {
-        if self.regime == regime {
-            self.set_regime("drift");
-        } else {
-            self.set_regime(regime);
-        }
-    }
-
-    fn advance_background(
-        &mut self,
-        live_event: &PolyMarketSnapshot,
-        slot: u64,
-    ) -> Result<(), String> {
-        self.ensure_initialized(live_event, slot);
-        if self.running {
-            let steps = self.speed.clamp(1, 12);
-            for _ in 0..steps {
-                self.apply_trade_tick(live_event, slot + self.tick)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn ensure_initialized(&mut self, _live_event: &PolyMarketSnapshot, slot: u64) {
-        if self.initialized {
-            return;
-        }
-        self.initialized = true;
-        self.current_mu = 50.0;
-        self.current_sigma = 10.0;
-        self.current_skew = 0.0;
-        self.previous_mu = self.current_mu;
-        self.previous_sigma = self.current_sigma;
-        self.previous_skew = self.current_skew;
-        self.history.clear();
-        self.tape.clear();
-        self.push_history(slot, "Neutral market baseline");
-    }
-
-    fn apply_trade_tick(
-        &mut self,
-        live_event: &PolyMarketSnapshot,
-        slot: u64,
-    ) -> Result<(), String> {
-        self.tick += 1;
-        let external_mu = (live_event.probability * 100.0).clamp(1.0, 99.0);
-        let external_sigma = live_event.sigma.clamp(4.0, 18.0);
-        let shock = if self.shock_remaining > 0 {
-            self.shock_remaining -= 1;
-            if self.shock_remaining == 0 {
-                self.regime = "drift".to_string();
-                self.scenario = "Consensus drift".to_string();
-                self.target_shift = 0.0;
-            }
-            self.target_shift
-        } else {
-            0.0
-        };
-        let target_consensus = self.regime_target_consensus(external_mu + shock);
-        let (agent_type, handle, action, reason, target_mu, target_sigma) =
-            self.agent_proposal(target_consensus, external_sigma);
-        let target_skew = self.regime_target_skew();
-
-        match self.quote_transition(target_mu, target_sigma, slot) {
-            Ok((collateral, fee, total_debit)) => {
-                self.previous_mu = self.current_mu;
-                self.previous_sigma = self.current_sigma;
-                self.previous_skew = self.current_skew;
-                self.current_mu = target_mu;
-                self.current_sigma = target_sigma;
-                self.current_skew = target_skew;
-                self.total_volume += total_debit;
-                self.fees_earned += fee;
-                self.trade_count += 1;
-                self.accepted_count += 1;
-                self.last_error = None;
-                self.push_tape(SimulationTradeEvent {
-                    id: format!("sim-{}", self.tick),
-                    slot,
-                    tick: self.tick,
-                    agent_type,
-                    handle,
-                    action,
-                    target_mu,
-                    target_sigma,
-                    collateral,
-                    fee,
-                    total_debit,
-                    accepted: true,
-                    reason: reason.clone(),
-                });
-                self.push_history(slot, &reason);
-            }
-            Err(error) => {
-                self.last_error = Some(error.clone());
-                self.push_tape(SimulationTradeEvent {
-                    id: format!("sim-{}", self.tick),
-                    slot,
-                    tick: self.tick,
-                    agent_type,
-                    handle,
-                    action,
-                    target_mu,
-                    target_sigma,
-                    collateral: 0.0,
-                    fee: 0.0,
-                    total_debit: 0.0,
-                    accepted: false,
-                    reason: error,
-                });
-            }
-        }
-        self.bump_revision();
-
-        Ok(())
-    }
-
-    fn regime_target_consensus(&self, base_consensus: f64) -> f64 {
-        match self.regime.as_str() {
-            "bullish" => (base_consensus + 24.0).clamp(70.0, 96.0),
-            "bearish" => (base_consensus - 45.0).clamp(4.0, 35.0),
-            "volatile" => {
-                let wave = if (self.tick / 4) % 2 == 0 {
-                    30.0
-                } else {
-                    -30.0
-                };
-                let pulse = (pseudo_unit(self.tick + 91) - 0.5) * 10.0;
-                (base_consensus + wave + pulse).clamp(1.0, 99.0)
-            }
-            _ => base_consensus.clamp(1.0, 99.0),
-        }
-    }
-
-    fn regime_target_skew(&self) -> f64 {
-        match self.regime.as_str() {
-            // Visual pressure layer only: settlement pricing remains Normal-only.
-            "bullish" => -7.0,
-            "bearish" => 7.0,
-            "volatile" => {
-                if (self.tick / 3) % 2 == 0 {
-                    -6.0
-                } else {
-                    6.0
-                }
-            }
-            "shock" => {
-                if self.target_shift >= 0.0 {
-                    -5.0
-                } else {
-                    5.0
-                }
-            }
-            _ => 0.0,
-        }
-    }
-
-    fn agent_proposal(
-        &self,
-        target_consensus: f64,
-        external_sigma: f64,
-    ) -> (String, String, String, String, f64, f64) {
-        let noise = pseudo_unit(self.tick + 17) - 0.5;
-        let momentum = self.current_mu - self.previous_mu;
-        let agent_index = (self.tick % 5) as usize;
-        if self.regime == "bullish" {
-            let breath = (pseudo_unit(self.tick + 31) - 0.5) * 4.5;
-            return (
-                "Bullish".to_string(),
-                format!("bull_{}", 100 + agent_index),
-                "bids higher with confidence".to_string(),
-                "Bullish traders are clustered above the live consensus, tightening confidence and leaving a left-tail risk shadow.".to_string(),
-                (self.current_mu * 0.25 + target_consensus * 0.75 + breath).clamp(70.0, 96.0),
-                (4.4 + pseudo_unit(self.tick + 37) * 2.4).clamp(4.0, 8.0),
-            );
-        }
-        if self.regime == "bearish" {
-            let breath = (pseudo_unit(self.tick + 43) - 0.5) * 4.5;
-            return (
-                "Bearish".to_string(),
-                format!("bear_{}", 100 + agent_index),
-                "offers lower with confidence".to_string(),
-                "Bearish traders are clustered below the live consensus, tightening confidence and leaving a right-tail risk shadow.".to_string(),
-                (self.current_mu * 0.25 + target_consensus * 0.75 + breath).clamp(4.0, 35.0),
-                (4.4 + pseudo_unit(self.tick + 47) * 2.4).clamp(4.0, 8.0),
-            );
-        }
-        if self.regime == "volatile" {
-            let direction = if (self.tick / 4) % 2 == 0 { 1.0 } else { -1.0 };
-            return (
-                "Volatile".to_string(),
-                format!("vol_{}", 100 + agent_index),
-                "hits both sides aggressively".to_string(),
-                "Two-sided flow keeps dragging the estimate back and forth while confidence widens.".to_string(),
-                (self.current_mu
-                    + (target_consensus - self.current_mu) * 1.05
-                    + direction * (5.0 + pseudo_unit(self.tick + 53) * 6.0))
-                    .clamp(1.0, 99.0),
-                (self.current_sigma * 1.20 + 4.0 + pseudo_unit(self.tick + 59) * 4.0)
-                    .clamp(10.0, 18.0),
-            );
-        }
-        let (agent, handle, action, raw_mu, raw_sigma, reason) = match agent_index {
-            0 => (
-                "Informed",
-                "model_alpha",
-                "leans toward fresh information",
-                self.current_mu + (target_consensus - self.current_mu) * 0.88 + noise * 3.5,
-                self.current_sigma * 0.78 + external_sigma * 0.22,
-                "An informed trader pulls the curve toward the latest consensus.",
-            ),
-            1 => (
-                "Momentum",
-                "trend_721",
-                "follows the last move",
-                self.current_mu + momentum * 2.15 + noise * 5.0,
-                self.current_sigma * (0.90 + pseudo_unit(self.tick + 3) * 0.22),
-                "A momentum trader extends the recent direction.",
-            ),
-            2 => (
-                "Noisy",
-                "anon_noise",
-                "adds disagreement",
-                self.current_mu + noise * 16.0,
-                self.current_sigma * (0.72 + pseudo_unit(self.tick + 5) * 0.70),
-                "A noisy trader adds short-term disagreement to the market.",
-            ),
-            3 => (
-                "Contrarian",
-                "fade_shop",
-                "fades the crowd",
-                self.current_mu + (target_consensus - self.current_mu) * 0.42 - momentum * 1.35
-                    + noise * 4.0,
-                self.current_sigma * 1.18,
-                "A contrarian trader fades the last move.",
-            ),
-            _ => (
-                "Risk-limited",
-                "small_size",
-                "nudges within budget",
-                self.current_mu + (target_consensus - self.current_mu) * 0.55 + noise * 2.5,
-                self.current_sigma * 0.88 + external_sigma * 0.12,
-                "A smaller trader still moves the curve visibly.",
-            ),
-        };
-
-        let mut target_mu = raw_mu.clamp(1.0, 99.0);
-        let mut target_sigma = raw_sigma.clamp(4.0, 18.0);
-        if (target_mu - self.current_mu).abs() < 0.12
-            && (target_sigma - self.current_sigma).abs() < 0.08
-        {
-            let sign = if target_consensus >= self.current_mu {
-                1.0
-            } else {
-                -1.0
-            };
-            target_mu = (target_mu + sign * 2.5).clamp(1.0, 99.0);
-            target_sigma = (target_sigma * 1.08).clamp(4.0, 18.0);
-        }
-
-        (
-            agent.to_string(),
-            handle.to_string(),
-            action.to_string(),
-            reason.to_string(),
-            target_mu,
-            target_sigma,
-        )
-    }
-
-    fn quote_transition(
-        &self,
-        target_mu: f64,
-        target_sigma: f64,
-        slot: u64,
-    ) -> Result<(f64, f64, f64), String> {
-        let mut program = seeded_demo_market()?;
-        program.state.core_market.config.max_collateral_per_trade = Fixed::from_f64(100.0)?;
-        program.state.market_account.max_collateral_per_trade =
-            program.state.core_market.config.max_collateral_per_trade;
-        set_program_distribution(&mut program, self.current_mu, self.current_sigma)?;
-        let target_distribution = FixedNormalDistribution::new(
-            Fixed::from_f64(target_mu)?,
-            Fixed::from_f64(target_sigma)?,
-        )?;
-        let envelope = build_trade_quote(
-            &program,
-            TradeQuoteRequestV1 {
-                trader: [8_u8; 32],
-                market: DEMO_MARKET_ID,
-                target_distribution,
-                quote_slot: slot,
-                quote_expiry_slot: slot + DEMO_QUOTE_EXPIRY_DELTA,
-            },
-        )?;
-        Ok((
-            envelope.collateral_required.to_f64(),
-            envelope.fee_paid.to_f64(),
-            envelope.total_debit.to_f64(),
-        ))
-    }
-
-    fn push_history(&mut self, slot: u64, reason: &str) {
-        self.history.push(SimulationHistoryPoint {
-            slot,
-            tick: self.tick,
-            mu: self.current_mu,
-            sigma: self.current_sigma,
-            volume: self.total_volume,
-            fees: self.fees_earned,
-            reason: reason.to_string(),
-        });
-        if self.history.len() > 64 {
-            let drop_count = self.history.len() - 64;
-            self.history.drain(0..drop_count);
-        }
-    }
-
-    fn push_tape(&mut self, event: SimulationTradeEvent) {
-        self.tape.insert(0, event);
-        if self.tape.len() > 18 {
-            self.tape.truncate(18);
-        }
-    }
-
-    fn to_payload(&self) -> Value {
-        json!({
-            "running": self.running,
-            "regime": self.regime,
-            "scenario": self.scenario,
-            "speed": self.speed,
-            "tick": self.tick,
-            "revision": self.revision,
-            "trade_count": self.trade_count,
-            "accepted_count": self.accepted_count,
-            "current_mu_display": format9(self.current_mu),
-            "current_sigma_display": format9(self.current_sigma),
-            "current_skew_display": format9(self.current_skew),
-            "previous_mu_display": format9(self.previous_mu),
-            "previous_sigma_display": format9(self.previous_sigma),
-            "previous_skew_display": format9(self.previous_skew),
-            "total_volume_display": format9(self.total_volume),
-            "fees_earned_display": format9(self.fees_earned),
-            "last_error": &self.last_error,
-            "market_path": self.history.iter().map(|point| json!({
-                "slot": point.slot,
-                "tick": point.tick,
-                "mu_display": format9(point.mu),
-                "sigma_display": format9(point.sigma),
-                "volume_display": format9(point.volume),
-                "fees_display": format9(point.fees),
-                "reason": &point.reason,
-            })).collect::<Vec<_>>(),
-            "trade_tape": self.tape.iter().map(|trade| json!({
-                "id": &trade.id,
-                "slot": trade.slot,
-                "tick": trade.tick,
-                "agent_type": &trade.agent_type,
-                "handle": &trade.handle,
-                "action": &trade.action,
-                "target_mu_display": format9(trade.target_mu),
-                "target_sigma_display": format9(trade.target_sigma),
-                "collateral_display": format9(trade.collateral),
-                "fee_display": format9(trade.fee),
-                "total_debit_display": format9(trade.total_debit),
-                "accepted": trade.accepted,
-                "reason": &trade.reason,
-            })).collect::<Vec<_>>(),
-        })
-    }
-}
-
-fn pseudo_unit(seed: u64) -> f64 {
-    let raw = ((seed as f64 + 1.0) * 12.9898).sin() * 43_758.5453;
-    raw - raw.floor()
-}
-
-fn clamp_probability_percent(value: f64) -> f64 {
-    value.clamp(1.0, 99.0)
-}
-
-fn set_program_distribution(
-    program: &mut normal_v1_program::NormalV1Program,
-    mu: f64,
-    sigma: f64,
-) -> Result<(), String> {
-    let distribution = FixedNormalDistribution::new(Fixed::from_f64(mu)?, Fixed::from_f64(sigma)?)?;
-    let lambda = fixed_calculate_lambda(distribution.sigma, program.state.market_account.k)?;
-    program.state.core_market.current_distribution = distribution;
-    program.state.core_market.current_lambda = lambda;
-    program.state.market_account.current_distribution = distribution;
-    program.state.market_account.current_lambda = lambda;
-    Ok(())
+    Ok(points)
 }
 
 fn build_live_quote(
@@ -1849,38 +1472,6 @@ fn build_live_quote_candidate(
     }))
 }
 
-fn build_curve_points(
-    amm_mu: f64,
-    amm_sigma: f64,
-    anchor_mu: f64,
-    anchor_sigma: f64,
-) -> Result<Vec<Value>, String> {
-    let amm_distribution =
-        FixedNormalDistribution::new(Fixed::from_f64(amm_mu)?, Fixed::from_f64(amm_sigma)?)?;
-    let anchor_distribution =
-        FixedNormalDistribution::new(Fixed::from_f64(anchor_mu)?, Fixed::from_f64(anchor_sigma)?)?;
-    let k = Fixed::from_f64(21.05026039569057)?;
-    let lower = amm_mu.min(anchor_mu) - amm_sigma.max(anchor_sigma) * 4.0;
-    let upper = amm_mu.max(anchor_mu) + amm_sigma.max(anchor_sigma) * 4.0;
-    let samples = 56_usize;
-    let mut points = Vec::with_capacity(samples + 1);
-
-    for step in 0..=samples {
-        let x = lower + (upper - lower) * step as f64 / samples as f64;
-        let x_fixed = Fixed::from_f64(x)?;
-        let amm_value = fixed_calculate_f(x_fixed, amm_distribution, k)?.to_f64();
-        let anchor_value = fixed_calculate_f(x_fixed, anchor_distribution, k)?.to_f64();
-        points.push(json!({
-            "x": format9(x),
-            "amm": format9(amm_value),
-            "anchor": format9(anchor_value),
-            "edge": format9(amm_value - anchor_value),
-        }));
-    }
-
-    Ok(points)
-}
-
 fn demo_perp_mark_payout(
     program: &normal_v1_program::NormalV1Program,
     target_mu: f64,
@@ -1930,8 +1521,12 @@ fn scaled_confidence_to_f64(component: &HermesPriceComponent) -> Result<f64, Str
     Ok(conf * 10_f64.powi(component.expo))
 }
 
-fn format9(value: f64) -> String {
+pub(crate) fn format9(value: f64) -> String {
     format!("{value:.9}")
+}
+
+fn clamp_probability_percent(value: f64) -> f64 {
+    value.clamp(1.0, 99.0)
 }
 
 fn now_unix_ms() -> u64 {
