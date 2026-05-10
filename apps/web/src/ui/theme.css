@@ -281,6 +281,85 @@
   box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
 }
 
+/* ── Global button transitions ──────────────────────────── */
+
+button {
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease,
+    transform 120ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease,
+    outline 120ms ease;
+}
+
+/* ── Market card (hover via CSS, no inline handlers) ─────── */
+
+.pb-market-card {
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+
+.pb-market-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--pb-card-shadow-hover);
+  border-color: var(--pb-border-strong);
+}
+
+.pb-market-card:active {
+  transform: translateY(0);
+}
+
+.pb-live-card {
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+
+.pb-live-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--pb-card-shadow-hover);
+  border-color: var(--pb-border-strong);
+}
+
+.pb-live-card:active {
+  transform: translateY(0);
+}
+
+/* ── Filter pill (category/type nav) ────────────────────── */
+
+.pb-filter-pill {
+  flex-shrink: 0;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 100ms ease;
+}
+
+.pb-filter-pill:active {
+  transform: scale(0.95);
+}
+
+/* ── Tab underline button ───────────────────────────────── */
+
+.pb-tab-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 150ms ease;
+}
+
 /* ── Page transitions ───────────────────────────────────── */
 
 @keyframes pb-exit {
