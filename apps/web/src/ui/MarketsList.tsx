@@ -10,6 +10,7 @@ import { compactDecimal, formatVolume, shorten } from "../domain/format";
 import { buildMarketListings } from "../domain/mockMarkets";
 import { Sparkline } from "./Sparkline";
 import { useParabolaStore } from "../state/parabolaStore";
+import { DistBar, MiniDistCurve } from "./shared";
 
 const ALL_CATEGORIES: MarketCategory[] = [
   "All", "Events", "Weather", "Crypto", "Sports",
@@ -34,83 +35,6 @@ function liveLabel(mode: string) {
   if (mode === "connecting") return "CONNECTING";
   if (mode === "error")      return "ERROR";
   return "DEMO";
-}
-
-/* clamp a % to [0, 100] */
-function clamp(v: number) { return Math.min(100, Math.max(0, v)); }
-
-/* ── Distribution bar ─────────────────────────────────────
-   Shows μ position (tick) + ±1σ window (filled band)
-   within the full [muMin, muMax] range.
-   This is the visual core of a distribution market:
-   where does the crowd think it lands, and how sure are they?
-─────────────────────────────────────────────────────────── */
-function DistBar({
-  mu, sigma, muMin, muMax, color = "var(--pb-crowd)",
-}: {
-  mu: number; sigma: number; muMin: number; muMax: number; color?: string;
-}) {
-  const span = muMax - muMin || 1;
-  const muPct   = clamp(((mu - muMin)       / span) * 100);
-  const leftPct = clamp(((mu - sigma - muMin) / span) * 100);
-  const wPct    = clamp(((2 * sigma)          / span) * 100);
-
-  return (
-    <div style={{ position: "relative", height: 6, borderRadius: 99, background: "var(--pb-surface-muted)" }}>
-      {/* ±1σ band */}
-      <div
-        style={{
-          position: "absolute", top: 0, bottom: 0,
-          left: `${leftPct}%`, width: `${wPct}%`,
-          background: color, opacity: 0.35, borderRadius: 99,
-        }}
-      />
-      {/* μ tick */}
-      <div
-        style={{
-          position: "absolute", top: -2, bottom: -2,
-          left: `${muPct}%`, width: 3,
-          transform: "translateX(-50%)",
-          background: color, borderRadius: 2,
-        }}
-      />
-    </div>
-  );
-}
-
-/* ── Mini distribution SVG drawn on the card ─────────────── */
-function MiniDistCurve({
-  mu, sigma, muMin, muMax, color = "var(--pb-crowd)",
-  width = 80, height = 32,
-}: {
-  mu: number; sigma: number; muMin: number; muMax: number;
-  color?: string; width?: number; height?: number;
-}) {
-  const span = muMax - muMin || 1;
-  const samples = 60;
-  const pad = 2;
-  const plotW = width - pad * 2;
-  const plotH = height - pad * 2;
-
-  const pdf = (x: number) => Math.exp(-0.5 * ((x - mu) / sigma) ** 2);
-  const pts = Array.from({ length: samples }, (_, i) => {
-    const t = i / (samples - 1);
-    const x = muMin + t * span;
-    return pdf(x);
-  });
-  const maxY = Math.max(...pts, 1e-9);
-
-  const path = pts.map((v, i) => {
-    const px = pad + (i / (samples - 1)) * plotW;
-    const py = pad + plotH - (v / maxY) * plotH * 0.9;
-    return `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`;
-  }).join(" ");
-
-  return (
-    <svg width={width} height={height} aria-hidden style={{ overflow: "visible" }}>
-      <path d={path} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" opacity={0.7} />
-    </svg>
-  );
 }
 
 /* ── Market type badge ────────────────────────────────────── */
