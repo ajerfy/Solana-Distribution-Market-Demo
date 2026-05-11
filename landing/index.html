@@ -232,7 +232,7 @@
   </div>
   <div class="lake-hint">
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="rgba(193,112,133,0.5)" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="2" fill="rgba(193,112,133,0.5)"/></svg>
-    drag the ball · move mouse to disturb the lake
+    drag the ball
   </div>
 </section>
 
@@ -762,41 +762,31 @@
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════
-     LAKE CANVAS
+     BALL CANVAS — rolling ball physics on Gaussian curve floor
 ════════════════════════════════════════════════════════════════ -->
 <script>
 (function () {
   'use strict';
   const canvas = document.getElementById('lake');
   const ctx    = canvas.getContext('2d');
+  const BALL_R = 13;
 
-  const SCALE   = window.devicePixelRatio > 1 ? 5 : 4;
-  const DAMPING = 0.981; // lower = faster decay = subtler ripples
-  const BALL_R  = 13;
-
-  let W, H, sw, sh;
-  let buf1, buf2;
-  let imgData, pixels;
-  const simCvs = document.createElement('canvas');
-  const simCtx = simCvs.getContext('2d');
-  let bgR, bgG, bgB;
-
+  let W, H;
   const ball = { x: 0, y: 0, vx: 1.8, vy: 0, grabbed: false };
   const TRAIL_LEN = 100;
   const trailX = new Float32Array(TRAIL_LEN);
   const trailY = new Float32Array(TRAIL_LEN);
   let trailHead = 0, trailCount = 0;
   let mouseX = -9999, mouseY = -9999;
-  let prevMouseX = -9999, prevMouseY = -9999;
 
+  // The floor IS a Gaussian: V(x) = (x-μ)²/(2σ²) — a parabola.
+  // The ball oscillates in this potential well as a harmonic oscillator.
   function bellY(x) {
-    const mu = W * 0.5, sig = W / 7.0;
-    const t = (x - mu) / sig;
+    const mu = W * 0.5, sig = W / 7.0, t = (x - mu) / sig;
     return H * 0.80 - H * 0.16 * Math.exp(-0.5 * t * t);
   }
   function bellDY(x) {
-    const mu = W * 0.5, sig = W / 7.0;
-    const t = (x - mu) / sig;
+    const mu = W * 0.5, sig = W / 7.0, t = (x - mu) / sig;
     return H * 0.16 * (t / sig) * Math.exp(-0.5 * t * t);
   }
 
@@ -804,86 +794,10 @@
     const rect = canvas.getBoundingClientRect();
     W = canvas.width  = Math.floor(rect.width);
     H = canvas.height = Math.floor(rect.height);
-    sw = Math.ceil(W / SCALE);
-    sh = Math.ceil(H / SCALE);
-    simCvs.width = sw; simCvs.height = sh;
-    buf1 = new Float32Array(sw * sh);
-    buf2 = new Float32Array(sw * sh);
-    imgData = simCtx.createImageData(sw, sh);
-    pixels  = imgData.data;
-
-    // Very dark water — barely above black, just a suggestion of depth
-    bgR = new Uint8Array(sw * sh);
-    bgG = new Uint8Array(sw * sh);
-    bgB = new Uint8Array(sw * sh);
-    for (let y = 0; y < sh; y++) {
-      for (let x = 0; x < sw; x++) {
-        const i  = y * sw + x;
-        const fy = y / sh;
-        const fx = x / sw - 0.5;
-        const dist = Math.sqrt(fx * fx * 0.4 + (fy - 0.5) * (fy - 0.5) * 0.5);
-        // Near-black with barely visible rose warmth — blends into page bg
-        bgR[i] = (4 + dist * 7 + fy * 3)  | 0;
-        bgG[i] = (2 + dist * 4 + fy * 1)  | 0;
-        bgB[i] = (3 + dist * 6 + fy * 2)  | 0;
-      }
-    }
-
     ball.x = W * 0.5;
     ball.y = bellY(ball.x) - BALL_R;
     ball.vx = 1.8; ball.vy = 0;
     trailCount = 0;
-  }
-
-  function stepWater() {
-    for (let y = 1; y < sh - 1; y++) {
-      for (let x = 1; x < sw - 1; x++) {
-        const i   = y * sw + x;
-        const val = (
-          buf1[(y-1)*sw+x] + buf1[(y+1)*sw+x] +
-          buf1[y*sw+x-1]   + buf1[y*sw+x+1]
-        ) * 0.5 - buf2[i];
-        buf2[i] = val * DAMPING;
-      }
-    }
-    const tmp = buf1; buf1 = buf2; buf2 = tmp;
-  }
-
-  function renderSim() {
-    const data = pixels;
-    for (let y = 0; y < sh; y++) {
-      for (let x = 0; x < sw; x++) {
-        const i  = y * sw + x;
-        const gx = (x > 0 && x < sw-1) ? (buf1[i+1] - buf1[i-1]) * 0.8 : 0;
-        const gy = (y > 0 && y < sh-1) ? (buf1[i+sw] - buf1[i-sw]) * 0.8 : 0;
-        const sx = Math.max(0, Math.min(sw-1, x + (gx | 0)));
-        const sy = Math.max(0, Math.min(sh-1, y + (gy | 0)));
-        const bi = sy * sw + sx;
-        // Very subtle specular — just enough to see the ripple
-        const spec = Math.max(0, buf1[i] * 0.45 - gx * 0.18) * 0.85;
-        const pi   = i * 4;
-        data[pi]   = Math.min(255, bgR[bi] + spec * 1.4) | 0;
-        data[pi+1] = Math.min(255, bgG[bi] + spec * 0.7) | 0;
-        data[pi+2] = Math.min(255, bgB[bi] + spec * 1.0) | 0;
-        data[pi+3] = 255;
-      }
-    }
-    simCtx.putImageData(imgData, 0, 0);
-  }
-
-  function addRipple(cx, cy, strength, radius) {
-    const sx = cx / SCALE | 0;
-    const sy = cy / SCALE | 0;
-    const r  = Math.max(2, (radius / SCALE) | 0);
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        const nx = sx + dx, ny = sy + dy;
-        if (nx > 0 && nx < sw-1 && ny > 0 && ny < sh-1) {
-          const d = Math.sqrt(dx*dx + dy*dy);
-          if (d <= r) buf1[ny * sw + nx] += strength * (1 - d / (r + 1));
-        }
-      }
-    }
   }
 
   function stepBall() {
@@ -900,16 +814,12 @@
       const nLen = Math.sqrt(slope * slope + 1);
       const nx = -slope / nLen, ny = 1 / nLen;
       const dot = ball.vx * nx + ball.vy * ny;
-      ball.vx = (ball.vx - 2*dot*nx) * ELASTICITY * FRICTION;
-      ball.vy = (ball.vy - 2*dot*ny) * ELASTICITY;
-      const impact = Math.abs(dot);
-      if (impact > 0.5) addRipple(ball.x, floor, impact * 2.5, impact * 3 + 7);
+      ball.vx = (ball.vx - 2 * dot * nx) * ELASTICITY * FRICTION;
+      ball.vy = (ball.vy - 2 * dot * ny) * ELASTICITY;
     }
     if (ball.x - BALL_R < 0)  { ball.x = BALL_R;     ball.vx =  Math.abs(ball.vx) * ELASTICITY; }
     if (ball.x + BALL_R > W)  { ball.x = W - BALL_R; ball.vx = -Math.abs(ball.vx) * ELASTICITY; }
     if (ball.y - BALL_R < 0)  { ball.y = BALL_R;     ball.vy =  Math.abs(ball.vy) * ELASTICITY; }
-    const speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
-    if (speed > 0.4) addRipple(ball.x, ball.y + BALL_R, speed * 0.28, 5);
     trailX[trailHead] = ball.x;
     trailY[trailHead] = ball.y;
     trailHead = (trailHead + 1) % TRAIL_LEN;
@@ -917,24 +827,22 @@
   }
 
   function draw() {
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'medium';
-    ctx.drawImage(simCvs, 0, 0, W, H);
+    ctx.clearRect(0, 0, W, H);
 
-    // Bell curve guide — very subtle
+    // Bell curve guide line
     ctx.beginPath();
     ctx.moveTo(0, bellY(0));
     for (let x = 1; x <= W; x++) ctx.lineTo(x, bellY(x));
-    ctx.strokeStyle = 'rgba(193,112,133,0.14)';
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(193,112,133,0.18)';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Fill under curve
+    // Subtle fill under curve
     ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
-    const grad = ctx.createLinearGradient(0, H * 0.55, 0, H);
-    grad.addColorStop(0, 'rgba(193,112,133,0.035)');
-    grad.addColorStop(1, 'rgba(12,9,10,0)');
-    ctx.fillStyle = grad;
+    const grd = ctx.createLinearGradient(0, H * 0.60, 0, H);
+    grd.addColorStop(0, 'rgba(193,112,133,0.055)');
+    grd.addColorStop(1, 'rgba(12,9,10,0)');
+    ctx.fillStyle = grd;
     ctx.fill();
 
     // Trail
@@ -949,9 +857,9 @@
       ctx.fill();
     }
 
-    // Ball glow
+    // Ball outer glow
     const gg = ctx.createRadialGradient(ball.x, ball.y, BALL_R * 0.5, ball.x, ball.y, BALL_R * 2.8);
-    gg.addColorStop(0, 'rgba(193,112,133,0.18)');
+    gg.addColorStop(0, 'rgba(193,112,133,0.20)');
     gg.addColorStop(1, 'rgba(193,112,133,0)');
     ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_R * 2.8, 0, Math.PI * 2);
     ctx.fillStyle = gg; ctx.fill();
@@ -965,51 +873,56 @@
     ctx.fillStyle = bg2; ctx.fill();
 
     // Catchlight
-    ctx.beginPath(); ctx.arc(ball.x - BALL_R * 0.28, ball.y - BALL_R * 0.30, BALL_R * 0.28, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,235,240,0.4)'; ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ball.x - BALL_R * 0.28, ball.y - BALL_R * 0.30, BALL_R * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,235,240,0.42)'; ctx.fill();
 
     const dx = mouseX - ball.x, dy = mouseY - ball.y;
-    canvas.style.cursor = ball.grabbed ? 'grabbing' : (Math.sqrt(dx*dx+dy*dy) < BALL_R + 12 ? 'grab' : 'crosshair');
+    canvas.style.cursor = ball.grabbed ? 'grabbing'
+      : (Math.sqrt(dx * dx + dy * dy) < BALL_R + 12 ? 'grab' : 'default');
   }
 
   function loop() {
-    if (mouseX > 0 && mouseY > 0 && !ball.grabbed) {
-      const mx = mouseX - prevMouseX, my = mouseY - prevMouseY;
-      const ms = Math.sqrt(mx*mx + my*my);
-      if (ms > 1) addRipple(mouseX, mouseY, ms * 0.38, ms * 0.6 + 5);
-    }
-    prevMouseX = mouseX; prevMouseY = mouseY;
-    stepWater(); stepBall(); renderSim(); draw();
+    stepBall(); draw();
     requestAnimationFrame(loop);
   }
 
-  function heroCoords(e) { const r = canvas.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
-  function touchCoords(e) { const r = canvas.getBoundingClientRect(); const t = e.touches[0]||e.changedTouches[0]; return [t.clientX-r.left, t.clientY-r.top]; }
-  function isBallHit(x, y) { const dx=x-ball.x, dy=y-ball.y; return Math.sqrt(dx*dx+dy*dy) < BALL_R+14; }
+  function heroCoords(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  function touchCoords(e) { const r = canvas.getBoundingClientRect(); const t = e.touches[0] || e.changedTouches[0]; return [t.clientX - r.left, t.clientY - r.top]; }
+  function isBallHit(x, y) { const dx = x - ball.x, dy = y - ball.y; return Math.sqrt(dx * dx + dy * dy) < BALL_R + 14; }
 
   const hero = document.getElementById('hero');
   hero.addEventListener('mousemove', e => {
     [mouseX, mouseY] = heroCoords(e);
-    if (ball.grabbed) { ball.vx = mouseX-ball.x; ball.vy = mouseY-ball.y; ball.x = mouseX; ball.y = mouseY; addRipple(ball.x,ball.y,4,10); }
-  }, { passive:true });
+    if (ball.grabbed) { ball.vx = mouseX - ball.x; ball.vy = mouseY - ball.y; ball.x = mouseX; ball.y = mouseY; }
+  }, { passive: true });
   hero.addEventListener('mousedown', e => {
-    const [x,y] = heroCoords(e);
-    if (isBallHit(x,y)) { ball.grabbed=true; ball.vx=ball.vy=0; }
-    else addRipple(x, y, 18, 16);
+    const [x, y] = heroCoords(e);
+    if (isBallHit(x, y)) { ball.grabbed = true; ball.vx = ball.vy = 0; }
   });
-  hero.addEventListener('mouseup', () => { ball.grabbed=false; });
-  hero.addEventListener('mouseleave', () => { ball.grabbed=false; mouseX=mouseY=-9999; });
-  hero.addEventListener('touchstart', e => { const [x,y]=touchCoords(e); if(isBallHit(x,y)){ball.grabbed=true;ball.vx=ball.vy=0;}else addRipple(x,y,22,18); }, {passive:true});
-  hero.addEventListener('touchmove', e => { e.preventDefault(); const [x,y]=touchCoords(e); mouseX=x;mouseY=y; if(ball.grabbed){ball.vx=(x-ball.x)*0.6;ball.vy=(y-ball.y)*0.6;ball.x=x;ball.y=y;addRipple(x,y,6,12);}else addRipple(x,y,8,10); }, {passive:false});
-  hero.addEventListener('touchend', () => { ball.grabbed=false; mouseX=mouseY=-9999; });
+  hero.addEventListener('mouseup',    () => { ball.grabbed = false; });
+  hero.addEventListener('mouseleave', () => { ball.grabbed = false; mouseX = mouseY = -9999; });
+  hero.addEventListener('touchstart', e => {
+    const [x, y] = touchCoords(e);
+    if (isBallHit(x, y)) { ball.grabbed = true; ball.vx = ball.vy = 0; }
+  }, { passive: true });
+  hero.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const [x, y] = touchCoords(e);
+    mouseX = x; mouseY = y;
+    if (ball.grabbed) { ball.vx = (x - ball.x) * 0.6; ball.vy = (y - ball.y) * 0.6; ball.x = x; ball.y = y; }
+  }, { passive: false });
+  hero.addEventListener('touchend', () => { ball.grabbed = false; mouseX = mouseY = -9999; });
 
   let rt;
-  window.addEventListener('resize', () => { clearTimeout(rt); rt=setTimeout(init,120); });
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(init, 120); });
 
   init();
   requestAnimationFrame(loop);
 
-  const io = new IntersectionObserver(entries => { entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); }); }, { threshold:0.10, rootMargin:'0px 0px -30px 0px' });
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.10, rootMargin: '0px 0px -30px 0px' });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 })();
 </script>
