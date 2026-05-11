@@ -3,895 +3,815 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Parabola Markets — Bet the Distribution</title>
-  <meta name="description" content="The first on-chain prediction market where you bet a full probability distribution, not just yes or no. Built on Solana." />
+  <title>Parabola Markets — Estimation Markets</title>
+  <meta name="description" content="The first on-chain estimation market. Stake a full probability distribution on any outcome. Built on Solana." />
   <meta property="og:title" content="Parabola Markets" />
-  <meta property="og:description" content="Bet the distribution, not the binary." />
+  <meta property="og:description" content="Markets where you bet the full distribution, not just yes or no." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://parabolamarkets.xyz" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,200;0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <!-- Grain filter -->
   <svg width="0" height="0" style="position:absolute">
     <defs>
       <filter id="grain">
-        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
+        <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="4" stitchTiles="stitch" />
         <feColorMatrix type="saturate" values="0" />
       </filter>
     </defs>
   </svg>
 
   <style>
-    /* ── Reset & base ─────────────────────────────────────────────────── */
+    /* ── Reset ──────────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
+
+    /* ── Tokens ─────────────────────────────────────────────────────────── */
+    :root {
+      --rose:        #c17085;
+      --rose-bright: #e0aabb;
+      --rose-dim:    #7d3f52;
+      --sand:        #b89870;
+      --sand-bright: #d4b894;
+      --sand-dim:    #6e5c40;
+      --bg:          #0d0a0b;
+      --bg-el:       rgba(255,255,255,0.025);
+      --bg-glass:    rgba(20,14,16,0.72);
+      --border:      rgba(255,255,255,0.065);
+      --border-mid:  rgba(255,255,255,0.10);
+      --border-str:  rgba(255,255,255,0.16);
+      --text:        #ede0e4;
+      --text-sec:    #a89099;
+      --text-dim:    #6b5860;
+      --radius-lg:   2rem;
+      --radius-md:   1.25rem;
+      --radius-sm:   0.75rem;
+    }
+
+    /* ── Base ───────────────────────────────────────────────────────────── */
     body {
       font-family: 'Inter', system-ui, sans-serif;
-      background: #07070e;
-      color: #e8e8f0;
-      line-height: 1.6;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── CSS variables ───────────────────────────────────────────────── */
-    :root {
-      --violet: #7c3aed;
-      --violet-bright: #a78bfa;
-      --teal: #0d9488;
-      --teal-bright: #2dd4bf;
-      --bg: #07070e;
-      --bg-el: rgba(255,255,255,0.03);
-      --border: rgba(255,255,255,0.07);
-      --border-strong: rgba(255,255,255,0.12);
-      --text: #e8e8f0;
-      --text-sec: rgba(232,232,240,0.55);
-      --text-dim: rgba(232,232,240,0.30);
-    }
-
-    /* ── Grain overlay (entire page) ────────────────────────────────── */
+    /* ── Grain overlay ──────────────────────────────────────────────────── */
     body::before {
       content: '';
       position: fixed; inset: 0;
+      pointer-events: none; z-index: 0;
+      opacity: 0.032;
       filter: url(#grain);
-      opacity: 0.045;
-      pointer-events: none;
-      z-index: 0;
-      mix-blend-mode: overlay;
+      background: #fff;
     }
 
-    /* ── Background gradient ─────────────────────────────────────────── */
-    .bg-gradient {
-      position: fixed; inset: 0;
-      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(109,40,217,0.22) 0%, transparent 70%),
-                  radial-gradient(ellipse 60% 50% at 85% 60%, rgba(13,148,136,0.12) 0%, transparent 60%),
-                  radial-gradient(ellipse 70% 40% at 15% 80%, rgba(109,40,217,0.08) 0%, transparent 50%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ── Orbs ────────────────────────────────────────────────────────── */
+    /* ── Orb blobs ──────────────────────────────────────────────────────── */
     .orb {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(80px);
-      pointer-events: none;
-      z-index: 0;
-      animation: orb-drift 14s ease-in-out infinite;
+      position: absolute; border-radius: 50%;
+      filter: blur(80px); pointer-events: none; z-index: 0;
     }
-    .orb-1 {
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(124,58,237,0.28) 0%, transparent 70%);
-      top: -200px; left: -100px;
-      animation-delay: 0s;
-    }
-    .orb-2 {
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(13,148,136,0.22) 0%, transparent 70%);
-      bottom: 10%; right: -80px;
-      animation-delay: -7s;
-    }
-    @keyframes orb-drift {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33%       { transform: translate(30px, -40px) scale(1.05); }
-      66%       { transform: translate(-20px, 30px) scale(0.97); }
-    }
+    .orb-1 { width: 520px; height: 520px; background: radial-gradient(circle, #7d3f5240 0%, transparent 70%); top: -140px; left: -160px; }
+    .orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, #6e5c4030 0%, transparent 70%); top: 200px; right: -120px; }
+    .orb-3 { width: 300px; height: 300px; background: radial-gradient(circle, #c1708530 0%, transparent 70%); top: 460px; left: 30%; }
 
-    /* ── All page content sits above z-index 0 overlays ─────────────── */
-    nav, main, footer { position: relative; z-index: 1; }
-
-    /* ── Navigation ──────────────────────────────────────────────────── */
+    /* ── Nav ────────────────────────────────────────────────────────────── */
     nav {
-      position: fixed; top: 0; left: 0; right: 0;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 20px 48px;
-      backdrop-filter: blur(20px) saturate(1.4);
-      -webkit-backdrop-filter: blur(20px) saturate(1.4);
-      background: rgba(7,7,14,0.65);
+      padding: 0 clamp(1.5rem, 5vw, 3.5rem);
+      height: 64px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(18px) saturate(1.2);
       border-bottom: 1px solid var(--border);
-      z-index: 100;
     }
     .nav-logo {
-      display: flex; align-items: baseline; gap: 6px;
-      text-decoration: none;
+      font-size: 1rem; font-weight: 600; letter-spacing: -0.01em;
+      color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: 9px;
     }
-    .nav-logo-word {
-      font-size: 18px; font-weight: 600; letter-spacing: -0.02em;
-      background: linear-gradient(135deg, #fff 30%, rgba(167,139,250,0.9) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
+    .nav-logo-mark {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--rose), var(--sand));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
     }
-    .nav-logo-tag {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; font-weight: 400; letter-spacing: 0.1em;
-      color: var(--teal-bright); opacity: 0.8; text-transform: uppercase;
-    }
-    .nav-links {
-      display: flex; align-items: center; gap: 32px;
-      list-style: none;
-    }
-    .nav-links a {
-      font-size: 13px; font-weight: 400; color: var(--text-sec);
-      text-decoration: none; letter-spacing: 0.01em;
+    nav a:not(.nav-logo) {
+      font-size: 0.87rem; color: var(--text-sec); text-decoration: none;
       transition: color 0.2s;
     }
-    .nav-links a:hover { color: var(--text); }
+    nav a:not(.nav-logo):hover { color: var(--text); }
+    .nav-links { display: flex; align-items: center; gap: clamp(1rem, 3vw, 2rem); }
     .nav-cta {
-      font-size: 13px; font-weight: 500;
-      background: rgba(124,58,237,0.15);
-      border: 1px solid rgba(124,58,237,0.3);
-      color: var(--violet-bright) !important;
-      padding: 8px 18px; border-radius: 8px;
-      transition: background 0.2s, border-color 0.2s !important;
+      padding: 9px 20px; border-radius: 50px;
+      background: var(--rose); color: #fff !important; font-weight: 500;
+      transition: opacity 0.2s !important;
     }
-    .nav-cta:hover {
-      background: rgba(124,58,237,0.25) !important;
-      border-color: rgba(124,58,237,0.5) !important;
-    }
-    @media (max-width: 640px) {
-      nav { padding: 16px 24px; }
-      .nav-links { display: none; }
+    .nav-cta:hover { opacity: 0.82; }
+    @media (max-width: 600px) {
+      .nav-links a:not(.nav-cta) { display: none; }
     }
 
-    /* ── Section wrapper ─────────────────────────────────────────────── */
-    .section { padding: 120px 48px; max-width: 1100px; margin: 0 auto; }
-    @media (max-width: 640px) { .section { padding: 80px 24px; } }
+    /* ── Layout helpers ─────────────────────────────────────────────────── */
+    .section { position: relative; z-index: 1; }
+    .container {
+      width: 100%; max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 clamp(1.25rem, 5vw, 3rem);
+    }
 
-    /* ── Hero ────────────────────────────────────────────────────────── */
+    /* ── Hero ───────────────────────────────────────────────────────────── */
     #hero {
-      min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center;
-      padding: 140px 48px 100px;
+      min-height: 100svh;
+      display: flex; flex-direction: column; justify-content: center;
+      padding-top: 64px;
     }
-
-    .hero-eyebrow {
+    .hero-inner {
+      max-width: 780px;
+      padding: clamp(5rem, 12vh, 8rem) clamp(1.25rem, 5vw, 3rem) clamp(4rem, 8vh, 6rem);
+    }
+    .eyebrow {
       display: inline-flex; align-items: center; gap: 8px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; font-weight: 500; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--teal-bright);
-      background: rgba(13,148,136,0.08);
-      border: 1px solid rgba(13,148,136,0.2);
-      padding: 6px 14px; border-radius: 100px;
-      margin-bottom: 40px;
-      opacity: 0; animation: fade-up 0.8s cubic-bezier(0.22,1,0.36,1) 0.1s both;
+      font-size: clamp(0.7rem, 1.8vw, 0.78rem);
+      font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--rose-bright);
+      margin-bottom: 1.5rem;
     }
-    .hero-eyebrow::before {
-      content: '';
+    .eyebrow-dot {
       width: 6px; height: 6px; border-radius: 50%;
-      background: var(--teal-bright);
-      animation: blink 1.6s ease-in-out infinite;
+      background: var(--rose); flex-shrink: 0;
+      animation: pulse-dot 2.4s ease-in-out infinite;
     }
-    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
 
-    .hero-headline {
-      font-size: clamp(44px, 8vw, 88px);
-      font-weight: 200; letter-spacing: -0.04em; line-height: 1.05;
-      max-width: 820px;
-      opacity: 0; animation: fade-up 0.9s cubic-bezier(0.22,1,0.36,1) 0.25s both;
+    h1 {
+      font-size: clamp(2.6rem, 7vw, 5rem);
+      font-weight: 300;
+      line-height: 1.1; letter-spacing: -0.03em;
+      margin-bottom: 0.35em;
+      color: var(--text);
     }
-    .hero-headline em {
+    h1 em {
       font-style: normal;
-      background: linear-gradient(125deg, var(--violet-bright) 0%, var(--teal-bright) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
+      background: linear-gradient(120deg, var(--rose-bright) 0%, var(--sand-bright) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    /* Text rotator */
+    .rotator-wrap {
+      display: inline-block; overflow: hidden;
+      height: 1.15em; vertical-align: bottom;
+    }
+    .rotator {
+      display: flex; flex-direction: column;
+      animation: rotatorSlide 8s ease-in-out infinite;
+    }
+    .rotator span {
+      height: 1.15em; flex-shrink: 0;
+      background: linear-gradient(120deg, var(--rose-bright), var(--sand-bright));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    @keyframes rotatorSlide {
+      0%, 18%   { transform: translateY(0); }
+      25%, 43%  { transform: translateY(-25%); }
+      50%, 68%  { transform: translateY(-50%); }
+      75%, 93%  { transform: translateY(-75%); }
+      100%      { transform: translateY(0); }
     }
 
     .hero-sub {
-      margin-top: 28px;
-      font-size: clamp(15px, 2vw, 18px);
-      font-weight: 300; color: var(--text-sec);
-      max-width: 520px; line-height: 1.7;
-      opacity: 0; animation: fade-up 0.9s cubic-bezier(0.22,1,0.36,1) 0.4s both;
+      font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+      color: var(--text-sec); font-weight: 300;
+      max-width: 560px; line-height: 1.75;
+      margin-bottom: 2.8rem; margin-top: 1.2rem;
     }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .btn-primary {
+      padding: clamp(12px, 2vw, 15px) clamp(22px, 4vw, 32px);
+      border-radius: 50px; font-size: clamp(0.88rem, 2vw, 0.96rem); font-weight: 500;
+      background: linear-gradient(135deg, var(--rose) 0%, #9b4c61 100%);
+      color: #fff; border: none; cursor: pointer; text-decoration: none;
+      display: inline-block;
+      box-shadow: 0 4px 24px rgba(193,112,133,0.30);
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(193,112,133,0.42); }
+    .btn-ghost {
+      padding: clamp(12px, 2vw, 15px) clamp(22px, 4vw, 32px);
+      border-radius: 50px; font-size: clamp(0.88rem, 2vw, 0.96rem); font-weight: 500;
+      background: transparent; color: var(--text-sec);
+      border: 1px solid var(--border-str); cursor: pointer; text-decoration: none;
+      display: inline-block;
+      transition: color 0.18s, border-color 0.18s;
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--rose-dim); }
 
-    /* ── Bell curve SVG ──────────────────────────────────────────────── */
-    .hero-curve {
-      margin-top: 60px; margin-bottom: 16px;
-      opacity: 0; animation: fade-up 1s cubic-bezier(0.22,1,0.36,1) 0.55s both;
+    /* ── Hero visual — animated bell curves ─────────────────────────────── */
+    .hero-visual {
+      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+      width: clamp(280px, 40vw, 520px); height: 380px;
+      pointer-events: none; z-index: 0; overflow: visible;
+      opacity: 0.55;
     }
-    .curve-path {
-      stroke-dasharray: 600;
-      stroke-dashoffset: 600;
-      animation: draw-curve 2.2s cubic-bezier(0.22,1,0.36,1) 0.9s both;
-    }
-    .fill-curve {
-      opacity: 0;
-      animation: fill-in 1.4s ease-out 2.6s both;
-    }
-    @keyframes draw-curve {
-      to { stroke-dashoffset: 0; }
-    }
-    @keyframes fill-in {
-      to { opacity: 1; }
-    }
+    @media (max-width: 860px) { .hero-visual { display: none; } }
 
-    .hero-curve-label {
-      display: flex; justify-content: center; gap: 32px;
-      font-family: 'JetBrains Mono', monospace; font-size: 11px;
-      color: var(--text-dim); letter-spacing: 0.06em;
-      opacity: 0; animation: fade-up 0.8s ease 2.8s both;
-    }
-    .curve-label-mu { color: var(--violet-bright); opacity: 0.8; }
-    .curve-label-sigma { color: var(--teal-bright); opacity: 0.8; }
-
-    @keyframes fade-up {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── Divider ─────────────────────────────────────────────────────── */
-    .divider {
-      max-width: 1100px; margin: 0 auto;
-      height: 1px; background: var(--border);
-    }
-
-    /* ── Section labels ──────────────────────────────────────────────── */
+    /* ── Section titles ──────────────────────────────────────────────────── */
     .section-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; font-weight: 500; letter-spacing: 0.16em;
-      text-transform: uppercase; color: var(--text-dim);
-      margin-bottom: 24px;
+      font-size: clamp(0.68rem, 1.6vw, 0.74rem);
+      font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--rose); margin-bottom: 0.9rem;
+    }
+    h2 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 300; letter-spacing: -0.025em; line-height: 1.15;
+      color: var(--text); margin-bottom: 1rem;
+    }
+    h2 em {
+      font-style: italic; color: var(--rose-bright);
+      -webkit-text-fill-color: initial;
+    }
+    .section-sub {
+      font-size: clamp(1rem, 2vw, 1.1rem);
+      color: var(--text-sec); font-weight: 300; line-height: 1.75;
+      max-width: 580px;
     }
 
-    /* ── Problem section ─────────────────────────────────────────────── */
-    #problem .two-col {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center;
+    /* ── Card grid ───────────────────────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+      gap: 1.25rem;
+      margin-top: 3rem;
     }
-    @media (max-width: 720px) { #problem .two-col { grid-template-columns: 1fr; gap: 40px; } }
-    #problem h2 {
-      font-size: clamp(32px, 5vw, 52px);
-      font-weight: 200; letter-spacing: -0.03em; line-height: 1.15;
-    }
-    #problem h2 strong { font-weight: 500; color: #fff; }
-    #problem p {
-      margin-top: 20px; font-size: 16px;
-      font-weight: 300; color: var(--text-sec); line-height: 1.75;
-    }
-
-    /* comparison cards */
-    .compare-grid { display: flex; flex-direction: column; gap: 12px; }
-    .compare-card {
-      padding: 18px 20px; border-radius: 14px;
-      border: 1px solid var(--border);
+    .card {
       background: var(--bg-el);
-      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.5rem, 4vw, 2.2rem);
+      transition: border-color 0.25s;
     }
-    .compare-card.bad { border-color: rgba(239,68,68,0.2); }
-    .compare-card.good { border-color: rgba(13,148,136,0.25); background: rgba(13,148,136,0.04); }
-    .compare-label {
-      font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
-      margin-bottom: 8px;
+    .card:hover { border-color: var(--rose-dim); }
+    .card-icon {
+      width: 44px; height: 44px; border-radius: var(--radius-sm);
+      background: rgba(193,112,133,0.12); border: 1px solid var(--rose-dim);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin-bottom: 1.2rem;
     }
-    .compare-card.bad .compare-label { color: rgba(239,68,68,0.7); }
-    .compare-card.good .compare-label { color: var(--teal-bright); }
-    .compare-title { font-size: 15px; font-weight: 400; margin-bottom: 4px; }
-    .compare-sub { font-size: 13px; color: var(--text-dim); }
+    .card h3 {
+      font-size: 1.05rem; font-weight: 600; margin-bottom: 0.55rem;
+      letter-spacing: -0.01em; color: var(--text);
+    }
+    .card p { font-size: 0.93rem; color: var(--text-sec); line-height: 1.7; }
 
-    /* ── How it works ────────────────────────────────────────────────── */
-    #how h2 {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 200; letter-spacing: -0.03em; margin-bottom: 56px;
-    }
-    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
-    @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+    /* ── Section spacing ─────────────────────────────────────────────────── */
+    .pad-section { padding: clamp(5rem, 12vh, 8rem) 0; }
 
+    /* ── Problem section ─────────────────────────────────────────────────── */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 3.5rem;
+    }
+    @media (max-width: 720px) { .problem-grid { grid-template-columns: 1fr; } }
+
+    .prob-card {
+      border-radius: var(--radius-lg);
+      padding: clamp(1.5rem, 4vw, 2.2rem);
+      border: 1px solid var(--border-mid);
+    }
+    .prob-card.bad  { background: rgba(220,60,60,0.04); }
+    .prob-card.good { background: rgba(193,112,133,0.06); border-color: var(--rose-dim); }
+    .prob-tag {
+      display: inline-block; font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 50px; margin-bottom: 1.1rem;
+    }
+    .prob-tag.bad  { background: rgba(220,60,60,0.12); color: #f08080; }
+    .prob-tag.good { background: rgba(193,112,133,0.18); color: var(--rose-bright); }
+    .prob-card h3  { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text); }
+    .prob-card p   { font-size: 0.92rem; color: var(--text-sec); line-height: 1.7; }
+    .prob-example {
+      margin-top: 0.9rem; padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+      color: var(--text-sec); line-height: 1.6;
+    }
+    .prob-example strong { color: var(--rose-bright); }
+
+    /* ── How it works ─────────────────────────────────────────────────────── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+      gap: 1.5rem;
+      margin-top: 3.5rem;
+    }
     .step {
-      padding: 36px 32px 40px;
-      border: 1px solid var(--border);
-      background: var(--bg-el);
-      backdrop-filter: blur(12px);
-      transition: border-color 0.3s, background 0.3s, transform 0.3s;
-      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; gap: 0.8rem;
+      padding: clamp(1.4rem, 3vw, 1.8rem);
+      border-radius: var(--radius-lg);
+      background: var(--bg-el); border: 1px solid var(--border-mid);
+      transition: border-color 0.25s;
     }
-    .step:first-child { border-radius: 16px 0 0 16px; }
-    .step:last-child  { border-radius: 0 16px 16px 0; }
-    @media (max-width: 720px) {
-      .step { border-radius: 0; }
-      .step:first-child { border-radius: 16px 16px 0 0; }
-      .step:last-child  { border-radius: 0 0 16px 16px; }
-    }
-    .step:hover {
-      border-color: var(--border-strong);
-      background: rgba(255,255,255,0.045);
-      transform: translateY(-2px);
-    }
-    .step::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(167,139,250,0.35), transparent);
-      opacity: 0; transition: opacity 0.3s;
-    }
-    .step:hover::before { opacity: 1; }
-
+    .step:hover { border-color: var(--rose-dim); }
     .step-num {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em;
-      margin-bottom: 20px;
+      font-size: 0.72rem; font-weight: 500; color: var(--rose);
+      letter-spacing: 0.12em;
     }
-    .step-icon {
-      width: 44px; height: 44px; border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 20px; font-size: 22px;
-    }
-    .step-icon-1 { background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.2); }
-    .step-icon-2 { background: rgba(13,148,136,0.12); border: 1px solid rgba(13,148,136,0.2); }
-    .step-icon-3 { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.15); }
+    .step h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; }
+    .step p  { font-size: 0.88rem; color: var(--text-sec); line-height: 1.65; margin: 0; }
 
-    .step h3 { font-size: 18px; font-weight: 500; letter-spacing: -0.01em; margin-bottom: 10px; }
-    .step p  { font-size: 14px; color: var(--text-sec); line-height: 1.7; }
-    .step-formula {
-      margin-top: 18px; padding: 10px 14px; border-radius: 8px;
-      background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);
-      font-family: 'JetBrains Mono', monospace; font-size: 12px;
-      color: var(--violet-bright);
+    /* ── Perps section ───────────────────────────────────────────────────── */
+    #perps { position: relative; overflow: hidden; }
+    .perps-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 3rem; align-items: center;
+      margin-top: 4rem;
     }
+    @media (max-width: 800px) { .perps-grid { grid-template-columns: 1fr; gap: 2rem; } }
+    .perp-chart-wrap {
+      border-radius: var(--radius-lg);
+      background: var(--bg-el); border: 1px solid var(--border-mid);
+      padding: 1.5rem 1.5rem 1rem;
+    }
+    .perp-chart-label {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim);
+      margin-bottom: 1rem;
+    }
+    .perp-feature-list {
+      list-style: none; display: flex; flex-direction: column; gap: 1rem;
+      margin-top: 2rem;
+    }
+    .perp-feature-list li {
+      display: flex; gap: 0.9rem; align-items: flex-start;
+      font-size: 0.95rem; color: var(--text-sec); line-height: 1.6;
+    }
+    .perp-feature-list li::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--rose); flex-shrink: 0; margin-top: 0.55em;
+    }
+    .perp-feature-list li strong { color: var(--text); font-weight: 500; }
 
-    /* ── Stats strip ─────────────────────────────────────────────────── */
-    #stats {
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+    /* ── Funding pill ──────────────────────────────────────────────────────── */
+    .funding-row {
+      display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap;
     }
-    #stats .section {
-      display: grid; grid-template-columns: repeat(3,1fr); gap: 0;
-      padding: 64px 48px;
+    .funding-pill {
+      padding: 5px 14px; border-radius: 50px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 500;
     }
-    @media (max-width: 640px) { #stats .section { grid-template-columns: 1fr; gap: 32px; } }
+    .pill-long  { background: rgba(30,180,100,0.12); color: #5dcc8c; border: 1px solid rgba(30,180,100,0.25); }
+    .pill-short { background: rgba(220,80,80,0.12);  color: #f07070; border: 1px solid rgba(220,80,80,0.25); }
 
-    .stat-item { text-align: center; position: relative; }
-    .stat-item:not(:last-child)::after {
-      content: '';
-      position: absolute; right: 0; top: 20%; height: 60%;
-      width: 1px; background: var(--border);
-    }
-    @media (max-width: 640px) { .stat-item:not(:last-child)::after { display: none; } }
-
-    .stat-number {
-      font-size: clamp(40px, 6vw, 64px);
-      font-weight: 200; letter-spacing: -0.04em; line-height: 1;
-      font-variant-numeric: tabular-nums;
-    }
-    .stat-number span {
-      background: linear-gradient(135deg, #fff 40%, rgba(167,139,250,0.85) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    .stat-label {
-      margin-top: 8px; font-size: 13px;
-      font-weight: 300; color: var(--text-dim);
-    }
-
-    /* ── Why distributions section ───────────────────────────────────── */
-    #why h2 {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 200; letter-spacing: -0.03em; margin-bottom: 12px;
-    }
-    #why .lead {
-      font-size: 16px; color: var(--text-sec); font-weight: 300;
-      max-width: 500px; line-height: 1.75; margin-bottom: 52px;
-    }
-    .why-grid {
-      display: grid; grid-template-columns: repeat(2,1fr); gap: 16px;
-    }
-    @media (max-width: 640px) { .why-grid { grid-template-columns: 1fr; } }
-
-    .why-card {
-      padding: 28px 28px 32px;
-      border: 1px solid var(--border); border-radius: 16px;
-      background: var(--bg-el); backdrop-filter: blur(12px);
-      transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
-    }
-    .why-card:hover {
-      border-color: rgba(167,139,250,0.2);
-      transform: translateY(-3px);
-      box-shadow: 0 16px 40px -12px rgba(124,58,237,0.15);
-    }
-    .why-card-header {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
-    }
-    .why-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .why-card h3 { font-size: 16px; font-weight: 500; letter-spacing: -0.01em; }
-    .why-card p  { font-size: 14px; color: var(--text-sec); line-height: 1.7; }
-    .why-card .mono-tag {
-      display: inline-block; margin-top: 14px;
-      font-family: 'JetBrains Mono', monospace; font-size: 11px;
-      color: var(--text-dim); letter-spacing: 0.04em;
-    }
-
-    /* ── Team ────────────────────────────────────────────────────────── */
-    #team h2 {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 200; letter-spacing: -0.03em; margin-bottom: 8px;
-    }
-    #team .lead {
-      font-size: 15px; color: var(--text-sec); margin-bottom: 52px;
-    }
+    /* ── Team ────────────────────────────────────────────────────────────── */
     .team-grid {
-      display: grid; grid-template-columns: repeat(4,1fr); gap: 2px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+      gap: 1.25rem;
+      margin-top: 3.5rem;
     }
-    @media (max-width: 720px) { .team-grid { grid-template-columns: repeat(2,1fr); } }
-    @media (max-width: 420px) { .team-grid { grid-template-columns: 1fr; } }
-
     .team-card {
-      padding: 32px 24px 36px;
-      border: 1px solid var(--border);
-      background: var(--bg-el); backdrop-filter: blur(12px);
-      transition: border-color 0.3s, background 0.3s;
-      position: relative; overflow: hidden;
+      padding: clamp(1.4rem, 3vw, 1.9rem);
+      border-radius: var(--radius-lg);
+      background: var(--bg-el); border: 1px solid var(--border-mid);
+      transition: border-color 0.25s;
     }
-    .team-card:first-child { border-radius: 16px 0 0 16px; }
-    .team-card:last-child  { border-radius: 0 16px 16px 0; }
-    @media (max-width: 720px) {
-      .team-card:first-child { border-radius: 16px 0 0 0; }
-      .team-card:nth-child(2) { border-radius: 0 16px 0 0; }
-      .team-card:nth-child(3) { border-radius: 0 0 0 16px; }
-      .team-card:last-child   { border-radius: 0 0 16px 0; }
-    }
-    .team-card:hover {
-      border-color: var(--border-strong);
-      background: rgba(255,255,255,0.04);
-    }
-    .team-card-glow {
-      position: absolute; width: 120px; height: 120px;
-      border-radius: 50%; filter: blur(50px);
-      top: -20px; right: -20px; opacity: 0.12;
-      transition: opacity 0.4s;
-    }
-    .team-card:hover .team-card-glow { opacity: 0.22; }
-
-    .team-initials {
-      width: 40px; height: 40px; border-radius: 10px;
+    .team-card:hover { border-color: var(--rose-dim); }
+    .team-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--rose-dim), var(--sand-dim));
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
-      margin-bottom: 18px;
+      font-size: 1.15rem; font-weight: 600; color: #fff;
+      margin-bottom: 1rem; flex-shrink: 0;
     }
-    .team-name {
-      font-size: 16px; font-weight: 500; letter-spacing: -0.01em;
-      margin-bottom: 6px;
-    }
+    .team-name { font-size: 1rem; font-weight: 600; color: var(--text); }
     .team-role {
-      font-size: 12px; color: var(--text-dim);
-      font-weight: 400; letter-spacing: 0.03em;
+      font-size: 0.8rem; color: var(--rose-bright); font-weight: 500;
+      letter-spacing: 0.04em; margin-top: 3px; margin-bottom: 0.5rem;
     }
-    .team-school {
-      margin-top: 14px; padding-top: 14px;
-      border-top: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em;
+    .team-desc { font-size: 0.87rem; color: var(--text-sec); line-height: 1.6; }
+    .team-headline {
+      font-size: clamp(0.95rem, 2vw, 1.05rem); color: var(--text-sec);
+      font-weight: 300; margin-top: 0.5rem; margin-bottom: 0;
     }
 
-    /* ── Solana badge ────────────────────────────────────────────────── */
-    #solana-banner {
-      background: linear-gradient(135deg, rgba(124,58,237,0.08) 0%, rgba(13,148,136,0.08) 100%);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+    /* ── Built-on bar ─────────────────────────────────────────────────────── */
+    .built-bar {
+      display: flex; gap: clamp(1.5rem, 4vw, 3rem); flex-wrap: wrap;
+      align-items: center; justify-content: center;
+      margin: 0 auto; padding: clamp(1.5rem, 4vw, 2.2rem) clamp(1.5rem, 4vw, 2.5rem);
+      border-radius: var(--radius-lg);
+      background: var(--bg-el); border: 1px solid var(--border-mid);
+      max-width: 700px;
     }
-    #solana-banner .section {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 48px 48px; flex-wrap: wrap; gap: 24px;
+    .built-item {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      font-size: 0.78rem; color: var(--text-dim); letter-spacing: 0.08em;
+      text-transform: uppercase; font-weight: 600;
     }
-    .solana-text h3 {
-      font-size: 22px; font-weight: 300; letter-spacing: -0.02em; margin-bottom: 6px;
+    .built-item span.logo {
+      font-size: 1.1rem; font-weight: 700; color: var(--text-sec);
     }
-    .solana-text p { font-size: 14px; color: var(--text-sec); }
-    .solana-pills { display: flex; gap: 8px; flex-wrap: wrap; }
-    .pill {
-      padding: 6px 14px; border-radius: 100px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; font-weight: 500; letter-spacing: 0.06em;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.03);
-      color: var(--text-sec);
-    }
-    .pill.violet { border-color: rgba(124,58,237,0.3); color: var(--violet-bright); background: rgba(124,58,237,0.07); }
-    .pill.teal   { border-color: rgba(13,148,136,0.3); color: var(--teal-bright); background: rgba(13,148,136,0.07); }
 
-    /* ── Footer ──────────────────────────────────────────────────────── */
+    /* ── Divider ─────────────────────────────────────────────────────────── */
+    .divider {
+      border: none; border-top: 1px solid var(--border);
+      margin: 0;
+    }
+
+    /* ── CTA band ────────────────────────────────────────────────────────── */
+    #cta {
+      text-align: center;
+      padding: clamp(5rem, 12vh, 8rem) clamp(1.25rem, 5vw, 3rem);
+    }
+    #cta h2 { max-width: 600px; margin: 0 auto 1.5rem; }
+    #cta p  { max-width: 480px; margin: 0 auto 2.5rem; }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
     footer {
-      padding: 48px 48px 40px;
-      display: flex; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 16px;
+      padding: 2.5rem clamp(1.25rem, 5vw, 3rem);
       border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap;
+      justify-content: space-between; align-items: center;
+      gap: 1rem;
+      font-size: 0.82rem; color: var(--text-dim);
     }
-    .footer-logo {
-      font-size: 15px; font-weight: 600; letter-spacing: -0.02em;
-      background: linear-gradient(135deg, #fff 30%, rgba(167,139,250,0.8) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .footer-right {
-      font-size: 12px; color: var(--text-dim); text-align: right;
-    }
-    .footer-right a { color: var(--text-dim); text-decoration: none; }
-    .footer-right a:hover { color: var(--text-sec); }
+    footer a { color: var(--text-dim); text-decoration: none; }
+    footer a:hover { color: var(--rose-bright); }
 
-    /* ── Scroll reveal ───────────────────────────────────────────────── */
+    /* ── Reveal animation ────────────────────────────────────────────────── */
     .reveal {
       opacity: 0; transform: translateY(28px);
-      transition: opacity 0.8s cubic-bezier(0.22,1,0.36,1), transform 0.8s cubic-bezier(0.22,1,0.36,1);
+      transition: opacity 0.6s ease, transform 0.6s ease;
     }
     .reveal.visible { opacity: 1; transform: translateY(0); }
-    .reveal-d1 { transition-delay: 0.05s; }
-    .reveal-d2 { transition-delay: 0.12s; }
-    .reveal-d3 { transition-delay: 0.19s; }
-    .reveal-d4 { transition-delay: 0.26s; }
+
+    /* ── Scrollbar ───────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-str); border-radius: 3px; }
   </style>
 </head>
-
 <body>
-  <div class="bg-gradient" aria-hidden="true"></div>
-  <div class="orb orb-1"  aria-hidden="true"></div>
-  <div class="orb orb-2"  aria-hidden="true"></div>
 
-  <!-- ── Nav ── -->
-  <nav>
-    <a class="nav-logo" href="#">
-      <span class="nav-logo-word">Parabola</span>
-      <span class="nav-logo-tag">Markets</span>
-    </a>
-    <ul class="nav-links">
-      <li><a href="#how">How It Works</a></li>
-      <li><a href="#why">Why Distributions</a></li>
-      <li><a href="#team">Team</a></li>
-      <li><a href="https://github.com/ajerfy/Parabola" target="_blank" rel="noopener" class="nav-cta">GitHub</a></li>
-    </ul>
-  </nav>
+<!-- ══ Nav ═══════════════════════════════════════════════════════════════ -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark">P</div>
+    Parabola
+  </a>
+  <div class="nav-links">
+    <a href="#problem">The Problem</a>
+    <a href="#how">How It Works</a>
+    <a href="#perps">Perps</a>
+    <a href="#team">Team</a>
+    <a href="https://github.com/shikharsehgal1" target="_blank" rel="noopener" class="nav-cta">GitHub</a>
+  </div>
+</nav>
 
-  <main>
-    <!-- ── Hero ── -->
-    <section id="hero">
-      <div class="hero-eyebrow">Built on Solana · Distribution Markets</div>
+<!-- ══ Hero ══════════════════════════════════════════════════════════════ -->
+<section id="hero" class="section" style="position:relative; overflow:hidden;">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
 
-      <h1 class="hero-headline">
-        You don't pick<br>
-        <em>yes or no.</em><br>
-        You bet the curve.
-      </h1>
+  <!-- Animated bell curves SVG -->
+  <svg class="hero-visual" viewBox="0 0 520 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="curveGrad1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#c17085" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#c17085" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="curveGrad2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#b89870" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#b89870" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="curveGrad3" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#e0aabb" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#e0aabb" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <!-- Crowd distribution (wide, amber) -->
+    <path d="M30 340 Q100 340 140 260 Q180 180 200 120 Q220 60 240 50 Q260 40 280 50 Q300 60 320 120 Q340 180 360 260 Q380 340 420 340 Z" fill="url(#curveGrad2)" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;0.5;0.7" dur="4s" repeatCount="indefinite"/>
+    </path>
+    <path d="M30 340 Q100 340 140 260 Q180 180 200 120 Q220 60 240 50 Q260 40 280 50 Q300 60 320 120 Q340 180 360 260 Q380 340 420 340" fill="none" stroke="#b89870" stroke-width="1.5" opacity="0.4"/>
+    <!-- You distribution (narrow, rose) -->
+    <path d="M120 340 Q180 340 210 240 Q230 180 240 110 Q248 62 260 48 Q272 34 280 48 Q292 62 300 110 Q312 180 340 260 Q370 330 400 340 Z" fill="url(#curveGrad1)" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.55;0.8" dur="3.2s" repeatCount="indefinite"/>
+    </path>
+    <path d="M120 340 Q180 340 210 240 Q230 180 240 110 Q248 62 260 48 Q272 34 280 48 Q292 62 300 110 Q312 180 340 260 Q370 330 400 340" fill="none" stroke="#c17085" stroke-width="2" opacity="0.7">
+      <animate attributeName="stroke-opacity" values="0.7;0.4;0.7" dur="3.2s" repeatCount="indefinite"/>
+    </path>
+    <!-- Wide diffuse crowd ghost -->
+    <path d="M0 340 Q60 340 120 300 Q170 265 200 220 Q230 180 260 160 Q290 140 320 160 Q360 185 400 240 Q440 295 480 340 Z" fill="url(#curveGrad3)" opacity="0.45"/>
+    <!-- Vertical center line -->
+    <line x1="260" y1="48" x2="260" y2="340" stroke="#c17085" stroke-width="1" stroke-dasharray="4 5" opacity="0.3"/>
+  </svg>
 
-      <p class="hero-sub">
-        Parabola is a prediction market where you submit a full probability distribution —
-        your mean estimate <em>and</em> your confidence — not just a direction.
-      </p>
+  <div class="hero-inner">
+    <div class="eyebrow reveal">
+      <div class="eyebrow-dot"></div>
+      Estimation Markets · Solana
+    </div>
 
-      <!-- Animated bell curve -->
-      <div class="hero-curve">
-        <svg width="480" height="120" viewBox="0 0 480 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <h1 class="reveal" style="transition-delay:0.08s">
+      Markets for<br>
+      <div class="rotator-wrap">
+        <div class="rotator">
+          <span>NBA totals.</span>
+          <span>election margins.</span>
+          <span>Bitcoin's year-end price.</span>
+          <span>Fed rate decisions.</span>
+        </div>
+      </div>
+    </h1>
+
+    <p class="hero-sub reveal" style="transition-delay:0.16s">
+      Parabola is the first on-chain market where you bet a <em>full probability distribution</em> — not just a binary yes/no. Your conviction becomes your edge.
+    </p>
+
+    <div class="hero-actions reveal" style="transition-delay:0.24s">
+      <a href="https://github.com/shikharsehgal1" class="btn-primary" target="_blank" rel="noopener">View on GitHub</a>
+      <a href="#problem" class="btn-ghost">How it works ↓</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Built on ═══════════════════════════════════════════════════════════ -->
+<section class="section pad-section" style="padding-top:0; padding-bottom:clamp(3rem,7vh,5rem);">
+  <div class="container">
+    <div class="built-bar reveal">
+      <div class="built-item"><span class="logo">◎ Solana</span>Built on</div>
+      <div class="built-item"><span class="logo">⚡ Pyth</span>Oracle</div>
+      <div class="built-item"><span class="logo">⬡ Normal</span>AMM</div>
+      <div class="built-item"><span class="logo">∿ KL-Divergence</span>Pricing</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ══ Problem ════════════════════════════════════════════════════════════ -->
+<section id="problem" class="section pad-section">
+  <div class="container">
+    <p class="section-label reveal">The Problem</p>
+    <h2 class="reveal" style="transition-delay:0.06s">Binary markets <em>throw away</em> information.</h2>
+    <p class="section-sub reveal" style="transition-delay:0.12s">
+      Ask "Will the Lakers–Celtics game total go over 220 points?" and you're left with yes or no. But real knowledge is richer than that.
+    </p>
+
+    <div class="problem-grid">
+      <div class="prob-card bad reveal" style="transition-delay:0.18s">
+        <div class="prob-tag bad">Today's markets</div>
+        <h3>Forced binary</h3>
+        <p>You know the game usually runs 215–230 points. You lean toward 224. But you can only bet yes/no at an arbitrary line you didn't choose.</p>
+        <div class="prob-example">
+          Lakers vs Celtics — Total<br>
+          Over 220.5 &nbsp;<strong>-115</strong><br>
+          Under 220.5 &nbsp;<strong>-105</strong>
+        </div>
+      </div>
+      <div class="prob-card good reveal" style="transition-delay:0.24s">
+        <div class="prob-tag good">Parabola</div>
+        <h3>Bet your full belief</h3>
+        <p>Submit a distribution centered wherever you think the true total lands. The more precisely right you are, the more you earn — your edge scales with conviction.</p>
+        <div class="prob-example">
+          Lakers vs Celtics — Total<br>
+          Your estimate &nbsp;<strong>μ = 224 &nbsp; σ = 6.2</strong><br>
+          Crowd &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>μ = 219 &nbsp; σ = 9.1</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ══ Features ═══════════════════════════════════════════════════════════ -->
+<section id="features" class="section pad-section">
+  <div class="container">
+    <p class="section-label reveal">Why Parabola</p>
+    <h2 class="reveal" style="transition-delay:0.06s">Built different, <em>on-chain.</em></h2>
+
+    <div class="card-grid">
+      <div class="card reveal" style="transition-delay:0.10s">
+        <div class="card-icon">∿</div>
+        <h3>KL-Divergence Pricing</h3>
+        <p>Collateral is proportional to how far your distribution diverges from the crowd. Tight, confident bets cost less. Wild outlier bets cost more.</p>
+      </div>
+      <div class="card reveal" style="transition-delay:0.16s">
+        <div class="card-icon">⬡</div>
+        <h3>Normal AMM</h3>
+        <p>A novel AMM where both axes are probability distributions, not just prices. Liquidity is a distribution over outcomes, settled by a proper scoring rule.</p>
+      </div>
+      <div class="card reveal" style="transition-delay:0.22s">
+        <div class="card-icon">◎</div>
+        <h3>On-Chain, Non-Custodial</h3>
+        <p>Every bet is a Solana transaction. No counterparty. No centralized oracle. Settlement is trustless and fully verifiable on-chain.</p>
+      </div>
+      <div class="card reveal" style="transition-delay:0.28s">
+        <div class="card-icon">⚡</div>
+        <h3>Pyth Oracle Integration</h3>
+        <p>Real-time Pyth prices anchor perpetual estimation markets, so distributions always settle against a tamper-resistant, live price feed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ══ How it works ═══════════════════════════════════════════════════════ -->
+<section id="how" class="section pad-section">
+  <div class="container">
+    <p class="section-label reveal">How It Works</p>
+    <h2 class="reveal" style="transition-delay:0.06s">Four steps, <em>infinite nuance.</em></h2>
+
+    <div class="steps">
+      <div class="step reveal" style="transition-delay:0.10s">
+        <div class="step-num">01</div>
+        <h3>Pick a market</h3>
+        <p>Browse open estimation markets: sports totals, macro data releases, crypto prices, election margins.</p>
+      </div>
+      <div class="step reveal" style="transition-delay:0.16s">
+        <div class="step-num">02</div>
+        <h3>Submit a distribution</h3>
+        <p>Choose your mean (what you expect) and sigma (how certain you are). More conviction → tighter sigma → lower collateral required.</p>
+      </div>
+      <div class="step reveal" style="transition-delay:0.22s">
+        <div class="step-num">03</div>
+        <h3>Sign on Solana</h3>
+        <p>Your distribution is submitted as an on-chain transaction. No intermediary. The AMM quotes you immediately.</p>
+      </div>
+      <div class="step reveal" style="transition-delay:0.28s">
+        <div class="step-num">04</div>
+        <h3>Settle and collect</h3>
+        <p>When the outcome resolves, the proper scoring rule pays out based on proximity. The closer your distribution, the bigger your reward.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ══ Perps ═══════════════════════════════════════════════════════════════ -->
+<section id="perps" class="section pad-section">
+  <div class="container">
+    <p class="section-label reveal">Perpetual Estimation Markets</p>
+    <h2 class="reveal" style="transition-delay:0.06s">Trade the distribution <em>continuously.</em></h2>
+    <p class="section-sub reveal" style="transition-delay:0.12s">
+      Distribution perps let you hold a long or short position on how a market's collective distribution evolves — like a perp on crowd wisdom itself.
+    </p>
+
+    <div class="perps-grid">
+      <!-- SVG chart -->
+      <div class="perp-chart-wrap reveal" style="transition-delay:0.16s">
+        <div class="perp-chart-label">AMM curve vs Anchor (Pyth oracle)</div>
+        <svg viewBox="0 0 400 220" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%">
           <defs>
-            <linearGradient id="curve-grad" x1="0" y1="0" x2="480" y2="0">
-              <stop offset="0%"   stop-color="#7c3aed" stop-opacity="0" />
-              <stop offset="20%"  stop-color="#7c3aed" stop-opacity="1" />
-              <stop offset="50%"  stop-color="#a78bfa" stop-opacity="1" />
-              <stop offset="80%"  stop-color="#2dd4bf" stop-opacity="1" />
-              <stop offset="100%" stop-color="#0d9488" stop-opacity="0" />
+            <linearGradient id="ammGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#c17085" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#c17085" stop-opacity="0"/>
             </linearGradient>
-            <linearGradient id="fill-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"  stop-color="#7c3aed" stop-opacity="0.18" />
-              <stop offset="100%" stop-color="#07070e" stop-opacity="0" />
+            <linearGradient id="anchorGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#b89870" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#b89870" stop-opacity="0"/>
             </linearGradient>
-            <mask id="curve-mask">
-              <path d="M10,110 C40,110 80,108 110,100 C140,92 155,70 170,50 C185,30 200,12 240,10 C280,8 295,30 310,50 C325,70 340,92 370,100 C400,108 440,110 470,110 Z" fill="white"/>
-            </mask>
           </defs>
-
-          <!-- Fill under curve -->
-          <path class="fill-curve"
-            d="M10,110 C40,110 80,108 110,100 C140,92 155,70 170,50 C185,30 200,12 240,10 C280,8 295,30 310,50 C325,70 340,92 370,100 C400,108 440,110 470,110 Z"
-            fill="url(#fill-grad)" />
-
-          <!-- Curve stroke -->
-          <path class="curve-path"
-            d="M10,110 C40,110 80,108 110,100 C140,92 155,70 170,50 C185,30 200,12 240,10 C280,8 295,30 310,50 C325,70 340,92 370,100 C400,108 440,110 470,110"
-            stroke="url(#curve-grad)" stroke-width="2" stroke-linecap="round" fill="none" />
-
-          <!-- μ tick -->
-          <line x1="240" y1="10" x2="240" y2="110"
-            stroke="rgba(167,139,250,0.3)" stroke-width="1" stroke-dasharray="3 4" />
-
-          <!-- ±1σ lines -->
-          <line x1="170" y1="50" x2="170" y2="110"
-            stroke="rgba(45,212,191,0.2)" stroke-width="1" stroke-dasharray="3 4" />
-          <line x1="310" y1="50" x2="310" y2="110"
-            stroke="rgba(45,212,191,0.2)" stroke-width="1" stroke-dasharray="3 4" />
+          <!-- Anchor distribution (oracle, sand) -->
+          <path d="M40 200 Q110 200 145 140 Q170 95 190 65 Q200 48 210 44 Q220 40 230 44 Q240 48 250 65 Q270 95 295 140 Q330 200 370 200 Z" fill="url(#anchorGrad)" opacity="0.9"/>
+          <path d="M40 200 Q110 200 145 140 Q170 95 190 65 Q200 48 210 44 Q220 40 230 44 Q240 48 250 65 Q270 95 295 140 Q330 200 370 200" fill="none" stroke="#b89870" stroke-width="1.8" stroke-dasharray="5 4" opacity="0.6"/>
+          <!-- AMM curve (rose, shifted right → funding pressure) -->
+          <path d="M80 200 Q140 200 168 140 Q190 95 208 65 Q218 48 232 44 Q248 40 260 44 Q274 48 288 65 Q310 95 340 140 Q370 200 400 200 Z" fill="url(#ammGrad)" opacity="0.9">
+            <animate attributeName="opacity" values="0.9;0.6;0.9" dur="3.5s" repeatCount="indefinite"/>
+          </path>
+          <path d="M80 200 Q140 200 168 140 Q190 95 208 65 Q218 48 232 44 Q248 40 260 44 Q274 48 288 65 Q310 95 340 140 Q370 200 400 200" fill="none" stroke="#c17085" stroke-width="2" opacity="0.8"/>
+          <!-- Labels -->
+          <text x="178" y="30" font-family="Inter,sans-serif" font-size="10" fill="#b89870" opacity="0.7">anchor (Pyth)</text>
+          <text x="248" y="30" font-family="Inter,sans-serif" font-size="10" fill="#c17085" opacity="0.9">AMM μ</text>
+          <!-- Funding arrow -->
+          <line x1="210" y1="44" x2="232" y2="44" stroke="#e0aabb" stroke-width="1.5" marker-end="url(#arr)"/>
+          <defs>
+            <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#e0aabb"/>
+            </marker>
+          </defs>
+          <text x="216" y="38" font-family="JetBrains Mono,monospace" font-size="8" fill="#e0aabb" opacity="0.8">funding</text>
+          <!-- Axis -->
+          <line x1="30" y1="200" x2="390" y2="200" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1"/>
         </svg>
-      </div>
-
-      <div class="hero-curve-label">
-        <span class="curve-label-mu">μ — mean estimate</span>
-        <span style="color:var(--border-strong)">·</span>
-        <span class="curve-label-sigma">σ — confidence (std dev)</span>
-      </div>
-    </section>
-
-    <div class="divider"></div>
-
-    <!-- ── Problem ── -->
-    <section id="problem">
-      <div class="section">
-        <div class="two-col">
-          <div class="reveal">
-            <div class="section-label">The Problem</div>
-            <h2>Binary markets<br><strong>collapse nuance</strong><br>into a coin flip.</h2>
-            <p>
-              A 72¢ YES on Polymarket hides everything you actually know —
-              your conviction level, your uncertainty, your tail risk. Parabola makes
-              all of that tradeable.
-            </p>
-          </div>
-          <div class="compare-grid reveal reveal-d2">
-            <div class="compare-card bad">
-              <div class="compare-label">Binary Market</div>
-              <div class="compare-title">Chimaev wins the fight</div>
-              <div class="compare-sub">YES · 0.72¢ &nbsp;/&nbsp; NO · 0.28¢</div>
-            </div>
-            <div class="compare-card good">
-              <div class="compare-label">Parabola</div>
-              <div class="compare-title">P(Chimaev wins) ~ Normal(72%, σ=9%)</div>
-              <div class="compare-sub">
-                Your mean: 68% &nbsp;·&nbsp; Your conviction: σ = 6% &nbsp;·&nbsp;
-                Collateral priced by KL-divergence from crowd
-              </div>
-            </div>
-          </div>
+        <div class="funding-row">
+          <div class="funding-pill pill-long">Long +0.014%/hr</div>
+          <div class="funding-pill pill-short">Short −0.014%/hr</div>
         </div>
       </div>
-    </section>
 
-    <div class="divider"></div>
-
-    <!-- ── How it works ── -->
-    <section id="how">
-      <div class="section">
-        <div class="section-label reveal">Mechanism</div>
-        <h2 class="reveal reveal-d1">How it works</h2>
-        <div class="steps">
-          <div class="step reveal reveal-d1">
-            <div class="step-num">01</div>
-            <div class="step-icon step-icon-1">𝒩</div>
-            <h3>Submit a distribution</h3>
-            <p>
-              Instead of a binary vote, you submit Normal(μ, σ).
-              μ is where you think the outcome lands. σ is how sure you are.
-            </p>
-            <div class="step-formula">target: Normal(μ=68, σ=6)</div>
-          </div>
-          <div class="step reveal reveal-d2">
-            <div class="step-num">02</div>
-            <div class="step-icon step-icon-2">𝒟</div>
-            <h3>Collateral from divergence</h3>
-            <p>
-              Your collateral requirement is computed from the KL-divergence between
-              your distribution and the crowd's. High conviction = higher stake.
-            </p>
-            <div class="step-formula">cost ∝ KL(yours ‖ crowd)</div>
-          </div>
-          <div class="step reveal reveal-d3">
-            <div class="step-num">03</div>
-            <div class="step-icon step-icon-3">✓</div>
-            <h3>Settle on outcomes</h3>
-            <p>
-              At resolution, an oracle posts the realized value.
-              Payout is scored by how close your distribution was to the truth.
-            </p>
-            <div class="step-formula">payout = f(x_true | μ, σ)</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Stats ── -->
-    <div id="stats">
-      <div class="section">
-        <div class="stat-item reveal">
-          <div class="stat-number"><span class="count" data-target="∞">∞</span></div>
-          <div class="stat-label">Resolution states (vs. binary's 2)</div>
-        </div>
-        <div class="stat-item reveal reveal-d2">
-          <div class="stat-number"><span class="count" data-target="100" data-suffix="%">0%</span></div>
-          <div class="stat-label">Collateral computed on-chain, trustlessly</div>
-        </div>
-        <div class="stat-item reveal reveal-d3">
-          <div class="stat-number"><span>~450ms</span></div>
-          <div class="stat-label">Simulation tick rate</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- ── Why distributions ── -->
-    <section id="why">
-      <div class="section">
-        <div class="section-label reveal">The Insight</div>
-        <h2 class="reveal reveal-d1">Why distributions<br>unlock better markets</h2>
-        <p class="lead reveal reveal-d2">
-          When you can trade uncertainty itself, markets become more efficient — and more honest.
+      <!-- Explanation -->
+      <div class="reveal" style="transition-delay:0.22s">
+        <p style="font-size:clamp(0.95rem,2vw,1.05rem); color:var(--text-sec); line-height:1.75; margin-bottom:1.5rem;">
+          In a Parabola perp, the AMM holds a distribution anchored to a live oracle (e.g. Pyth BTC/USD). When the market's collective μ drifts away from the anchor, a <strong style="color:var(--text)">funding rate</strong> is charged to bring it back — just like a traditional perp funding rate, but over a full distribution.
         </p>
-        <div class="why-grid">
-          <div class="why-card reveal reveal-d1">
-            <div class="why-card-header">
-              <div class="why-dot" style="background:var(--violet-bright)"></div>
-              <h3>Expressive positions</h3>
-            </div>
-            <p>
-              A trader who thinks 65% but is very uncertain and a trader who thinks 65%
-              with total conviction should not pay the same price. Now they don't.
-            </p>
-            <span class="mono-tag">σ encodes conviction</span>
-          </div>
-          <div class="why-card reveal reveal-d2">
-            <div class="why-card-header">
-              <div class="why-dot" style="background:var(--teal-bright)"></div>
-              <h3>Truthful incentives</h3>
-            </div>
-            <p>
-              KL-divergence pricing means the only way to minimize your expected cost
-              is to report your true belief — including your uncertainty.
-            </p>
-            <span class="mono-tag">proper scoring rule</span>
-          </div>
-          <div class="why-card reveal reveal-d3">
-            <div class="why-card-header">
-              <div class="why-dot" style="background:#fbbf24"></div>
-              <h3>Continuous resolution</h3>
-            </div>
-            <p>
-              Settlement isn't binary. The payout function is smooth — a distribution
-              centered 1% off still gets partial credit. No more all-or-nothing cliff.
-            </p>
-            <span class="mono-tag">f(x_true | μ, σ)</span>
-          </div>
-          <div class="why-card reveal reveal-d4">
-            <div class="why-card-header">
-              <div class="why-dot" style="background:#f472b6"></div>
-              <h3>Crowd σ as consensus</h3>
-            </div>
-            <p>
-              The aggregate σ across all traders is itself a market signal — a live,
-              on-chain measure of how certain the crowd is. Better than any sentiment index.
-            </p>
-            <span class="mono-tag">crowd σ → VIX-like index</span>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <div class="divider"></div>
-
-    <!-- ── Team ── -->
-    <section id="team">
-      <div class="section">
-        <div class="section-label reveal">The Team</div>
-        <h2 class="reveal reveal-d1">Built by four people<br>obsessed with the problem</h2>
-        <p class="lead reveal reveal-d2">University of Chicago</p>
-        <div class="team-grid">
-
-          <div class="team-card reveal reveal-d1">
-            <div class="team-card-glow" style="background:var(--violet)"></div>
-            <div class="team-initials" style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.2);color:var(--violet-bright)">SS</div>
-            <div class="team-name">Shikhar Sehgal</div>
-            <div class="team-role">Co-founder</div>
-            <div class="team-school">UChicago</div>
-          </div>
-
-          <div class="team-card reveal reveal-d2">
-            <div class="team-card-glow" style="background:var(--teal)"></div>
-            <div class="team-initials" style="background:rgba(13,148,136,0.12);border:1px solid rgba(13,148,136,0.2);color:var(--teal-bright)">AJ</div>
-            <div class="team-name">Aadit Jerfy</div>
-            <div class="team-role">Co-founder</div>
-            <div class="team-school">UChicago</div>
-          </div>
-
-          <div class="team-card reveal reveal-d3">
-            <div class="team-card-glow" style="background:#7c3aed"></div>
-            <div class="team-initials" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);color:#fbbf24">PB</div>
-            <div class="team-name">Prashanth Bhaskara</div>
-            <div class="team-role">Co-founder</div>
-            <div class="team-school">UChicago</div>
-          </div>
-
-          <div class="team-card reveal reveal-d4">
-            <div class="team-card-glow" style="background:#ec4899"></div>
-            <div class="team-initials" style="background:rgba(244,114,182,0.08);border:1px solid rgba(244,114,182,0.2);color:#f472b6">ML</div>
-            <div class="team-name">Matthew Lin</div>
-            <div class="team-role">Co-founder</div>
-            <div class="team-school">UChicago</div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Solana banner ── -->
-    <div id="solana-banner">
-      <div class="section">
-        <div class="solana-text reveal">
-          <h3>Live on Solana devnet</h3>
-          <p>PD-AMM settlement · Pyth oracle feeds · Mobile Wallet Adapter signing</p>
-        </div>
-        <div class="solana-pills reveal reveal-d2">
-          <span class="pill violet">Normal(μ, σ)</span>
-          <span class="pill teal">KL-divergence pricing</span>
-          <span class="pill">Solana devnet</span>
-          <span class="pill">Pyth Hermes</span>
-          <span class="pill">Polymarket feeds</span>
-        </div>
+        <ul class="perp-feature-list">
+          <li><strong>Long:</strong> profits when the crowd distribution shifts higher than the oracle anchor. Funding is paid to you when the crowd is bearish.</li>
+          <li><strong>Short:</strong> profits when the crowd distribution shifts lower. You collect funding when the crowd is overly optimistic.</li>
+          <li><strong>KL-divergence funding:</strong> the rate is proportional to the KL-divergence between the AMM distribution and the oracle anchor — a principled, manipulation-resistant signal.</li>
+          <li><strong>No expiry:</strong> hold your position as long as you want. Exit any time by taking the other side.</li>
+        </ul>
       </div>
     </div>
-  </main>
+  </div>
+</section>
 
-  <!-- ── Footer ── -->
-  <footer>
-    <div class="footer-logo">Parabola Markets</div>
-    <div class="footer-right">
-      <a href="https://github.com/ajerfy/Parabola" target="_blank" rel="noopener">GitHub</a>
-      &nbsp;·&nbsp; parabolamarkets.xyz &nbsp;·&nbsp; © 2025
+<hr class="divider" />
+
+<!-- ══ Team ════════════════════════════════════════════════════════════════ -->
+<section id="team" class="section pad-section">
+  <div class="container">
+    <p class="section-label reveal">Team</p>
+    <h2 class="reveal" style="transition-delay:0.06s">Three co-founders, <em>one founding engineer.</em></h2>
+    <p class="team-headline reveal" style="transition-delay:0.1s; color:var(--text-sec); font-weight:300; font-size:clamp(0.95rem,2vw,1.05rem); margin-bottom:0;">
+      Built at the intersection of mechanism design, market microstructure, and Solana protocol engineering.
+    </p>
+
+    <div class="team-grid" style="margin-top:2.5rem;">
+      <div class="team-card reveal" style="transition-delay:0.12s">
+        <div class="team-avatar">SS</div>
+        <div class="team-name">Shikhar Sehgal</div>
+        <div class="team-role">Co-Founder</div>
+        <div class="team-desc">Protocol design, AMM architecture, and on-chain Solana programs.</div>
+      </div>
+      <div class="team-card reveal" style="transition-delay:0.18s">
+        <div class="team-avatar">AJ</div>
+        <div class="team-name">Aadit Jerfy</div>
+        <div class="team-role">Co-Founder</div>
+        <div class="team-desc">Market microstructure, mechanism design, and scoring rule research.</div>
+      </div>
+      <div class="team-card reveal" style="transition-delay:0.24s">
+        <div class="team-avatar">PB</div>
+        <div class="team-name">Prashanth Bhaskara</div>
+        <div class="team-role">Co-Founder</div>
+        <div class="team-desc">Quantitative modeling, simulation engine, and market-making strategy.</div>
+      </div>
+      <div class="team-card reveal" style="transition-delay:0.30s">
+        <div class="team-avatar">ML</div>
+        <div class="team-name">Matthew Lin</div>
+        <div class="team-role">Founding Engineer</div>
+        <div class="team-desc">Full-stack infrastructure, backend services, and frontend experience.</div>
+      </div>
     </div>
-  </footer>
+  </div>
+</section>
 
-  <!-- ── Scroll reveal + counter JS ── -->
-  <script>
-    // Scroll reveal
-    const revealEls = document.querySelectorAll('.reveal');
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
-    }, { threshold: 0.12 });
-    revealEls.forEach(el => io.observe(el));
+<hr class="divider" />
 
-    // Count-up animation
-    function animateCount(el) {
-      const target = el.dataset.target;
-      const suffix = el.dataset.suffix || '';
-      if (target === '∞') return;
-      const end = parseInt(target, 10);
-      let start = 0;
-      const duration = 1400;
-      const step = (ts) => {
-        if (!start) start = ts;
-        const progress = Math.min((ts - start) / duration, 1);
-        const ease = 1 - Math.pow(1 - progress, 3);
-        el.textContent = Math.floor(ease * end) + suffix;
-        if (progress < 1) requestAnimationFrame(step);
-        else el.textContent = end + suffix;
-      };
-      requestAnimationFrame(step);
-    }
+<!-- ══ CTA ════════════════════════════════════════════════════════════════ -->
+<section id="cta" class="section">
+  <div class="orb" style="width:350px;height:350px;background:radial-gradient(circle,#7d3f5228 0%,transparent 70%);bottom:-80px;left:50%;transform:translateX(-50%);"></div>
+  <h2 class="reveal">Ready to bet the distribution?</h2>
+  <p class="section-sub reveal" style="transition-delay:0.08s; margin:0 auto 2.5rem;">
+    Parabola is in development on Solana devnet. Follow our progress on GitHub.
+  </p>
+  <div class="hero-actions" style="justify-content:center;" class="reveal">
+    <a href="https://github.com/shikharsehgal1" class="btn-primary" target="_blank" rel="noopener">View on GitHub</a>
+    <a href="mailto:shikharsehgal@uchicago.edu" class="btn-ghost">Get in touch</a>
+  </div>
+</section>
 
-    const statIo = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          const counter = e.target.querySelector('.count[data-target]');
-          if (counter && counter.dataset.target !== '∞') animateCount(counter);
-          statIo.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.5 });
-    document.querySelectorAll('.stat-item').forEach(el => statIo.observe(el));
-  </script>
+<!-- ══ Footer ═════════════════════════════════════════════════════════════ -->
+<footer>
+  <span>© 2026 Parabola Markets. All rights reserved.</span>
+  <span>Built on <a href="https://solana.com" target="_blank" rel="noopener">Solana</a> · Powered by <a href="https://pyth.network" target="_blank" rel="noopener">Pyth</a></span>
+</footer>
+
+<script>
+  /* ── Scroll reveal ─────────────────────────────────────────────────── */
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  /* ── Count-up on built bar ─────────────────────────────────────────── */
+  function countUp(el, target, duration = 1200) {
+    const start = performance.now();
+    const update = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      el.textContent = Math.round(progress * target).toLocaleString();
+      if (progress < 1) requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
+  }
+</script>
 </body>
 </html>
