@@ -12,37 +12,22 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <!-- Bodoni Moda: high-contrast editorial serif. Syne: geometric modernist UI. -->
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,700;1,6..96,300;1,6..96,400;1,6..96,500&family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-  <!-- Grain filter -->
-  <svg width="0" height="0" style="position:absolute">
-    <defs>
-      <filter id="grain" x="0%" y="0%" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="4" stitchTiles="stitch" result="noise"/>
-        <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
-        <feBlend in="SourceGraphic" in2="grey" mode="overlay"/>
-      </filter>
-    </defs>
-  </svg>
-
   <style>
-    /* ── Reset ──────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
 
-    /* ── Tokens ─────────────────────────────────────────────────────── */
     :root {
       --rose:        #c17085;
       --rose-bright: #e0aabb;
       --rose-dim:    #7d3f52;
-      --rose-faint:  rgba(193,112,133,0.10);
       --sand:        #b89870;
       --sand-bright: #d4b894;
       --sand-dim:    #6e5c40;
       --bg:          #0c090a;
       --bg-el:       rgba(255,255,255,0.022);
-      --bg-glass:    rgba(16,10,12,0.80);
+      --bg-glass:    rgba(16,10,12,0.82);
       --border:      rgba(255,255,255,0.058);
       --border-mid:  rgba(255,255,255,0.09);
       --border-str:  rgba(255,255,255,0.15);
@@ -55,7 +40,6 @@
       --r-sm:        0.6rem;
     }
 
-    /* ── Base ───────────────────────────────────────────────────────── */
     body {
       font-family: 'Syne', system-ui, sans-serif;
       background: var(--bg);
@@ -63,44 +47,6 @@
       line-height: 1.65;
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── Grain ──────────────────────────────────────────────────────── */
-    .grain-overlay {
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      opacity: 0.028;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-      background-size: 200px 200px;
-    }
-
-    /* ── Orbs ───────────────────────────────────────────────────────── */
-    .orb {
-      position: absolute; border-radius: 50%;
-      filter: blur(90px); pointer-events: none; z-index: 0;
-    }
-    .orb-a {
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(125,63,82,0.32) 0%, transparent 70%);
-      top: -200px; left: -200px;
-      animation: orbDrift 14s ease-in-out infinite alternate;
-    }
-    .orb-b {
-      width: 450px; height: 450px;
-      background: radial-gradient(circle, rgba(110,92,64,0.22) 0%, transparent 70%);
-      top: 300px; right: -150px;
-      animation: orbDrift 18s ease-in-out infinite alternate-reverse;
-    }
-    .orb-c {
-      width: 320px; height: 320px;
-      background: radial-gradient(circle, rgba(193,112,133,0.18) 0%, transparent 70%);
-      bottom: -80px; left: 35%;
-      animation: orbDrift 22s ease-in-out infinite alternate;
-    }
-    @keyframes orbDrift {
-      0%   { transform: translate(0, 0) scale(1); }
-      33%  { transform: translate(40px, -30px) scale(1.05); }
-      66%  { transform: translate(-20px, 20px) scale(0.96); }
-      100% { transform: translate(30px, 10px) scale(1.03); }
     }
 
     /* ── Nav ─────────────────────────────────────────────────────────── */
@@ -118,62 +64,33 @@
       font-family: 'Bodoni Moda', Georgia, serif;
       font-size: 1.05rem; font-weight: 500; letter-spacing: 0.02em;
     }
-    /* ── Parabola Logo SVG ── */
-    .logo-svg { flex-shrink: 0; }
-    .nav-links {
-      display: flex; align-items: center;
-      gap: clamp(1.2rem, 3vw, 2.2rem);
-    }
+    .nav-links { display: flex; align-items: center; gap: clamp(1.2rem, 3vw, 2.2rem); }
     .nav-links a {
       font-size: 0.84rem; font-weight: 500; letter-spacing: 0.04em;
-      color: var(--text-sec); text-decoration: none;
-      transition: color 0.2s;
+      color: var(--text-sec); text-decoration: none; transition: color 0.2s;
     }
     .nav-links a:hover { color: var(--text); }
-    @media (max-width: 580px) {
-      .nav-links a:not(:last-child) { display: none; }
-    }
+    @media (max-width: 580px) { .nav-links a:not(:last-child) { display: none; } }
 
-    /* ── Sections ───────────────────────────────────────────────────── */
+    /* ── Layout ─────────────────────────────────────────────────────── */
     .section { position: relative; z-index: 1; }
-    .container {
-      max-width: 1100px; margin: 0 auto;
-      padding: 0 clamp(1.25rem, 5vw, 3.5rem);
-    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 clamp(1.25rem, 5vw, 3.5rem); }
     .pad { padding: clamp(5rem, 12vh, 9rem) 0; }
 
-    /* ── Typography ──────────────────────────────────────────────────── */
-    h1, h2, h3 {
-      font-family: 'Bodoni Moda', Georgia, serif;
-      letter-spacing: -0.02em; line-height: 1.08;
-    }
-    h1 {
-      font-size: clamp(2.8rem, 8vw, 5.6rem);
-      font-weight: 400;
-    }
+    /* ── Typography ─────────────────────────────────────────────────── */
+    h1, h2, h3 { font-family: 'Bodoni Moda', Georgia, serif; letter-spacing: -0.02em; line-height: 1.08; }
+    h1 { font-size: clamp(2.8rem, 8vw, 5.6rem); font-weight: 400; }
     h1 em {
       font-style: italic;
       background: linear-gradient(118deg, var(--rose-bright) 0%, var(--sand-bright) 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
-    h2 {
-      font-size: clamp(2rem, 5.5vw, 3.6rem); font-weight: 400;
-      color: var(--text);
-    }
-    h2 em {
-      font-style: italic; color: var(--rose-bright);
-      -webkit-text-fill-color: initial;
-    }
-    h3 {
-      font-size: clamp(1.1rem, 2.5vw, 1.3rem); font-weight: 500;
-      color: var(--text); margin-bottom: 0.5rem;
-    }
-    p { font-family: 'Syne', sans-serif; }
+    h2 { font-size: clamp(2rem, 5.5vw, 3.6rem); font-weight: 400; color: var(--text); }
+    h2 em { font-style: italic; color: var(--rose-bright); -webkit-text-fill-color: initial; }
+    h3 { font-size: clamp(1.05rem, 2.5vw, 1.25rem); font-weight: 500; color: var(--text); margin-bottom: 0.5rem; }
 
-    /* ── Eyebrow ─────────────────────────────────────────────────────── */
     .eyebrow {
       display: inline-flex; align-items: center; gap: 9px;
-      font-family: 'Syne', sans-serif;
       font-size: clamp(0.68rem, 1.6vw, 0.76rem);
       font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
       color: var(--rose-bright); margin-bottom: 1.6rem;
@@ -183,23 +100,28 @@
       background: var(--rose); flex-shrink: 0;
       animation: pip 2.4s ease-in-out infinite;
     }
-    @keyframes pip {
-      0%, 100% { opacity:1; transform:scale(1); }
-      50%       { opacity:0.4; transform:scale(0.65); }
-    }
+    @keyframes pip { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.65)} }
+
     .section-label {
-      font-family: 'Syne', sans-serif;
-      font-size: clamp(0.66rem, 1.5vw, 0.72rem);
-      font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
-      color: var(--rose); margin-bottom: 1rem;
+      font-size: clamp(0.66rem,1.5vw,0.72rem); font-weight: 700;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--rose); margin-bottom: 1rem;
     }
 
-    /* ── Hero ─────────────────────────────────────────────────────────── */
+    /* ── Hero ───────────────────────────────────────────────────────── */
     #hero {
       min-height: 100svh; display: flex; flex-direction: column;
       justify-content: center; overflow: hidden; padding-top: 66px;
+      position: relative;
+    }
+    /* Lake canvas is the hero background */
+    #lake {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 0; display: block;
+      cursor: crosshair;
     }
     .hero-inner {
+      position: relative; z-index: 2;
       max-width: 800px;
       padding: clamp(5rem,12vh,9rem) clamp(1.25rem,5vw,3.5rem) clamp(4rem,8vh,6rem);
     }
@@ -211,10 +133,7 @@
     .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
     /* Text rotator */
-    .rotator-wrap {
-      display: inline-block; overflow: hidden;
-      height: 1.08em; vertical-align: bottom;
-    }
+    .rotator-wrap { display: inline-block; overflow: hidden; height: 1.08em; vertical-align: bottom; }
     .rotator {
       display: flex; flex-direction: column;
       animation: rotSlide 9s cubic-bezier(0.77,0,0.18,1) infinite;
@@ -225,267 +144,167 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
     @keyframes rotSlide {
-      0%, 18%  { transform: translateY(0); }
-      25%, 43% { transform: translateY(-25%); }
-      50%, 68% { transform: translateY(-50%); }
-      75%, 93% { transform: translateY(-75%); }
-      100%     { transform: translateY(0); }
+      0%,18%  { transform:translateY(0) }
+      25%,43% { transform:translateY(-25%) }
+      50%,68% { transform:translateY(-50%) }
+      75%,93% { transform:translateY(-75%) }
+      100%    { transform:translateY(0) }
     }
 
-    /* Hero bell curve visual */
-    .hero-curves {
-      position: absolute; right: 0; top: 50%; transform: translateY(-52%);
-      width: clamp(260px, 38vw, 500px); pointer-events: none; z-index: 0;
-      opacity: 0.5;
+    /* Lake hint label */
+    .lake-hint {
+      position: absolute; bottom: clamp(1.2rem,3vh,2rem); left: 50%;
+      transform: translateX(-50%);
+      z-index: 3; pointer-events: none;
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: rgba(193,112,133,0.5);
+      display: flex; align-items: center; gap: 8px;
+      animation: hintFade 3s ease-in-out 2s infinite alternate;
     }
-    @media (max-width: 860px) { .hero-curves { opacity: 0.18; width: 280px; } }
+    @keyframes hintFade { 0%{opacity:0.6} 100%{opacity:0.2} }
 
     /* ── Buttons ─────────────────────────────────────────────────────── */
     .btn-rose {
-      padding: clamp(12px,2vw,14px) clamp(24px,4vw,34px);
-      border-radius: 50px; font-family: 'Syne', sans-serif;
-      font-size: clamp(0.85rem,1.8vw,0.93rem); font-weight: 600; letter-spacing: 0.04em;
+      padding: clamp(12px,2vw,14px) clamp(24px,4vw,34px); border-radius: 50px;
+      font-family: 'Syne', sans-serif; font-size: clamp(0.85rem,1.8vw,0.93rem);
+      font-weight: 600; letter-spacing: 0.04em;
       background: linear-gradient(135deg, var(--rose) 0%, #9b4860 100%);
-      color: #fff; border: none; cursor: pointer; text-decoration: none;
-      display: inline-block;
+      color: #fff; border: none; cursor: pointer; text-decoration: none; display: inline-block;
       box-shadow: 0 4px 28px rgba(193,112,133,0.28);
       transition: transform 0.18s, box-shadow 0.18s;
+      position: relative; z-index: 3;
     }
     .btn-rose:hover { transform: translateY(-2px); box-shadow: 0 8px 36px rgba(193,112,133,0.40); }
     .btn-ghost {
-      padding: clamp(12px,2vw,14px) clamp(24px,4vw,34px);
-      border-radius: 50px; font-family: 'Syne', sans-serif;
-      font-size: clamp(0.85rem,1.8vw,0.93rem); font-weight: 500;
-      background: transparent; color: var(--text-sec);
-      border: 1px solid var(--border-str); cursor: pointer; text-decoration: none;
-      display: inline-block;
-      transition: color 0.18s, border-color 0.18s;
+      padding: clamp(12px,2vw,14px) clamp(24px,4vw,34px); border-radius: 50px;
+      font-family: 'Syne', sans-serif; font-size: clamp(0.85rem,1.8vw,0.93rem); font-weight: 500;
+      background: transparent; color: var(--text-sec); border: 1px solid var(--border-str);
+      cursor: pointer; text-decoration: none; display: inline-block;
+      transition: color 0.18s, border-color 0.18s; position: relative; z-index: 3;
     }
     .btn-ghost:hover { color: var(--text); border-color: var(--rose-dim); }
 
-    /* ── Divider ─────────────────────────────────────────────────────── */
     hr { border: none; border-top: 1px solid var(--border); margin: 0; }
 
-    /* ── Built-on row ─────────────────────────────────────────────────── */
+    /* ── Built-on ─────────────────────────────────────────────────────── */
     .built-wrap {
       display: flex; gap: clamp(1.5rem,4vw,3.5rem); flex-wrap: wrap;
-      align-items: center; justify-content: center;
-      max-width: 680px; margin: 0 auto;
+      align-items: center; justify-content: center; max-width: 680px; margin: 0 auto;
       padding: clamp(1.4rem,4vw,2rem) clamp(1.5rem,4vw,2.5rem);
-      border-radius: var(--r-xl); background: var(--bg-el);
-      border: 1px solid var(--border-mid);
+      border-radius: var(--r-xl); background: var(--bg-el); border: 1px solid var(--border-mid);
     }
     .built-item {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.76rem; font-weight: 600; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--text-dim);
-      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      font-size: 0.76rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 5px;
     }
     .built-item .bi-name { font-size: 1rem; font-weight: 700; color: var(--text-sec); }
 
-    /* ── Problem section ──────────────────────────────────────────────── */
-    .problem-grid {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 1.25rem; margin-top: 3.5rem;
-    }
+    /* ── Problem ──────────────────────────────────────────────────────── */
+    .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 3.5rem; }
     @media (max-width: 700px) { .problem-grid { grid-template-columns: 1fr; } }
-    .prob-card {
-      border-radius: var(--r-xl);
-      padding: clamp(1.5rem,4vw,2.2rem);
-      border: 1px solid var(--border-mid);
-    }
+    .prob-card { border-radius: var(--r-xl); padding: clamp(1.5rem,4vw,2.2rem); border: 1px solid var(--border-mid); }
     .prob-card.bad  { background: rgba(180,50,50,0.04); }
     .prob-card.good { background: rgba(193,112,133,0.055); border-color: var(--rose-dim); }
     .prob-tag {
-      display: inline-block; font-family: 'Syne', sans-serif;
-      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
+      display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
       text-transform: uppercase; padding: 4px 13px; border-radius: 50px; margin-bottom: 1rem;
     }
     .prob-tag.bad  { background: rgba(200,60,60,0.12); color: #e08080; }
     .prob-tag.good { background: rgba(193,112,133,0.18); color: var(--rose-bright); }
-    .prob-card h3  { font-size: 1.05rem; }
-    .prob-card p   { font-size: 0.91rem; color: var(--text-sec); line-height: 1.72; }
+    .prob-card p { font-size: 0.91rem; color: var(--text-sec); line-height: 1.72; }
     .prob-example {
-      margin-top: 1rem; padding: 0.8rem 1rem;
-      border-radius: var(--r-md); background: rgba(255,255,255,0.035);
-      border: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
-      color: var(--text-sec); line-height: 1.7;
+      margin-top: 1rem; padding: 0.8rem 1rem; border-radius: var(--r-md);
+      background: rgba(255,255,255,0.035); border: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-sec); line-height: 1.7;
     }
     .prob-example strong { color: var(--rose-bright); }
 
-    /* ── Edge section ────────────────────────────────────────────────── */
-    #edge { position: relative; overflow: hidden; }
+    /* ── Edge section ─────────────────────────────────────────────────── */
     .edge-grid {
       display: grid; grid-template-columns: 1fr 1.1fr;
-      gap: clamp(2rem,5vw,4rem); align-items: start;
-      margin-top: 3.5rem;
+      gap: clamp(2rem,5vw,4rem); align-items: start; margin-top: 3.5rem;
     }
     @media (max-width: 760px) { .edge-grid { grid-template-columns: 1fr; } }
-
     .edge-card {
-      padding: clamp(1.4rem,3.5vw,2rem);
-      border-radius: var(--r-xl);
+      padding: clamp(1.4rem,3.5vw,2rem); border-radius: var(--r-xl);
       background: var(--bg-el); border: 1px solid var(--border-mid);
       margin-bottom: 1.1rem; transition: border-color 0.25s;
     }
     .edge-card:hover { border-color: var(--rose-dim); }
     .edge-card:last-child { margin-bottom: 0; }
     .edge-num {
-      font-family: 'Bodoni Moda', Georgia, serif;
-      font-size: 2.8rem; font-weight: 400; line-height: 1;
+      font-family: 'Bodoni Moda', Georgia, serif; font-size: 2.8rem; font-weight: 400; line-height: 1;
       background: linear-gradient(118deg, var(--rose-bright), var(--sand-bright));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
       margin-bottom: 0.4rem;
     }
     .edge-card h3 { font-size: 0.95rem; letter-spacing: 0.02em; margin-bottom: 0.4rem; }
     .edge-card p  { font-size: 0.87rem; color: var(--text-sec); line-height: 1.7; }
-
-    /* Animated comparison chart */
     .edge-visual {
       border-radius: var(--r-xl); background: var(--bg-el);
-      border: 1px solid var(--border-mid);
-      padding: clamp(1.4rem,3.5vw,2rem); overflow: hidden;
+      border: 1px solid var(--border-mid); padding: clamp(1.4rem,3.5vw,2rem); overflow: hidden;
     }
     .ev-label {
-      font-family: 'Syne', sans-serif;
       font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em;
       text-transform: uppercase; color: var(--text-dim); margin-bottom: 1.2rem;
     }
-    .ev-row {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
-    }
+    .ev-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .ev-row:last-child { margin-bottom: 0; }
-    .ev-row-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem; color: var(--text-sec); width: 68px; flex-shrink: 0;
-    }
-    .ev-bar-track {
-      flex: 1; height: 10px; background: rgba(255,255,255,0.05);
-      border-radius: 5px; overflow: hidden; position: relative;
-    }
-    .ev-bar {
-      height: 100%; border-radius: 5px;
-      animation: barPulse 4s ease-in-out infinite;
-    }
-    .ev-bar.b1 {
-      background: linear-gradient(90deg, #cc5050, #e07070);
-      animation-delay: 0s;
-    }
-    .ev-bar.b2 {
-      background: linear-gradient(90deg, var(--rose), var(--rose-bright));
-      animation-delay: 0.3s;
-    }
-    .ev-bar.b3 {
-      background: linear-gradient(90deg, var(--sand-dim), var(--sand-bright));
-      animation-delay: 0.6s;
-    }
-    @keyframes barPulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.7; }
-    }
-    .ev-val {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem; width: 46px; text-align: right; flex-shrink: 0;
-    }
-    .ev-note {
-      font-size: 0.78rem; color: var(--text-dim); line-height: 1.6;
-      margin-top: 1.2rem; padding-top: 1rem;
-      border-top: 1px solid var(--border);
-    }
+    .ev-row-label { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-sec); width: 68px; flex-shrink: 0; }
+    .ev-bar-track { flex: 1; height: 10px; background: rgba(255,255,255,0.05); border-radius: 5px; overflow: hidden; }
+    .ev-bar { height: 100%; border-radius: 5px; animation: barPulse 4s ease-in-out infinite; }
+    .ev-bar.b1 { background: linear-gradient(90deg,#cc5050,#e07070); }
+    .ev-bar.b2 { background: linear-gradient(90deg,var(--rose),var(--rose-bright)); animation-delay:0.3s; }
+    .ev-bar.b3 { background: linear-gradient(90deg,var(--sand-dim),var(--sand-bright)); animation-delay:0.6s; }
+    @keyframes barPulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+    .ev-val { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; width: 46px; text-align: right; flex-shrink: 0; }
+    .ev-note { font-size: 0.78rem; color: var(--text-dim); line-height: 1.6; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 
-    /* ── How it works ─────────────────────────────────────────────────── */
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(200px,100%), 1fr));
-      gap: 1.25rem; margin-top: 3.5rem;
-    }
-    .step {
-      padding: clamp(1.4rem,3vw,1.9rem); border-radius: var(--r-xl);
-      background: var(--bg-el); border: 1px solid var(--border-mid);
-      transition: border-color 0.25s;
-    }
+    /* ── Steps ────────────────────────────────────────────────────────── */
+    .steps { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(200px,100%),1fr)); gap: 1.25rem; margin-top: 3.5rem; }
+    .step { padding: clamp(1.4rem,3vw,1.9rem); border-radius: var(--r-xl); background: var(--bg-el); border: 1px solid var(--border-mid); transition: border-color 0.25s; }
     .step:hover { border-color: var(--rose-dim); }
-    .step-num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem; font-weight: 500; letter-spacing: 0.14em;
-      color: var(--rose); margin-bottom: 0.8rem;
-    }
+    .step-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.14em; color: var(--rose); margin-bottom: 0.8rem; }
     .step h3 { font-size: 0.97rem; margin-bottom: 0.4rem; }
-    .step p  { font-size: 0.87rem; color: var(--text-sec); line-height: 1.65; }
+    .step p { font-size: 0.87rem; color: var(--text-sec); line-height: 1.65; }
 
     /* ── Perps ────────────────────────────────────────────────────────── */
-    .perps-layout {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: clamp(2rem,5vw,4rem); align-items: center; margin-top: 4rem;
-    }
+    .perps-layout { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem,5vw,4rem); align-items: center; margin-top: 4rem; }
     @media (max-width: 780px) { .perps-layout { grid-template-columns: 1fr; } }
-    .perp-chart-box {
-      border-radius: var(--r-xl); background: var(--bg-el);
-      border: 1px solid var(--border-mid); padding: 1.5rem 1.5rem 1.1rem;
-    }
-    .chart-sublabel {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.69rem; font-weight: 700; letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--text-dim); margin-bottom: 1rem;
-    }
+    .perp-chart-box { border-radius: var(--r-xl); background: var(--bg-el); border: 1px solid var(--border-mid); padding: 1.5rem 1.5rem 1.1rem; }
+    .chart-sublabel { font-size: 0.69rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1rem; }
     .funding-pills { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 0.8rem; }
-    .fpill {
-      padding: 5px 14px; border-radius: 50px;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; font-weight: 500;
-      animation: pillBreath 3.5s ease-in-out infinite;
-    }
+    .fpill { padding: 5px 14px; border-radius: 50px; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; font-weight: 500; animation: pillBreath 3.5s ease-in-out infinite; }
     .fpill.long  { background: rgba(30,180,100,0.10); color: #5dcc8c; border: 1px solid rgba(30,180,100,0.22); }
-    .fpill.short { background: rgba(220,70,70,0.10);  color: #ee7070; border: 1px solid rgba(220,70,70,0.22); }
-    .fpill.short { animation-delay: 0.7s; }
-    @keyframes pillBreath {
-      0%, 100% { opacity:1; }
-      50%       { opacity:0.55; }
-    }
+    .fpill.short { background: rgba(220,70,70,0.10); color: #ee7070; border: 1px solid rgba(220,70,70,0.22); animation-delay:0.7s; }
+    @keyframes pillBreath { 0%,100%{opacity:1} 50%{opacity:0.55} }
     .perp-features { list-style: none; display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem; }
-    .perp-features li {
-      display: flex; gap: 0.85rem; align-items: flex-start;
-      font-size: 0.92rem; color: var(--text-sec); line-height: 1.65;
-    }
-    .perp-features li::before {
-      content: ''; width: 5px; height: 5px; border-radius: 50%;
-      background: var(--rose); flex-shrink: 0; margin-top: 0.6em;
-      animation: pip 2.8s ease-in-out infinite;
-    }
-    .perp-features li:nth-child(2)::before { animation-delay:0.4s; }
-    .perp-features li:nth-child(3)::before { animation-delay:0.8s; }
-    .perp-features li:nth-child(4)::before { animation-delay:1.2s; }
+    .perp-features li { display: flex; gap: 0.85rem; align-items: flex-start; font-size: 0.92rem; color: var(--text-sec); line-height: 1.65; }
+    .perp-features li::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--rose); flex-shrink:0; margin-top:0.6em; animation:pip 2.8s ease-in-out infinite; }
+    .perp-features li:nth-child(2)::before{animation-delay:0.4s}
+    .perp-features li:nth-child(3)::before{animation-delay:0.8s}
+    .perp-features li:nth-child(4)::before{animation-delay:1.2s}
     .perp-features li strong { color: var(--text); font-weight: 500; }
 
     /* ── CTA ──────────────────────────────────────────────────────────── */
     #cta { text-align: center; position: relative; overflow: hidden; }
     #cta h2 { max-width: 560px; margin: 0 auto 1.4rem; }
-    #cta .section-sub { max-width: 460px; margin: 0 auto 2.8rem; }
-    .section-sub {
-      font-size: clamp(1rem,2vw,1.1rem);
-      color: var(--text-sec); font-weight: 400; line-height: 1.75;
-    }
+    .section-sub { font-size: clamp(1rem,2vw,1.1rem); color: var(--text-sec); font-weight: 400; line-height: 1.75; }
 
     /* ── Footer ───────────────────────────────────────────────────────── */
     footer {
       padding: 2.2rem clamp(1.25rem,5vw,3.5rem);
       border-top: 1px solid var(--border);
-      display: flex; flex-wrap: wrap;
-      justify-content: space-between; align-items: center; gap: 1rem;
-      font-family: 'Syne', sans-serif;
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;
       font-size: 0.8rem; color: var(--text-dim);
     }
     footer a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
     footer a:hover { color: var(--rose-bright); }
 
     /* ── Reveal ───────────────────────────────────────────────────────── */
-    .reveal {
-      opacity: 0; transform: translateY(30px);
-      transition: opacity 0.65s ease, transform 0.65s ease;
-    }
+    .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.65s ease, transform 0.65s ease; }
     .reveal.visible { opacity: 1; transform: translateY(0); }
 
-    /* ── Scrollbar ────────────────────────────────────────────────────── */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border-str); border-radius: 3px; }
@@ -493,34 +312,27 @@
 </head>
 <body>
 
-<div class="grain-overlay"></div>
-
 <!-- ══ Nav ════════════════════════════════════════════════════════════ -->
 <nav>
   <a href="#" class="nav-logo">
-    <!-- Parabola logo: dual-curve lens — a parabola opening upward fused with an inverted one, encoding both the math curve and the distribution peak -->
-    <svg class="logo-svg" width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="logoG" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+        <linearGradient id="lg" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#c17085"/>
           <stop offset="100%" stop-color="#b89870"/>
         </linearGradient>
-        <linearGradient id="logoGfill" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+        <linearGradient id="lgf" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#c17085" stop-opacity="0.15"/>
           <stop offset="100%" stop-color="#b89870" stop-opacity="0.08"/>
         </linearGradient>
       </defs>
-      <!-- Upward parabola arms -->
-      <path d="M4 28 Q17 4 30 28" stroke="url(#logoG)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-      <!-- Inverted bell (distribution peak) overlaid -->
-      <path d="M8 28 Q17 10 26 28" fill="url(#logoGfill)" stroke="url(#logoG)" stroke-width="1.4" stroke-linecap="round"/>
-      <!-- Vertex glow dot -->
-      <circle cx="17" cy="9.5" r="2.2" fill="url(#logoG)">
-        <animate attributeName="r" values="2.2;2.7;2.2" dur="2.6s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="1;0.65;1" dur="2.6s" repeatCount="indefinite"/>
+      <path d="M4 28 Q17 4 30 28" stroke="url(#lg)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M8 28 Q17 10 26 28" fill="url(#lgf)" stroke="url(#lg)" stroke-width="1.4" stroke-linecap="round"/>
+      <circle cx="17" cy="9.5" r="2.2" fill="url(#lg)">
+        <animate attributeName="r" values="2.2;2.8;2.2" dur="2.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="1;0.6;1" dur="2.6s" repeatCount="indefinite"/>
       </circle>
-      <!-- Axis tick -->
-      <line x1="17" y1="7" x2="17" y2="28" stroke="url(#logoG)" stroke-width="0.9" stroke-dasharray="2 3" opacity="0.4"/>
+      <line x1="17" y1="7" x2="17" y2="28" stroke="url(#lg)" stroke-width="0.9" stroke-dasharray="2 3" opacity="0.35"/>
     </svg>
     Parabola
   </a>
@@ -532,64 +344,9 @@
   </div>
 </nav>
 
-<!-- ══ Hero ══════════════════════════════════════════════════════════ -->
-<section id="hero" class="section" style="position:relative; overflow:hidden;">
-  <div class="orb orb-a"></div>
-  <div class="orb orb-b"></div>
-  <div class="orb orb-c"></div>
-
-  <!-- Continuously animated bell curves -->
-  <svg class="hero-curves" viewBox="0 0 500 380" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="hg1" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#c17085" stop-opacity="0.45"/>
-        <stop offset="100%" stop-color="#c17085" stop-opacity="0"/>
-      </linearGradient>
-      <linearGradient id="hg2" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#b89870" stop-opacity="0.28"/>
-        <stop offset="100%" stop-color="#b89870" stop-opacity="0"/>
-      </linearGradient>
-      <linearGradient id="hg3" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#e0aabb" stop-opacity="0.14"/>
-        <stop offset="100%" stop-color="#e0aabb" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <!-- Wide crowd distribution -->
-    <path d="M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355 Z" fill="url(#hg2)">
-      <animate attributeName="d" dur="7s" repeatCount="indefinite"
-        values="M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355 Z;
-                M20 355 Q95 355 148 265 Q182 190 202 122 Q218 68 242 50 Q268 32 294 50 Q318 68 336 122 Q358 192 395 282 Q424 342 470 355 Z;
-                M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355 Z"
-        calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/>
-    </path>
-    <path d="M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355" fill="none" stroke="#b89870" stroke-width="1.6" opacity="0.35">
-      <animate attributeName="stroke-opacity" values="0.35;0.55;0.35" dur="4s" repeatCount="indefinite"/>
-    </path>
-    <!-- Narrow "you" distribution -->
-    <path d="M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355 Z" fill="url(#hg1)">
-      <animate attributeName="d" dur="5.5s" repeatCount="indefinite"
-        values="M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355 Z;
-                M125 355 Q188 355 218 258 Q238 190 250 126 Q258 78 266 52 Q274 30 280 48 Q290 74 300 128 Q314 194 358 282 Q388 344 438 355 Z;
-                M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355 Z"
-        calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/>
-    </path>
-    <path d="M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355" fill="none" stroke="#c17085" stroke-width="2.2" opacity="0.65">
-      <animate attributeName="stroke-opacity" values="0.65;0.85;0.65" dur="3.5s" repeatCount="indefinite"/>
-    </path>
-    <!-- Ghost diffuse -->
-    <path d="M0 355 Q60 355 120 305 Q170 265 210 218 Q248 178 275 155 Q300 135 330 158 Q368 184 410 240 Q452 298 500 355 Z" fill="url(#hg3)">
-      <animate attributeName="opacity" values="0.6;1;0.6" dur="6s" repeatCount="indefinite"/>
-    </path>
-    <!-- Center axis -->
-    <line x1="275" y1="28" x2="275" y2="355" stroke="#c17085" stroke-width="1" stroke-dasharray="4 6" opacity="0.25">
-      <animate attributeName="opacity" values="0.25;0.45;0.25" dur="3s" repeatCount="indefinite"/>
-    </line>
-    <!-- Vertex dot -->
-    <circle cx="275" cy="28" r="3.5" fill="#e0aabb" opacity="0.8">
-      <animate attributeName="r" values="3.5;5;3.5" dur="2.8s" repeatCount="indefinite"/>
-      <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2.8s" repeatCount="indefinite"/>
-    </circle>
-  </svg>
+<!-- ══ Hero (lake canvas) ═════════════════════════════════════════════ -->
+<section id="hero">
+  <canvas id="lake"></canvas>
 
   <div class="hero-inner">
     <div class="eyebrow reveal">
@@ -610,13 +367,18 @@
     </h1>
 
     <p class="hero-sub reveal" style="transition-delay:0.14s">
-      The first on-chain market where you stake a <em style="font-style:italic; color:var(--rose-bright);">full probability distribution</em> — not a binary yes/no. Your precision is your edge.
+      The first on-chain market where you stake a <em style="font-style:italic;color:var(--rose-bright);">full probability distribution</em> — not a binary yes/no. Your precision is your edge.
     </p>
 
     <div class="hero-actions reveal" style="transition-delay:0.21s">
       <a href="#edge" class="btn-rose">See your edge ↓</a>
       <a href="#problem" class="btn-ghost">How it works</a>
     </div>
+  </div>
+
+  <div class="lake-hint">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="rgba(193,112,133,0.6)" stroke-width="1.2"/><circle cx="7" cy="7" r="2" fill="rgba(193,112,133,0.6)"/></svg>
+    drag the ball · move mouse to disturb the lake
   </div>
 </section>
 
@@ -642,27 +404,18 @@
     <p class="section-sub reveal" style="transition-delay:0.13s; max-width:560px; margin-top:0.9rem;">
       Ask "Will the Lakers–Celtics game go over 220?" and you're forced into yes or no. But you know far more than that.
     </p>
-
     <div class="problem-grid">
       <div class="prob-card bad reveal" style="transition-delay:0.17s">
         <div class="prob-tag bad">Standard sportsbook</div>
         <h3>Forced binary, buried vig</h3>
         <p>You think the total will land around 224. But the line is fixed at 220.5 and baked with a 5% house edge. You can't express where you think it peaks or how certain you are.</p>
-        <div class="prob-example">
-          Lakers vs Celtics — Total<br>
-          Over 220.5 &nbsp;<strong>−115</strong>&nbsp; (implies 53.5%)<br>
-          Under 220.5 &nbsp;<strong>−105</strong>&nbsp; (implies 51.2%)
-        </div>
+        <div class="prob-example">Lakers vs Celtics — Total<br>Over 220.5 &nbsp;<strong>−115</strong>&nbsp; (implies 53.5%)<br>Under 220.5 &nbsp;<strong>−105</strong>&nbsp; (implies 51.2%)</div>
       </div>
       <div class="prob-card good reveal" style="transition-delay:0.23s">
         <div class="prob-tag good">Parabola</div>
         <h3>Express your full belief</h3>
         <p>Submit the distribution you actually believe. The closer your distribution to the realized outcome, the higher your payout. Your sigma matters as much as your mu.</p>
-        <div class="prob-example">
-          Lakers vs Celtics — Total<br>
-          Your estimate &nbsp;<strong>μ = 224 &nbsp; σ = 5.8</strong><br>
-          Crowd &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>μ = 219 &nbsp; σ = 9.4</strong>
-        </div>
+        <div class="prob-example">Lakers vs Celtics — Total<br>Your estimate &nbsp;<strong>μ = 224 &nbsp; σ = 5.8</strong><br>Crowd &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>μ = 219 &nbsp; σ = 9.4</strong></div>
       </div>
     </div>
   </div>
@@ -670,78 +423,62 @@
 
 <hr/>
 
-<!-- ══ Your Edge (Statistics) ═════════════════════════════════════════ -->
+<!-- ══ Edge ═══════════════════════════════════════════════════════════ -->
 <section id="edge" class="section pad">
-  <div class="orb" style="width:400px;height:400px;background:radial-gradient(circle,rgba(125,63,82,0.18) 0%,transparent 70%);top:10%;left:-100px;pointer-events:none;filter:blur(80px);animation:orbDrift 16s ease-in-out infinite alternate;"></div>
   <div class="container">
     <p class="section-label reveal">The Math</p>
     <h2 class="reveal" style="transition-delay:0.07s">Why the odds are <em>always</em> better here.</h2>
     <p class="section-sub reveal" style="transition-delay:0.13s; max-width:600px; margin-top:0.9rem;">
       This isn't marketing — it follows from information theory. Distribution markets are strictly superior to binary markets for anyone with real forecasting skill.
     </p>
-
     <div class="edge-grid">
-      <!-- Left: stat cards -->
       <div>
         <div class="edge-card reveal" style="transition-delay:0.16s">
           <div class="edge-num">5–8%</div>
           <h3>The vig tax in every binary bet</h3>
-          <p>Standard sportsbooks embed 5–8% vig into every line. To break even you must be right 52–54% of the time before you capture a single dollar of your real edge. Parabola charges only for <em>KL-divergence from the crowd</em> — if you're well-calibrated, you pay almost nothing.</p>
+          <p>Sportsbooks embed 5–8% vig into every line. You must be right 52–54% of the time before capturing a single dollar of real edge. Parabola charges only for KL-divergence from the crowd — if you're well-calibrated, you pay almost nothing.</p>
         </div>
         <div class="edge-card reveal" style="transition-delay:0.22s">
           <div class="edge-num">1 bit</div>
           <h3>How much of your knowledge a binary captures</h3>
-          <p>Over/under is a single bit: above or below a threshold. Every dimension of your knowledge — where the peak is, how certain you are, the tail behavior — is thrown away. A distribution bet uses the <em>full continuous density</em>. Under a logarithmic scoring rule, expected profit scales as KL(you ‖ crowd), which integrates your advantage across all moments.</p>
+          <p>Over/under is a single bit. Every dimension of your knowledge — where the peak is, how certain you are, the tail behavior — is discarded. A distribution bet uses the full continuous density. Under a logarithmic scoring rule, expected profit scales as KL(you ‖ crowd), integrating your advantage across all moments.</p>
         </div>
         <div class="edge-card reveal" style="transition-delay:0.28s">
           <div class="edge-num">σ²</div>
           <h3>The calibration premium</h3>
-          <p>If your σ is half the crowd's, you're more certain — a real informational edge. Binary markets give you nothing for that certainty. Here, tighter σ means <em>lower collateral required</em>, which means higher return on capital for the same directional bet. Proper scoring rules (Brier, logarithmic) are uniquely incentive-compatible: the optimal strategy is to report your true belief.</p>
+          <p>If your σ is half the crowd's, you have a real informational edge. Binary markets give you nothing for that certainty. Here, tighter σ means lower collateral required — higher return on capital for the same directional bet. Proper scoring rules are uniquely incentive-compatible: the optimal strategy is to report your true belief.</p>
         </div>
       </div>
-
-      <!-- Right: animated EV comparison chart -->
       <div class="edge-visual reveal" style="transition-delay:0.20s">
         <div class="ev-label">Expected value · same forecasting skill</div>
-
         <div class="ev-row">
           <div class="ev-row-label">Sportsbook</div>
-          <div class="ev-bar-track">
-            <div class="ev-bar b1" style="width:22%"></div>
-          </div>
+          <div class="ev-bar-track"><div class="ev-bar b1" style="width:22%"></div></div>
           <div class="ev-val" style="color:#e08080;">−5.4%</div>
         </div>
         <div class="ev-row">
           <div class="ev-row-label">Binary DEX</div>
-          <div class="ev-bar-track">
-            <div class="ev-bar b1" style="width:28%"></div>
-          </div>
+          <div class="ev-bar-track"><div class="ev-bar b1" style="width:28%"></div></div>
           <div class="ev-val" style="color:#e08080;">−2.1%</div>
         </div>
         <div class="ev-row">
           <div class="ev-row-label">Parabola μ</div>
-          <div class="ev-bar-track">
-            <div class="ev-bar b2" style="width:62%"></div>
-          </div>
+          <div class="ev-bar-track"><div class="ev-bar b2" style="width:62%"></div></div>
           <div class="ev-val" style="color:var(--rose-bright);">+3.8%</div>
         </div>
         <div class="ev-row">
           <div class="ev-row-label">Parabola μ+σ</div>
-          <div class="ev-bar-track">
-            <div class="ev-bar b3" style="width:84%"></div>
-          </div>
+          <div class="ev-bar-track"><div class="ev-bar b3" style="width:84%"></div></div>
           <div class="ev-val" style="color:var(--sand-bright);">+8.2%</div>
         </div>
-
         <div class="ev-note">
-          Assumes 55% directional accuracy. "Parabola μ+σ" means the bettor also knows the outcome's variance better than the crowd (σ you = 6, σ crowd = 10). The extra EV is purely from the calibration premium — a dimension binary markets cannot price.
+          Assumes 55% directional accuracy. "Parabola μ+σ" means the bettor also knows the outcome variance better than the crowd. The extra EV is purely the calibration premium — a dimension binary markets cannot price.
         </div>
-
-        <div style="margin-top:1.4rem; padding-top:1rem; border-top:1px solid var(--border);">
+        <div style="margin-top:1.4rem;padding-top:1rem;border-top:1px solid var(--border);">
           <div class="ev-label" style="margin-bottom:0.8rem;">Theorem (proper scoring rules)</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--text-sec); line-height:1.8; background:rgba(255,255,255,0.03); border-radius:var(--r-md); padding:0.9rem 1rem; border:1px solid var(--border);">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--text-sec);line-height:1.8;background:rgba(255,255,255,0.03);border-radius:var(--r-md);padding:0.9rem 1rem;border:1px solid var(--border);">
             𝔼[reward] = −H(P*) + KL(P* ‖ Q)<br>
-            <span style="color:var(--text-dim);">P* = true distribution &nbsp;·&nbsp; Q = reported &nbsp;·&nbsp; H = entropy</span><br>
+            <span style="color:var(--text-dim);">P* = true · Q = reported · H = entropy</span><br>
             <span style="color:var(--rose-bright);">Optimal strategy: report P* exactly.</span><br>
             <span style="color:var(--text-dim);">Binary markets violate this. Distribution markets satisfy it.</span>
           </div>
@@ -758,7 +495,6 @@
   <div class="container">
     <p class="section-label reveal">How It Works</p>
     <h2 class="reveal" style="transition-delay:0.07s">Four steps. <em>Infinite nuance.</em></h2>
-
     <div class="steps">
       <div class="step reveal" style="transition-delay:0.10s">
         <div class="step-num">01</div>
@@ -794,7 +530,6 @@
     <p class="section-sub reveal" style="transition-delay:0.13s; max-width:560px; margin-top:0.9rem;">
       Distribution perps let you hold a continuous long or short on how the crowd's collective distribution evolves — a perpetual on crowd wisdom itself.
     </p>
-
     <div class="perps-layout">
       <div class="perp-chart-box reveal" style="transition-delay:0.16s">
         <div class="chart-sublabel">AMM distribution vs Pyth oracle anchor</div>
@@ -808,37 +543,30 @@
               <stop offset="0%" stop-color="#b89870" stop-opacity="0.22"/>
               <stop offset="100%" stop-color="#b89870" stop-opacity="0"/>
             </linearGradient>
-            <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+            <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
               <path d="M0,0 L7,3.5 L0,7 Z" fill="#e0aabb"/>
             </marker>
           </defs>
-          <!-- Anchor (oracle, sand dashes) -->
           <path d="M35 200 Q110 200 148 138 Q172 92 192 62 Q202 44 214 40 Q226 36 238 40 Q250 44 262 62 Q282 92 310 148 Q348 200 390 200 Z" fill="url(#pg2)" opacity="0.9">
             <animate attributeName="opacity" values="0.9;0.6;0.9" dur="5s" repeatCount="indefinite"/>
           </path>
           <path d="M35 200 Q110 200 148 138 Q172 92 192 62 Q202 44 214 40 Q226 36 238 40 Q250 44 262 62 Q282 92 310 148 Q348 200 390 200" fill="none" stroke="#b89870" stroke-width="1.8" stroke-dasharray="5 4" opacity="0.55">
             <animate attributeName="stroke-opacity" values="0.55;0.8;0.55" dur="4s" repeatCount="indefinite"/>
           </path>
-          <!-- AMM (rose, shifted) -->
           <path d="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z" fill="url(#pg1)" opacity="0.9">
             <animate attributeName="d" dur="4.5s" repeatCount="indefinite"
-              values="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z;
-                      M62 200 Q135 200 170 140 Q194 94 210 64 Q222 46 236 42 Q252 38 266 42 Q282 46 296 66 Q320 97 352 150 Q386 202 418 200 Z;
-                      M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z"
+              values="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z;M62 200 Q135 200 170 140 Q194 94 210 64 Q222 46 236 42 Q252 38 266 42 Q282 46 296 66 Q320 97 352 150 Q386 202 418 200 Z;M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z"
               calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/>
           </path>
           <path d="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200" fill="none" stroke="#c17085" stroke-width="2.2" opacity="0.78">
             <animate attributeName="stroke-opacity" values="0.78;0.95;0.78" dur="3.5s" repeatCount="indefinite"/>
           </path>
-          <!-- Funding arrow between peaks -->
-          <line x1="214" y1="40" x2="238" y2="40" stroke="#e0aabb" stroke-width="1.6" marker-end="url(#arrowhead)" opacity="0.8">
+          <line x1="214" y1="40" x2="238" y2="40" stroke="#e0aabb" stroke-width="1.6" marker-end="url(#arr)" opacity="0.8">
             <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.5s" repeatCount="indefinite"/>
           </line>
-          <text x="218" y="34" font-family="JetBrains Mono, monospace" font-size="8.5" fill="#e0aabb" opacity="0.75">funding</text>
-          <!-- Labels -->
-          <text x="195" y="25" font-family="Syne, sans-serif" font-size="9.5" fill="#b89870" opacity="0.65">anchor (Pyth)</text>
-          <text x="264" y="25" font-family="Syne, sans-serif" font-size="9.5" fill="#c17085" opacity="0.85">AMM μ</text>
-          <!-- Axis -->
+          <text x="218" y="34" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#e0aabb" opacity="0.75">funding</text>
+          <text x="195" y="25" font-family="Syne,sans-serif" font-size="9.5" fill="#b89870" opacity="0.65">anchor (Pyth)</text>
+          <text x="264" y="25" font-family="Syne,sans-serif" font-size="9.5" fill="#c17085" opacity="0.85">AMM μ</text>
           <line x1="25" y1="200" x2="395" y2="200" stroke="#fff" stroke-opacity="0.06" stroke-width="1"/>
         </svg>
         <div class="funding-pills">
@@ -846,10 +574,9 @@
           <div class="fpill short">Short −0.014%/hr</div>
         </div>
       </div>
-
       <div class="reveal" style="transition-delay:0.22s">
-        <p style="font-size:clamp(0.93rem,2vw,1.03rem); color:var(--text-sec); line-height:1.78; margin-bottom:0.5rem;">
-          The AMM holds a distribution anchored to a live Pyth oracle. When the collective market μ drifts away from the oracle anchor, a <strong style="color:var(--text);">funding rate</strong> proportional to KL-divergence is charged — pulling it back, continuously.
+        <p style="font-size:clamp(0.93rem,2vw,1.03rem);color:var(--text-sec);line-height:1.78;margin-bottom:0.5rem;">
+          The AMM holds a distribution anchored to a live Pyth oracle. When the collective market μ drifts from the oracle anchor, a <strong style="color:var(--text);">funding rate</strong> proportional to KL-divergence is charged — pulling it back, continuously.
         </p>
         <ul class="perp-features">
           <li><strong>Long:</strong> profits when the crowd distribution shifts above the oracle anchor. Collect funding when markets are unduly bearish.</li>
@@ -866,51 +593,431 @@
 
 <!-- ══ CTA ════════════════════════════════════════════════════════════ -->
 <section id="cta" class="section pad">
-  <div class="orb" style="width:500px;height:500px;background:radial-gradient(circle,rgba(125,63,82,0.20) 0%,transparent 70%);bottom:-200px;left:50%;transform:translateX(-50%);pointer-events:none;filter:blur(90px);animation:orbDrift 20s ease-in-out infinite alternate;"></div>
-  <div class="container" style="text-align:center; position:relative; z-index:1;">
-    <p class="section-label reveal" style="justify-content:center; display:flex; align-items:center; gap:8px;">
-      <span class="eyebrow-pip" style="display:inline-block;"></span>
-      Early Access
+  <div class="container" style="text-align:center;position:relative;z-index:1;">
+    <p class="section-label reveal" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+      <span class="eyebrow-pip" style="display:inline-block;"></span>Early Access
     </p>
-    <h2 class="reveal" style="transition-delay:0.07s; max-width:560px; margin:0 auto 1.2rem;">
-      Ready to bet the <em>full distribution?</em>
-    </h2>
-    <p class="section-sub reveal" style="transition-delay:0.13s; max-width:440px; margin:0 auto 2.8rem;">
+    <h2 class="reveal" style="transition-delay:0.07s;max-width:560px;margin:0 auto 1.2rem;">Ready to bet the <em>full distribution?</em></h2>
+    <p class="section-sub reveal" style="transition-delay:0.13s;max-width:440px;margin:0 auto 2.8rem;">
       Parabola is live on Solana devnet. Reach out to get early access or learn more about the protocol.
     </p>
-    <div class="hero-actions reveal" style="transition-delay:0.19s; justify-content:center;">
+    <div class="hero-actions reveal" style="transition-delay:0.19s;justify-content:center;">
       <a href="mailto:shikharsehgal@uchicago.edu" class="btn-rose">Get early access</a>
       <a href="#edge" class="btn-ghost">Read the math ↑</a>
     </div>
   </div>
 </section>
 
-<!-- ══ Footer ═════════════════════════════════════════════════════════ -->
 <footer>
   <span>© 2026 Parabola Markets</span>
-  <span>
-    Built on <a href="https://solana.com" target="_blank" rel="noopener">Solana</a>
-    &nbsp;·&nbsp;
-    Oracle by <a href="https://pyth.network" target="_blank" rel="noopener">Pyth</a>
-  </span>
+  <span>Built on <a href="https://solana.com" target="_blank" rel="noopener">Solana</a> · Oracle by <a href="https://pyth.network" target="_blank" rel="noopener">Pyth</a></span>
 </footer>
 
+<!-- ══════════════════════════════════════════════════════════════
+     LAKE CANVAS — water ripple simulation + ball physics
+═══════════════════════════════════════════════════════════════ -->
 <script>
-  /* ── Scroll reveal ─────────────────────────────────────────────── */
+(function () {
+  'use strict';
+
+  const canvas = document.getElementById('lake');
+  const ctx    = canvas.getContext('2d');
+
+  // ── Simulation parameters ──────────────────────────────────────────
+  const SCALE   = window.devicePixelRatio > 1 ? 5 : 4; // sim resolution divisor
+  const DAMPING = 0.988;
+  const BALL_R  = 13;
+
+  // ── State ──────────────────────────────────────────────────────────
+  let W, H, sw, sh;
+  let buf1, buf2;           // Float32 height maps
+  let imgData, pixels;      // ImageData for sim render
+  const simCvs = document.createElement('canvas');
+  const simCtx = simCvs.getContext('2d');
+
+  // Pre-computed background gradient (dark water base)
+  let bgR, bgG, bgB;
+
+  // Ball
+  const ball = { x: 0, y: 0, vx: 1.8, vy: 0, grabbed: false };
+  let lastMX = -1, lastMY = -1;
+  let prevBallVX = 0;
+
+  // Trail
+  const TRAIL_LEN = 100;
+  const trailX = new Float32Array(TRAIL_LEN);
+  const trailY = new Float32Array(TRAIL_LEN);
+  let trailHead = 0, trailCount = 0;
+
+  // Mouse
+  let mouseX = -9999, mouseY = -9999;
+  let prevMouseX = -9999, prevMouseY = -9999;
+
+  // ── Bell curve floor ───────────────────────────────────────────────
+  // This IS the parabolic potential well — the ball rolls along it.
+  // V(x) = (x-μ)²/(2σ²) is the energy, so the floor shape is a Gaussian
+  // (negative log of the normal distribution), which IS a parabola.
+  function bellY(x) {
+    const mu  = W * 0.5;
+    const sig = W / 7.0;
+    const t   = (x - mu) / sig;
+    return H * 0.80 - H * 0.16 * Math.exp(-0.5 * t * t);
+  }
+
+  // Derivative of bellY (for surface normal at bounce point)
+  function bellDY(x) {
+    const mu  = W * 0.5;
+    const sig = W / 7.0;
+    const t   = (x - mu) / sig;
+    return H * 0.16 * (t / sig) * Math.exp(-0.5 * t * t);
+  }
+
+  // ── Initialise / resize ────────────────────────────────────────────
+  function init() {
+    const rect = canvas.getBoundingClientRect();
+    W = canvas.width  = Math.floor(rect.width);
+    H = canvas.height = Math.floor(rect.height);
+    sw = Math.ceil(W / SCALE);
+    sh = Math.ceil(H / SCALE);
+    simCvs.width  = sw;
+    simCvs.height = sh;
+    buf1 = new Float32Array(sw * sh);
+    buf2 = new Float32Array(sw * sh);
+    imgData = simCtx.createImageData(sw, sh);
+    pixels  = imgData.data;
+
+    // Pre-compute background colour per sim pixel (dark water gradient)
+    bgR = new Uint8Array(sw * sh);
+    bgG = new Uint8Array(sw * sh);
+    bgB = new Uint8Array(sw * sh);
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const i  = y * sw + x;
+        const fy = y / sh;            // 0 = top, 1 = bottom
+        const fx = x / sw - 0.5;     // -0.5 … 0.5
+        const dist = Math.sqrt(fx * fx * 0.5 + (fy - 0.5) * (fy - 0.5) * 0.6);
+        // Very dark rose-black base; slightly warmer near bottom-centre
+        bgR[i] = (10 + dist * 18 + fy * 8)  | 0;
+        bgG[i] = ( 7 + dist * 10 + fy * 4)  | 0;
+        bgB[i] = ( 9 + dist * 14 + fy * 6)  | 0;
+      }
+    }
+
+    // Place ball on the peak of the Gaussian floor
+    ball.x  = W * 0.5;
+    ball.y  = bellY(ball.x) - BALL_R;
+    ball.vx = 1.8;
+    ball.vy = 0;
+    trailCount = 0;
+  }
+
+  // ── Water simulation step (Hugo Elias wave equation) ──────────────
+  function stepWater() {
+    for (let y = 1; y < sh - 1; y++) {
+      for (let x = 1; x < sw - 1; x++) {
+        const i   = y * sw + x;
+        const val = (
+          buf1[(y - 1) * sw + x] +
+          buf1[(y + 1) * sw + x] +
+          buf1[y * sw + x - 1]   +
+          buf1[y * sw + x + 1]
+        ) * 0.5 - buf2[i];
+        buf2[i] = val * DAMPING;
+      }
+    }
+    // Swap buffers (buf2 now has new heights)
+    const tmp = buf1; buf1 = buf2; buf2 = tmp;
+  }
+
+  // ── Render simulation to ImageData with refraction + specular ─────
+  function renderSim() {
+    const data = pixels;
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const i = y * sw + x;
+
+        // Surface gradient → refraction UV offset
+        const gx = (x > 0 && x < sw - 1)
+          ? (buf1[i + 1] - buf1[i - 1]) * 0.9
+          : 0;
+        const gy = (y > 0 && y < sh - 1)
+          ? (buf1[i + sw] - buf1[i - sw]) * 0.9
+          : 0;
+
+        // Displaced sample position (clamped)
+        const sx = Math.max(0, Math.min(sw - 1, x + (gx | 0)));
+        const sy = Math.max(0, Math.min(sh - 1, y + (gy | 0)));
+        const bi = sy * sw + sx;
+
+        // Specular highlight (directional: top-right light)
+        const h    = buf1[i];
+        const spec = Math.max(0, h * 0.55 - gx * 0.3) * 1.2;
+
+        const pi    = i * 4;
+        data[pi]     = Math.min(255, bgR[bi] + spec * 2.2) | 0;
+        data[pi + 1] = Math.min(255, bgG[bi] + spec * 1.2) | 0;
+        data[pi + 2] = Math.min(255, bgB[bi] + spec * 1.8) | 0;
+        data[pi + 3] = 255;
+      }
+    }
+    simCtx.putImageData(imgData, 0, 0);
+  }
+
+  // ── Add ripple at full-canvas coordinates ─────────────────────────
+  function addRipple(cx, cy, strength, radius) {
+    const sx = cx / SCALE | 0;
+    const sy = cy / SCALE | 0;
+    const r  = (radius / SCALE) | 0 || 2;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = sx + dx, ny = sy + dy;
+        if (nx > 0 && nx < sw - 1 && ny > 0 && ny < sh - 1) {
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d <= r) {
+            buf1[ny * sw + nx] += strength * (1 - d / (r + 1));
+          }
+        }
+      }
+    }
+  }
+
+  // ── Ball physics step ──────────────────────────────────────────────
+  function stepBall() {
+    if (ball.grabbed) return;
+
+    const GRAVITY    = 0.38;
+    const ELASTICITY = 0.62;
+    const FRICTION   = 0.994;
+    const AIR_DRAG   = 0.998;
+
+    ball.vy += GRAVITY;
+    ball.x  += ball.vx;
+    ball.y  += ball.vy;
+    ball.vx *= AIR_DRAG;
+
+    // Floor (bell curve) collision
+    const floor = bellY(ball.x);
+    if (ball.y + BALL_R >= floor) {
+      ball.y = floor - BALL_R;
+
+      // Reflect along the surface normal
+      const slope = bellDY(ball.x);
+      // Normal vector (perpendicular to slope): (-slope, 1) normalised
+      const nLen = Math.sqrt(slope * slope + 1);
+      const nx   = -slope / nLen;
+      const ny   = 1       / nLen;
+      const dot  = ball.vx * nx + ball.vy * ny;
+      ball.vx = (ball.vx - 2 * dot * nx) * ELASTICITY;
+      ball.vy = (ball.vy - 2 * dot * ny) * ELASTICITY;
+      ball.vx *= FRICTION; // rolling friction
+
+      // Impact ripple proportional to impact velocity
+      const impact = Math.abs(dot);
+      if (impact > 0.5) addRipple(ball.x, floor, impact * 3.5, impact * 4 + 8);
+    }
+
+    // Lateral walls — bounces off canvas edges
+    if (ball.x - BALL_R < 0)  { ball.x = BALL_R;      ball.vx = Math.abs(ball.vx) * ELASTICITY; }
+    if (ball.x + BALL_R > W)  { ball.x = W - BALL_R;  ball.vx = -Math.abs(ball.vx) * ELASTICITY; }
+
+    // Top ceiling
+    if (ball.y - BALL_R < 0)  { ball.y = BALL_R;      ball.vy = Math.abs(ball.vy) * ELASTICITY; }
+
+    // Continuous gentle bow-wave while moving
+    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    if (speed > 0.4) addRipple(ball.x, ball.y + BALL_R, speed * 0.4, 6);
+
+    // Record trail
+    trailX[trailHead] = ball.x;
+    trailY[trailHead] = ball.y;
+    trailHead = (trailHead + 1) % TRAIL_LEN;
+    if (trailCount < TRAIL_LEN) trailCount++;
+  }
+
+  // ── Draw everything onto the main canvas ──────────────────────────
+  function draw() {
+    // Scaled-up water background (bilinear smoothing for soft look)
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'medium';
+    ctx.drawImage(simCvs, 0, 0, W, H);
+
+    // ── Bell curve guide line ──────────────────────────────────────
+    ctx.beginPath();
+    ctx.moveTo(0, bellY(0));
+    for (let x = 1; x <= W; x++) ctx.lineTo(x, bellY(x));
+    ctx.strokeStyle = 'rgba(193,112,133,0.22)';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+
+    // Glowing fill under the curve (subtle surface impression)
+    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+    const grad = ctx.createLinearGradient(0, H * 0.55, 0, H);
+    grad.addColorStop(0, 'rgba(193,112,133,0.06)');
+    grad.addColorStop(1, 'rgba(12,9,10,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // ── Trail ─────────────────────────────────────────────────────
+    for (let k = 0; k < trailCount; k++) {
+      const age   = (trailCount - 1 - k) / TRAIL_LEN; // 0 = newest, 1 = oldest
+      const idx   = (trailHead - 1 - k + TRAIL_LEN) % TRAIL_LEN;
+      const alpha = (1 - age) * 0.35;
+      const r2    = BALL_R * (1 - age) * 0.65;
+      if (r2 < 0.5) continue;
+      ctx.beginPath();
+      ctx.arc(trailX[idx], trailY[idx], r2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(193,112,133,${alpha.toFixed(3)})`;
+      ctx.fill();
+    }
+
+    // ── Ball ──────────────────────────────────────────────────────
+    // Outer glow
+    const glowGrad = ctx.createRadialGradient(ball.x, ball.y, BALL_R * 0.5, ball.x, ball.y, BALL_R * 2.8);
+    glowGrad.addColorStop(0, 'rgba(193,112,133,0.22)');
+    glowGrad.addColorStop(1, 'rgba(193,112,133,0)');
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R * 2.8, 0, Math.PI * 2);
+    ctx.fillStyle = glowGrad;
+    ctx.fill();
+
+    // Ball body
+    const ballGrad = ctx.createRadialGradient(
+      ball.x - BALL_R * 0.3, ball.y - BALL_R * 0.35, 1,
+      ball.x, ball.y, BALL_R
+    );
+    ballGrad.addColorStop(0, '#edd5de');
+    ballGrad.addColorStop(0.5, '#c17085');
+    ballGrad.addColorStop(1, 'rgba(110,50,66,0.85)');
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fillStyle = ballGrad;
+    ctx.fill();
+
+    // Specular catchlight
+    ctx.beginPath();
+    ctx.arc(ball.x - BALL_R * 0.28, ball.y - BALL_R * 0.30, BALL_R * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,235,240,0.45)';
+    ctx.fill();
+
+    // Cursor change when hovering ball
+    const dx = mouseX - ball.x, dy = mouseY - ball.y;
+    canvas.style.cursor = (Math.sqrt(dx * dx + dy * dy) < BALL_R + 12) ? 'grab' : 'crosshair';
+    if (ball.grabbed) canvas.style.cursor = 'grabbing';
+  }
+
+  // ── Main loop ─────────────────────────────────────────────────────
+  function loop() {
+    // Passive mouse-ripple (continuous while mouse is in hero)
+    if (mouseX > 0 && mouseY > 0 && !ball.grabbed) {
+      const mx = mouseX - prevMouseX, my = mouseY - prevMouseY;
+      const ms = Math.sqrt(mx * mx + my * my);
+      if (ms > 1) addRipple(mouseX, mouseY, ms * 0.55, ms * 0.8 + 6);
+    }
+    prevMouseX = mouseX; prevMouseY = mouseY;
+
+    stepWater();
+    stepBall();
+    renderSim();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ── Event helpers ─────────────────────────────────────────────────
+  function heroCoords(e) {
+    const r = canvas.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+  function touchCoords(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches[0] || e.changedTouches[0];
+    return [t.clientX - r.left, t.clientY - r.top];
+  }
+  function isBallHit(x, y) {
+    const dx = x - ball.x, dy = y - ball.y;
+    return Math.sqrt(dx * dx + dy * dy) < BALL_R + 14;
+  }
+
+  // ── Bind events ────────────────────────────────────────────────────
+  // Use the hero section for mouse events so the full hero is interactive
+  const hero = document.getElementById('hero');
+
+  hero.addEventListener('mousemove', (e) => {
+    [mouseX, mouseY] = heroCoords(e);
+    if (ball.grabbed) {
+      ball.vx = mouseX - ball.x;
+      ball.vy = mouseY - ball.y;
+      ball.x  = mouseX;
+      ball.y  = mouseY;
+      // Grabbed ball pushes water
+      addRipple(ball.x, ball.y, 6, 12);
+    }
+  }, { passive: true });
+
+  hero.addEventListener('mousedown', (e) => {
+    const [x, y] = heroCoords(e);
+    if (isBallHit(x, y)) {
+      ball.grabbed = true;
+      ball.vx = ball.vy = 0;
+    } else {
+      // Splash click
+      addRipple(x, y, 22, 18);
+    }
+  });
+
+  hero.addEventListener('mouseup', () => { ball.grabbed = false; });
+  hero.addEventListener('mouseleave', () => {
+    ball.grabbed = false;
+    mouseX = mouseY = -9999;
+  });
+
+  // Touch
+  hero.addEventListener('touchstart', (e) => {
+    const [x, y] = touchCoords(e);
+    if (isBallHit(x, y)) {
+      ball.grabbed = true;
+      ball.vx = ball.vy = 0;
+    } else {
+      addRipple(x, y, 25, 20);
+    }
+  }, { passive: true });
+
+  hero.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const [x, y] = touchCoords(e);
+    mouseX = x; mouseY = y;
+    if (ball.grabbed) {
+      ball.vx = (x - ball.x) * 0.6;
+      ball.vy = (y - ball.y) * 0.6;
+      ball.x  = x; ball.y = y;
+      addRipple(x, y, 8, 14);
+    } else {
+      addRipple(x, y, 10, 12);
+    }
+  }, { passive: false });
+
+  hero.addEventListener('touchend', () => {
+    ball.grabbed = false;
+    mouseX = mouseY = -9999;
+  });
+
+  // Resize
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(init, 120);
+  });
+
+  // ── Start ─────────────────────────────────────────────────────────
+  init();
+  requestAnimationFrame(loop);
+
+  // ── Scroll reveal (existing content) ──────────────────────────────
   const io = new IntersectionObserver((entries) => {
     entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
   }, { threshold: 0.10, rootMargin: '0px 0px -30px 0px' });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
-  /* ── Continuous EV bar shimmer ─────────────────────────────────── */
-  // Bars already pulse via CSS animation; nothing extra needed.
-
-  /* ── Parallax orbs on scroll ───────────────────────────────────── */
-  window.addEventListener('scroll', () => {
-    const y = window.scrollY;
-    document.querySelector('.orb-a').style.transform = `translate(${y * 0.04}px, ${y * -0.06}px) scale(1)`;
-    document.querySelector('.orb-b').style.transform = `translate(${y * -0.03}px, ${y * 0.04}px) scale(1)`;
-  }, { passive: true });
+})();
 </script>
 </body>
 </html>
