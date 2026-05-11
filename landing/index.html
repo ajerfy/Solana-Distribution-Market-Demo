@@ -802,7 +802,7 @@
 
   function stepBall() {
     if (ball.grabbed) return;
-    const GRAVITY = 0.38, ELASTICITY = 0.62, FRICTION = 0.994, AIR_DRAG = 0.998;
+    const GRAVITY = 0.38, ELASTICITY = 0.97, AIR_DRAG = 0.9999;
     ball.vy += GRAVITY;
     ball.x  += ball.vx;
     ball.y  += ball.vy;
@@ -814,8 +814,12 @@
       const nLen = Math.sqrt(slope * slope + 1);
       const nx = -slope / nLen, ny = 1 / nLen;
       const dot = ball.vx * nx + ball.vy * ny;
-      ball.vx = (ball.vx - 2 * dot * nx) * ELASTICITY * FRICTION;
+      ball.vx = (ball.vx - 2 * dot * nx) * ELASTICITY;
       ball.vy = (ball.vy - 2 * dot * ny) * ELASTICITY;
+    }
+    // Auto-roll: if nearly stopped, nudge toward the centre of the well
+    if (Math.abs(ball.vx) < 1.4 && Math.abs(ball.vy) < 1.4) {
+      ball.vx = (ball.x < W * 0.5 ? 1 : -1) * 2.5;
     }
     if (ball.x - BALL_R < 0)  { ball.x = BALL_R;     ball.vx =  Math.abs(ball.vx) * ELASTICITY; }
     if (ball.x + BALL_R > W)  { ball.x = W - BALL_R; ball.vx = -Math.abs(ball.vx) * ELASTICITY; }
