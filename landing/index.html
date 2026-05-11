@@ -12,48 +12,52 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,200;0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <!-- Bodoni Moda: high-contrast editorial serif. Syne: geometric modernist UI. -->
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,700;1,6..96,300;1,6..96,400;1,6..96,500&family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <!-- Grain filter -->
   <svg width="0" height="0" style="position:absolute">
     <defs>
-      <filter id="grain">
-        <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="4" stitchTiles="stitch" />
-        <feColorMatrix type="saturate" values="0" />
+      <filter id="grain" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="4" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
+        <feBlend in="SourceGraphic" in2="grey" mode="overlay"/>
       </filter>
     </defs>
   </svg>
 
   <style>
-    /* ── Reset ──────────────────────────────────────────────────────────── */
+    /* ── Reset ──────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
 
-    /* ── Tokens ─────────────────────────────────────────────────────────── */
+    /* ── Tokens ─────────────────────────────────────────────────────── */
     :root {
       --rose:        #c17085;
       --rose-bright: #e0aabb;
       --rose-dim:    #7d3f52;
+      --rose-faint:  rgba(193,112,133,0.10);
       --sand:        #b89870;
       --sand-bright: #d4b894;
       --sand-dim:    #6e5c40;
-      --bg:          #0d0a0b;
-      --bg-el:       rgba(255,255,255,0.025);
-      --bg-glass:    rgba(20,14,16,0.72);
-      --border:      rgba(255,255,255,0.065);
-      --border-mid:  rgba(255,255,255,0.10);
-      --border-str:  rgba(255,255,255,0.16);
+      --bg:          #0c090a;
+      --bg-el:       rgba(255,255,255,0.022);
+      --bg-glass:    rgba(16,10,12,0.80);
+      --border:      rgba(255,255,255,0.058);
+      --border-mid:  rgba(255,255,255,0.09);
+      --border-str:  rgba(255,255,255,0.15);
       --text:        #ede0e4;
-      --text-sec:    #a89099;
-      --text-dim:    #6b5860;
-      --radius-lg:   2rem;
-      --radius-md:   1.25rem;
-      --radius-sm:   0.75rem;
+      --text-sec:    #9e8890;
+      --text-dim:    #5e4e55;
+      --r-xl:        2.25rem;
+      --r-lg:        1.5rem;
+      --r-md:        1rem;
+      --r-sm:        0.6rem;
     }
 
-    /* ── Base ───────────────────────────────────────────────────────────── */
+    /* ── Base ───────────────────────────────────────────────────────── */
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Syne', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.65;
@@ -61,152 +65,197 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Grain overlay ──────────────────────────────────────────────────── */
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      pointer-events: none; z-index: 0;
-      opacity: 0.032;
-      filter: url(#grain);
-      background: #fff;
+    /* ── Grain ──────────────────────────────────────────────────────── */
+    .grain-overlay {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 0.028;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
     }
 
-    /* ── Orb blobs ──────────────────────────────────────────────────────── */
+    /* ── Orbs ───────────────────────────────────────────────────────── */
     .orb {
       position: absolute; border-radius: 50%;
-      filter: blur(80px); pointer-events: none; z-index: 0;
+      filter: blur(90px); pointer-events: none; z-index: 0;
     }
-    .orb-1 { width: 520px; height: 520px; background: radial-gradient(circle, #7d3f5240 0%, transparent 70%); top: -140px; left: -160px; }
-    .orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, #6e5c4030 0%, transparent 70%); top: 200px; right: -120px; }
-    .orb-3 { width: 300px; height: 300px; background: radial-gradient(circle, #c1708530 0%, transparent 70%); top: 460px; left: 30%; }
+    .orb-a {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(125,63,82,0.32) 0%, transparent 70%);
+      top: -200px; left: -200px;
+      animation: orbDrift 14s ease-in-out infinite alternate;
+    }
+    .orb-b {
+      width: 450px; height: 450px;
+      background: radial-gradient(circle, rgba(110,92,64,0.22) 0%, transparent 70%);
+      top: 300px; right: -150px;
+      animation: orbDrift 18s ease-in-out infinite alternate-reverse;
+    }
+    .orb-c {
+      width: 320px; height: 320px;
+      background: radial-gradient(circle, rgba(193,112,133,0.18) 0%, transparent 70%);
+      bottom: -80px; left: 35%;
+      animation: orbDrift 22s ease-in-out infinite alternate;
+    }
+    @keyframes orbDrift {
+      0%   { transform: translate(0, 0) scale(1); }
+      33%  { transform: translate(40px, -30px) scale(1.05); }
+      66%  { transform: translate(-20px, 20px) scale(0.96); }
+      100% { transform: translate(30px, 10px) scale(1.03); }
+    }
 
-    /* ── Nav ────────────────────────────────────────────────────────────── */
+    /* ── Nav ─────────────────────────────────────────────────────────── */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 clamp(1.5rem, 5vw, 3.5rem);
-      height: 64px;
+      padding: 0 clamp(1.5rem, 5vw, 3.5rem); height: 66px;
       background: var(--bg-glass);
-      backdrop-filter: blur(18px) saturate(1.2);
+      backdrop-filter: blur(22px) saturate(1.3);
       border-bottom: 1px solid var(--border);
     }
     .nav-logo {
-      font-size: 1rem; font-weight: 600; letter-spacing: -0.01em;
-      color: var(--text); text-decoration: none;
-      display: flex; align-items: center; gap: 9px;
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--text);
+      font-family: 'Bodoni Moda', Georgia, serif;
+      font-size: 1.05rem; font-weight: 500; letter-spacing: 0.02em;
     }
-    .nav-logo-mark {
-      width: 28px; height: 28px; border-radius: 8px;
-      background: linear-gradient(135deg, var(--rose), var(--sand));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+    /* ── Parabola Logo SVG ── */
+    .logo-svg { flex-shrink: 0; }
+    .nav-links {
+      display: flex; align-items: center;
+      gap: clamp(1.2rem, 3vw, 2.2rem);
     }
-    nav a:not(.nav-logo) {
-      font-size: 0.87rem; color: var(--text-sec); text-decoration: none;
+    .nav-links a {
+      font-size: 0.84rem; font-weight: 500; letter-spacing: 0.04em;
+      color: var(--text-sec); text-decoration: none;
       transition: color 0.2s;
     }
-    nav a:not(.nav-logo):hover { color: var(--text); }
-    .nav-links { display: flex; align-items: center; gap: clamp(1rem, 3vw, 2rem); }
-    .nav-cta {
-      padding: 9px 20px; border-radius: 50px;
-      background: var(--rose); color: #fff !important; font-weight: 500;
-      transition: opacity 0.2s !important;
-    }
-    .nav-cta:hover { opacity: 0.82; }
-    @media (max-width: 600px) {
-      .nav-links a:not(.nav-cta) { display: none; }
+    .nav-links a:hover { color: var(--text); }
+    @media (max-width: 580px) {
+      .nav-links a:not(:last-child) { display: none; }
     }
 
-    /* ── Layout helpers ─────────────────────────────────────────────────── */
+    /* ── Sections ───────────────────────────────────────────────────── */
     .section { position: relative; z-index: 1; }
     .container {
-      width: 100%; max-width: 1120px;
-      margin: 0 auto;
-      padding: 0 clamp(1.25rem, 5vw, 3rem);
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 clamp(1.25rem, 5vw, 3.5rem);
     }
+    .pad { padding: clamp(5rem, 12vh, 9rem) 0; }
 
-    /* ── Hero ───────────────────────────────────────────────────────────── */
-    #hero {
-      min-height: 100svh;
-      display: flex; flex-direction: column; justify-content: center;
-      padding-top: 64px;
+    /* ── Typography ──────────────────────────────────────────────────── */
+    h1, h2, h3 {
+      font-family: 'Bodoni Moda', Georgia, serif;
+      letter-spacing: -0.02em; line-height: 1.08;
     }
-    .hero-inner {
-      max-width: 780px;
-      padding: clamp(5rem, 12vh, 8rem) clamp(1.25rem, 5vw, 3rem) clamp(4rem, 8vh, 6rem);
-    }
-    .eyebrow {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-size: clamp(0.7rem, 1.8vw, 0.78rem);
-      font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--rose-bright);
-      margin-bottom: 1.5rem;
-    }
-    .eyebrow-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--rose); flex-shrink: 0;
-      animation: pulse-dot 2.4s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.7); }
-    }
-
     h1 {
-      font-size: clamp(2.6rem, 7vw, 5rem);
-      font-weight: 300;
-      line-height: 1.1; letter-spacing: -0.03em;
-      margin-bottom: 0.35em;
-      color: var(--text);
+      font-size: clamp(2.8rem, 8vw, 5.6rem);
+      font-weight: 400;
     }
     h1 em {
-      font-style: normal;
-      background: linear-gradient(120deg, var(--rose-bright) 0%, var(--sand-bright) 100%);
+      font-style: italic;
+      background: linear-gradient(118deg, var(--rose-bright) 0%, var(--sand-bright) 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
+    h2 {
+      font-size: clamp(2rem, 5.5vw, 3.6rem); font-weight: 400;
+      color: var(--text);
+    }
+    h2 em {
+      font-style: italic; color: var(--rose-bright);
+      -webkit-text-fill-color: initial;
+    }
+    h3 {
+      font-size: clamp(1.1rem, 2.5vw, 1.3rem); font-weight: 500;
+      color: var(--text); margin-bottom: 0.5rem;
+    }
+    p { font-family: 'Syne', sans-serif; }
+
+    /* ── Eyebrow ─────────────────────────────────────────────────────── */
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 9px;
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(0.68rem, 1.6vw, 0.76rem);
+      font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--rose-bright); margin-bottom: 1.6rem;
+    }
+    .eyebrow-pip {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--rose); flex-shrink: 0;
+      animation: pip 2.4s ease-in-out infinite;
+    }
+    @keyframes pip {
+      0%, 100% { opacity:1; transform:scale(1); }
+      50%       { opacity:0.4; transform:scale(0.65); }
+    }
+    .section-label {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(0.66rem, 1.5vw, 0.72rem);
+      font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--rose); margin-bottom: 1rem;
+    }
+
+    /* ── Hero ─────────────────────────────────────────────────────────── */
+    #hero {
+      min-height: 100svh; display: flex; flex-direction: column;
+      justify-content: center; overflow: hidden; padding-top: 66px;
+    }
+    .hero-inner {
+      max-width: 800px;
+      padding: clamp(5rem,12vh,9rem) clamp(1.25rem,5vw,3.5rem) clamp(4rem,8vh,6rem);
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 2.4vw, 1.18rem);
+      color: var(--text-sec); font-weight: 400; line-height: 1.78;
+      max-width: 540px; margin: 1.4rem 0 3rem;
+    }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
     /* Text rotator */
     .rotator-wrap {
       display: inline-block; overflow: hidden;
-      height: 1.15em; vertical-align: bottom;
+      height: 1.08em; vertical-align: bottom;
     }
     .rotator {
       display: flex; flex-direction: column;
-      animation: rotatorSlide 8s ease-in-out infinite;
+      animation: rotSlide 9s cubic-bezier(0.77,0,0.18,1) infinite;
     }
     .rotator span {
-      height: 1.15em; flex-shrink: 0;
-      background: linear-gradient(120deg, var(--rose-bright), var(--sand-bright));
+      height: 1.08em; flex-shrink: 0; line-height: 1.08;
+      background: linear-gradient(118deg, var(--rose-bright), var(--sand-bright));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
-    @keyframes rotatorSlide {
-      0%, 18%   { transform: translateY(0); }
-      25%, 43%  { transform: translateY(-25%); }
-      50%, 68%  { transform: translateY(-50%); }
-      75%, 93%  { transform: translateY(-75%); }
-      100%      { transform: translateY(0); }
+    @keyframes rotSlide {
+      0%, 18%  { transform: translateY(0); }
+      25%, 43% { transform: translateY(-25%); }
+      50%, 68% { transform: translateY(-50%); }
+      75%, 93% { transform: translateY(-75%); }
+      100%     { transform: translateY(0); }
     }
 
-    .hero-sub {
-      font-size: clamp(1.05rem, 2.5vw, 1.2rem);
-      color: var(--text-sec); font-weight: 300;
-      max-width: 560px; line-height: 1.75;
-      margin-bottom: 2.8rem; margin-top: 1.2rem;
+    /* Hero bell curve visual */
+    .hero-curves {
+      position: absolute; right: 0; top: 50%; transform: translateY(-52%);
+      width: clamp(260px, 38vw, 500px); pointer-events: none; z-index: 0;
+      opacity: 0.5;
     }
-    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .btn-primary {
-      padding: clamp(12px, 2vw, 15px) clamp(22px, 4vw, 32px);
-      border-radius: 50px; font-size: clamp(0.88rem, 2vw, 0.96rem); font-weight: 500;
-      background: linear-gradient(135deg, var(--rose) 0%, #9b4c61 100%);
+    @media (max-width: 860px) { .hero-curves { opacity: 0.18; width: 280px; } }
+
+    /* ── Buttons ─────────────────────────────────────────────────────── */
+    .btn-rose {
+      padding: clamp(12px,2vw,14px) clamp(24px,4vw,34px);
+      border-radius: 50px; font-family: 'Syne', sans-serif;
+      font-size: clamp(0.85rem,1.8vw,0.93rem); font-weight: 600; letter-spacing: 0.04em;
+      background: linear-gradient(135deg, var(--rose) 0%, #9b4860 100%);
       color: #fff; border: none; cursor: pointer; text-decoration: none;
       display: inline-block;
-      box-shadow: 0 4px 24px rgba(193,112,133,0.30);
+      box-shadow: 0 4px 28px rgba(193,112,133,0.28);
       transition: transform 0.18s, box-shadow 0.18s;
     }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(193,112,133,0.42); }
+    .btn-rose:hover { transform: translateY(-2px); box-shadow: 0 8px 36px rgba(193,112,133,0.40); }
     .btn-ghost {
-      padding: clamp(12px, 2vw, 15px) clamp(22px, 4vw, 32px);
-      border-radius: 50px; font-size: clamp(0.88rem, 2vw, 0.96rem); font-weight: 500;
+      padding: clamp(12px,2vw,14px) clamp(24px,4vw,34px);
+      border-radius: 50px; font-family: 'Syne', sans-serif;
+      font-size: clamp(0.85rem,1.8vw,0.93rem); font-weight: 500;
       background: transparent; color: var(--text-sec);
       border: 1px solid var(--border-str); cursor: pointer; text-decoration: none;
       display: inline-block;
@@ -214,604 +263,654 @@
     }
     .btn-ghost:hover { color: var(--text); border-color: var(--rose-dim); }
 
-    /* ── Hero visual — animated bell curves ─────────────────────────────── */
-    .hero-visual {
-      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
-      width: clamp(280px, 40vw, 520px); height: 380px;
-      pointer-events: none; z-index: 0; overflow: visible;
-      opacity: 0.55;
-    }
-    @media (max-width: 860px) { .hero-visual { display: none; } }
+    /* ── Divider ─────────────────────────────────────────────────────── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 0; }
 
-    /* ── Section titles ──────────────────────────────────────────────────── */
-    .section-label {
-      font-size: clamp(0.68rem, 1.6vw, 0.74rem);
-      font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--rose); margin-bottom: 0.9rem;
-    }
-    h2 {
-      font-size: clamp(2rem, 5vw, 3rem);
-      font-weight: 300; letter-spacing: -0.025em; line-height: 1.15;
-      color: var(--text); margin-bottom: 1rem;
-    }
-    h2 em {
-      font-style: italic; color: var(--rose-bright);
-      -webkit-text-fill-color: initial;
-    }
-    .section-sub {
-      font-size: clamp(1rem, 2vw, 1.1rem);
-      color: var(--text-sec); font-weight: 300; line-height: 1.75;
-      max-width: 580px;
-    }
-
-    /* ── Card grid ───────────────────────────────────────────────────────── */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-      gap: 1.25rem;
-      margin-top: 3rem;
-    }
-    .card {
-      background: var(--bg-el);
+    /* ── Built-on row ─────────────────────────────────────────────────── */
+    .built-wrap {
+      display: flex; gap: clamp(1.5rem,4vw,3.5rem); flex-wrap: wrap;
+      align-items: center; justify-content: center;
+      max-width: 680px; margin: 0 auto;
+      padding: clamp(1.4rem,4vw,2rem) clamp(1.5rem,4vw,2.5rem);
+      border-radius: var(--r-xl); background: var(--bg-el);
       border: 1px solid var(--border-mid);
-      border-radius: var(--radius-lg);
-      padding: clamp(1.5rem, 4vw, 2.2rem);
-      transition: border-color 0.25s;
     }
-    .card:hover { border-color: var(--rose-dim); }
-    .card-icon {
-      width: 44px; height: 44px; border-radius: var(--radius-sm);
-      background: rgba(193,112,133,0.12); border: 1px solid var(--rose-dim);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; margin-bottom: 1.2rem;
+    .built-item {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.76rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim);
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
     }
-    .card h3 {
-      font-size: 1.05rem; font-weight: 600; margin-bottom: 0.55rem;
-      letter-spacing: -0.01em; color: var(--text);
-    }
-    .card p { font-size: 0.93rem; color: var(--text-sec); line-height: 1.7; }
+    .built-item .bi-name { font-size: 1rem; font-weight: 700; color: var(--text-sec); }
 
-    /* ── Section spacing ─────────────────────────────────────────────────── */
-    .pad-section { padding: clamp(5rem, 12vh, 8rem) 0; }
-
-    /* ── Problem section ─────────────────────────────────────────────────── */
+    /* ── Problem section ──────────────────────────────────────────────── */
     .problem-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-top: 3.5rem;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1.25rem; margin-top: 3.5rem;
     }
-    @media (max-width: 720px) { .problem-grid { grid-template-columns: 1fr; } }
-
+    @media (max-width: 700px) { .problem-grid { grid-template-columns: 1fr; } }
     .prob-card {
-      border-radius: var(--radius-lg);
-      padding: clamp(1.5rem, 4vw, 2.2rem);
+      border-radius: var(--r-xl);
+      padding: clamp(1.5rem,4vw,2.2rem);
       border: 1px solid var(--border-mid);
     }
-    .prob-card.bad  { background: rgba(220,60,60,0.04); }
-    .prob-card.good { background: rgba(193,112,133,0.06); border-color: var(--rose-dim); }
+    .prob-card.bad  { background: rgba(180,50,50,0.04); }
+    .prob-card.good { background: rgba(193,112,133,0.055); border-color: var(--rose-dim); }
     .prob-tag {
-      display: inline-block; font-size: 0.7rem; font-weight: 700;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      padding: 4px 12px; border-radius: 50px; margin-bottom: 1.1rem;
+      display: inline-block; font-family: 'Syne', sans-serif;
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; padding: 4px 13px; border-radius: 50px; margin-bottom: 1rem;
     }
-    .prob-tag.bad  { background: rgba(220,60,60,0.12); color: #f08080; }
+    .prob-tag.bad  { background: rgba(200,60,60,0.12); color: #e08080; }
     .prob-tag.good { background: rgba(193,112,133,0.18); color: var(--rose-bright); }
-    .prob-card h3  { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text); }
-    .prob-card p   { font-size: 0.92rem; color: var(--text-sec); line-height: 1.7; }
+    .prob-card h3  { font-size: 1.05rem; }
+    .prob-card p   { font-size: 0.91rem; color: var(--text-sec); line-height: 1.72; }
     .prob-example {
-      margin-top: 0.9rem; padding: 0.75rem 1rem;
-      border-radius: var(--radius-sm);
-      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
-      color: var(--text-sec); line-height: 1.6;
+      margin-top: 1rem; padding: 0.8rem 1rem;
+      border-radius: var(--r-md); background: rgba(255,255,255,0.035);
+      border: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      color: var(--text-sec); line-height: 1.7;
     }
     .prob-example strong { color: var(--rose-bright); }
 
-    /* ── How it works ─────────────────────────────────────────────────────── */
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-      gap: 1.5rem;
+    /* ── Edge section ────────────────────────────────────────────────── */
+    #edge { position: relative; overflow: hidden; }
+    .edge-grid {
+      display: grid; grid-template-columns: 1fr 1.1fr;
+      gap: clamp(2rem,5vw,4rem); align-items: start;
       margin-top: 3.5rem;
     }
+    @media (max-width: 760px) { .edge-grid { grid-template-columns: 1fr; } }
+
+    .edge-card {
+      padding: clamp(1.4rem,3.5vw,2rem);
+      border-radius: var(--r-xl);
+      background: var(--bg-el); border: 1px solid var(--border-mid);
+      margin-bottom: 1.1rem; transition: border-color 0.25s;
+    }
+    .edge-card:hover { border-color: var(--rose-dim); }
+    .edge-card:last-child { margin-bottom: 0; }
+    .edge-num {
+      font-family: 'Bodoni Moda', Georgia, serif;
+      font-size: 2.8rem; font-weight: 400; line-height: 1;
+      background: linear-gradient(118deg, var(--rose-bright), var(--sand-bright));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 0.4rem;
+    }
+    .edge-card h3 { font-size: 0.95rem; letter-spacing: 0.02em; margin-bottom: 0.4rem; }
+    .edge-card p  { font-size: 0.87rem; color: var(--text-sec); line-height: 1.7; }
+
+    /* Animated comparison chart */
+    .edge-visual {
+      border-radius: var(--r-xl); background: var(--bg-el);
+      border: 1px solid var(--border-mid);
+      padding: clamp(1.4rem,3.5vw,2rem); overflow: hidden;
+    }
+    .ev-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 1.2rem;
+    }
+    .ev-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+    }
+    .ev-row:last-child { margin-bottom: 0; }
+    .ev-row-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; color: var(--text-sec); width: 68px; flex-shrink: 0;
+    }
+    .ev-bar-track {
+      flex: 1; height: 10px; background: rgba(255,255,255,0.05);
+      border-radius: 5px; overflow: hidden; position: relative;
+    }
+    .ev-bar {
+      height: 100%; border-radius: 5px;
+      animation: barPulse 4s ease-in-out infinite;
+    }
+    .ev-bar.b1 {
+      background: linear-gradient(90deg, #cc5050, #e07070);
+      animation-delay: 0s;
+    }
+    .ev-bar.b2 {
+      background: linear-gradient(90deg, var(--rose), var(--rose-bright));
+      animation-delay: 0.3s;
+    }
+    .ev-bar.b3 {
+      background: linear-gradient(90deg, var(--sand-dim), var(--sand-bright));
+      animation-delay: 0.6s;
+    }
+    @keyframes barPulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.7; }
+    }
+    .ev-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; width: 46px; text-align: right; flex-shrink: 0;
+    }
+    .ev-note {
+      font-size: 0.78rem; color: var(--text-dim); line-height: 1.6;
+      margin-top: 1.2rem; padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── How it works ─────────────────────────────────────────────────── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px,100%), 1fr));
+      gap: 1.25rem; margin-top: 3.5rem;
+    }
     .step {
-      display: flex; flex-direction: column; gap: 0.8rem;
-      padding: clamp(1.4rem, 3vw, 1.8rem);
-      border-radius: var(--radius-lg);
+      padding: clamp(1.4rem,3vw,1.9rem); border-radius: var(--r-xl);
       background: var(--bg-el); border: 1px solid var(--border-mid);
       transition: border-color 0.25s;
     }
     .step:hover { border-color: var(--rose-dim); }
     .step-num {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem; font-weight: 500; color: var(--rose);
-      letter-spacing: 0.12em;
+      font-size: 0.7rem; font-weight: 500; letter-spacing: 0.14em;
+      color: var(--rose); margin-bottom: 0.8rem;
     }
-    .step h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; }
-    .step p  { font-size: 0.88rem; color: var(--text-sec); line-height: 1.65; margin: 0; }
+    .step h3 { font-size: 0.97rem; margin-bottom: 0.4rem; }
+    .step p  { font-size: 0.87rem; color: var(--text-sec); line-height: 1.65; }
 
-    /* ── Perps section ───────────────────────────────────────────────────── */
-    #perps { position: relative; overflow: hidden; }
-    .perps-grid {
+    /* ── Perps ────────────────────────────────────────────────────────── */
+    .perps-layout {
       display: grid; grid-template-columns: 1fr 1fr;
-      gap: 3rem; align-items: center;
-      margin-top: 4rem;
+      gap: clamp(2rem,5vw,4rem); align-items: center; margin-top: 4rem;
     }
-    @media (max-width: 800px) { .perps-grid { grid-template-columns: 1fr; gap: 2rem; } }
-    .perp-chart-wrap {
-      border-radius: var(--radius-lg);
-      background: var(--bg-el); border: 1px solid var(--border-mid);
-      padding: 1.5rem 1.5rem 1rem;
+    @media (max-width: 780px) { .perps-layout { grid-template-columns: 1fr; } }
+    .perp-chart-box {
+      border-radius: var(--r-xl); background: var(--bg-el);
+      border: 1px solid var(--border-mid); padding: 1.5rem 1.5rem 1.1rem;
     }
-    .perp-chart-label {
-      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--text-dim);
-      margin-bottom: 1rem;
+    .chart-sublabel {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.69rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 1rem;
     }
-    .perp-feature-list {
-      list-style: none; display: flex; flex-direction: column; gap: 1rem;
-      margin-top: 2rem;
-    }
-    .perp-feature-list li {
-      display: flex; gap: 0.9rem; align-items: flex-start;
-      font-size: 0.95rem; color: var(--text-sec); line-height: 1.6;
-    }
-    .perp-feature-list li::before {
-      content: ''; width: 6px; height: 6px; border-radius: 50%;
-      background: var(--rose); flex-shrink: 0; margin-top: 0.55em;
-    }
-    .perp-feature-list li strong { color: var(--text); font-weight: 500; }
-
-    /* ── Funding pill ──────────────────────────────────────────────────────── */
-    .funding-row {
-      display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap;
-    }
-    .funding-pill {
+    .funding-pills { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 0.8rem; }
+    .fpill {
       padding: 5px 14px; border-radius: 50px;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 500;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; font-weight: 500;
+      animation: pillBreath 3.5s ease-in-out infinite;
     }
-    .pill-long  { background: rgba(30,180,100,0.12); color: #5dcc8c; border: 1px solid rgba(30,180,100,0.25); }
-    .pill-short { background: rgba(220,80,80,0.12);  color: #f07070; border: 1px solid rgba(220,80,80,0.25); }
+    .fpill.long  { background: rgba(30,180,100,0.10); color: #5dcc8c; border: 1px solid rgba(30,180,100,0.22); }
+    .fpill.short { background: rgba(220,70,70,0.10);  color: #ee7070; border: 1px solid rgba(220,70,70,0.22); }
+    .fpill.short { animation-delay: 0.7s; }
+    @keyframes pillBreath {
+      0%, 100% { opacity:1; }
+      50%       { opacity:0.55; }
+    }
+    .perp-features { list-style: none; display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem; }
+    .perp-features li {
+      display: flex; gap: 0.85rem; align-items: flex-start;
+      font-size: 0.92rem; color: var(--text-sec); line-height: 1.65;
+    }
+    .perp-features li::before {
+      content: ''; width: 5px; height: 5px; border-radius: 50%;
+      background: var(--rose); flex-shrink: 0; margin-top: 0.6em;
+      animation: pip 2.8s ease-in-out infinite;
+    }
+    .perp-features li:nth-child(2)::before { animation-delay:0.4s; }
+    .perp-features li:nth-child(3)::before { animation-delay:0.8s; }
+    .perp-features li:nth-child(4)::before { animation-delay:1.2s; }
+    .perp-features li strong { color: var(--text); font-weight: 500; }
 
-    /* ── Team ────────────────────────────────────────────────────────────── */
-    .team-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-      gap: 1.25rem;
-      margin-top: 3.5rem;
-    }
-    .team-card {
-      padding: clamp(1.4rem, 3vw, 1.9rem);
-      border-radius: var(--radius-lg);
-      background: var(--bg-el); border: 1px solid var(--border-mid);
-      transition: border-color 0.25s;
-    }
-    .team-card:hover { border-color: var(--rose-dim); }
-    .team-avatar {
-      width: 52px; height: 52px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--rose-dim), var(--sand-dim));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.15rem; font-weight: 600; color: #fff;
-      margin-bottom: 1rem; flex-shrink: 0;
-    }
-    .team-name { font-size: 1rem; font-weight: 600; color: var(--text); }
-    .team-role {
-      font-size: 0.8rem; color: var(--rose-bright); font-weight: 500;
-      letter-spacing: 0.04em; margin-top: 3px; margin-bottom: 0.5rem;
-    }
-    .team-desc { font-size: 0.87rem; color: var(--text-sec); line-height: 1.6; }
-    .team-headline {
-      font-size: clamp(0.95rem, 2vw, 1.05rem); color: var(--text-sec);
-      font-weight: 300; margin-top: 0.5rem; margin-bottom: 0;
+    /* ── CTA ──────────────────────────────────────────────────────────── */
+    #cta { text-align: center; position: relative; overflow: hidden; }
+    #cta h2 { max-width: 560px; margin: 0 auto 1.4rem; }
+    #cta .section-sub { max-width: 460px; margin: 0 auto 2.8rem; }
+    .section-sub {
+      font-size: clamp(1rem,2vw,1.1rem);
+      color: var(--text-sec); font-weight: 400; line-height: 1.75;
     }
 
-    /* ── Built-on bar ─────────────────────────────────────────────────────── */
-    .built-bar {
-      display: flex; gap: clamp(1.5rem, 4vw, 3rem); flex-wrap: wrap;
-      align-items: center; justify-content: center;
-      margin: 0 auto; padding: clamp(1.5rem, 4vw, 2.2rem) clamp(1.5rem, 4vw, 2.5rem);
-      border-radius: var(--radius-lg);
-      background: var(--bg-el); border: 1px solid var(--border-mid);
-      max-width: 700px;
-    }
-    .built-item {
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
-      font-size: 0.78rem; color: var(--text-dim); letter-spacing: 0.08em;
-      text-transform: uppercase; font-weight: 600;
-    }
-    .built-item span.logo {
-      font-size: 1.1rem; font-weight: 700; color: var(--text-sec);
-    }
-
-    /* ── Divider ─────────────────────────────────────────────────────────── */
-    .divider {
-      border: none; border-top: 1px solid var(--border);
-      margin: 0;
-    }
-
-    /* ── CTA band ────────────────────────────────────────────────────────── */
-    #cta {
-      text-align: center;
-      padding: clamp(5rem, 12vh, 8rem) clamp(1.25rem, 5vw, 3rem);
-    }
-    #cta h2 { max-width: 600px; margin: 0 auto 1.5rem; }
-    #cta p  { max-width: 480px; margin: 0 auto 2.5rem; }
-
-    /* ── Footer ──────────────────────────────────────────────────────────── */
+    /* ── Footer ───────────────────────────────────────────────────────── */
     footer {
-      padding: 2.5rem clamp(1.25rem, 5vw, 3rem);
+      padding: 2.2rem clamp(1.25rem,5vw,3.5rem);
       border-top: 1px solid var(--border);
       display: flex; flex-wrap: wrap;
-      justify-content: space-between; align-items: center;
-      gap: 1rem;
-      font-size: 0.82rem; color: var(--text-dim);
+      justify-content: space-between; align-items: center; gap: 1rem;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.8rem; color: var(--text-dim);
     }
-    footer a { color: var(--text-dim); text-decoration: none; }
+    footer a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
     footer a:hover { color: var(--rose-bright); }
 
-    /* ── Reveal animation ────────────────────────────────────────────────── */
+    /* ── Reveal ───────────────────────────────────────────────────────── */
     .reveal {
-      opacity: 0; transform: translateY(28px);
-      transition: opacity 0.6s ease, transform 0.6s ease;
+      opacity: 0; transform: translateY(30px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
     }
     .reveal.visible { opacity: 1; transform: translateY(0); }
 
-    /* ── Scrollbar ───────────────────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 6px; }
+    /* ── Scrollbar ────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border-str); border-radius: 3px; }
   </style>
 </head>
 <body>
 
-<!-- ══ Nav ═══════════════════════════════════════════════════════════════ -->
+<div class="grain-overlay"></div>
+
+<!-- ══ Nav ════════════════════════════════════════════════════════════ -->
 <nav>
   <a href="#" class="nav-logo">
-    <div class="nav-logo-mark">P</div>
+    <!-- Parabola logo: dual-curve lens — a parabola opening upward fused with an inverted one, encoding both the math curve and the distribution peak -->
+    <svg class="logo-svg" width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="logoG" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#c17085"/>
+          <stop offset="100%" stop-color="#b89870"/>
+        </linearGradient>
+        <linearGradient id="logoGfill" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#c17085" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#b89870" stop-opacity="0.08"/>
+        </linearGradient>
+      </defs>
+      <!-- Upward parabola arms -->
+      <path d="M4 28 Q17 4 30 28" stroke="url(#logoG)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <!-- Inverted bell (distribution peak) overlaid -->
+      <path d="M8 28 Q17 10 26 28" fill="url(#logoGfill)" stroke="url(#logoG)" stroke-width="1.4" stroke-linecap="round"/>
+      <!-- Vertex glow dot -->
+      <circle cx="17" cy="9.5" r="2.2" fill="url(#logoG)">
+        <animate attributeName="r" values="2.2;2.7;2.2" dur="2.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="1;0.65;1" dur="2.6s" repeatCount="indefinite"/>
+      </circle>
+      <!-- Axis tick -->
+      <line x1="17" y1="7" x2="17" y2="28" stroke="url(#logoG)" stroke-width="0.9" stroke-dasharray="2 3" opacity="0.4"/>
+    </svg>
     Parabola
   </a>
   <div class="nav-links">
     <a href="#problem">The Problem</a>
-    <a href="#how">How It Works</a>
+    <a href="#edge">Your Edge</a>
     <a href="#perps">Perps</a>
-    <a href="#team">Team</a>
-    <a href="https://github.com/shikharsehgal1" target="_blank" rel="noopener" class="nav-cta">GitHub</a>
+    <a href="#cta">Contact</a>
   </div>
 </nav>
 
-<!-- ══ Hero ══════════════════════════════════════════════════════════════ -->
+<!-- ══ Hero ══════════════════════════════════════════════════════════ -->
 <section id="hero" class="section" style="position:relative; overflow:hidden;">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+  <div class="orb orb-c"></div>
 
-  <!-- Animated bell curves SVG -->
-  <svg class="hero-visual" viewBox="0 0 520 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Continuously animated bell curves -->
+  <svg class="hero-curves" viewBox="0 0 500 380" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="curveGrad1" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#c17085" stop-opacity="0.5"/>
+      <linearGradient id="hg1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#c17085" stop-opacity="0.45"/>
         <stop offset="100%" stop-color="#c17085" stop-opacity="0"/>
       </linearGradient>
-      <linearGradient id="curveGrad2" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#b89870" stop-opacity="0.3"/>
+      <linearGradient id="hg2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#b89870" stop-opacity="0.28"/>
         <stop offset="100%" stop-color="#b89870" stop-opacity="0"/>
       </linearGradient>
-      <linearGradient id="curveGrad3" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#e0aabb" stop-opacity="0.18"/>
+      <linearGradient id="hg3" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#e0aabb" stop-opacity="0.14"/>
         <stop offset="100%" stop-color="#e0aabb" stop-opacity="0"/>
       </linearGradient>
     </defs>
-    <!-- Crowd distribution (wide, amber) -->
-    <path d="M30 340 Q100 340 140 260 Q180 180 200 120 Q220 60 240 50 Q260 40 280 50 Q300 60 320 120 Q340 180 360 260 Q380 340 420 340 Z" fill="url(#curveGrad2)" opacity="0.7">
-      <animate attributeName="opacity" values="0.7;0.5;0.7" dur="4s" repeatCount="indefinite"/>
+    <!-- Wide crowd distribution -->
+    <path d="M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355 Z" fill="url(#hg2)">
+      <animate attributeName="d" dur="7s" repeatCount="indefinite"
+        values="M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355 Z;
+                M20 355 Q95 355 148 265 Q182 190 202 122 Q218 68 242 50 Q268 32 294 50 Q318 68 336 122 Q358 192 395 282 Q424 342 470 355 Z;
+                M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355 Z"
+        calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/>
     </path>
-    <path d="M30 340 Q100 340 140 260 Q180 180 200 120 Q220 60 240 50 Q260 40 280 50 Q300 60 320 120 Q340 180 360 260 Q380 340 420 340" fill="none" stroke="#b89870" stroke-width="1.5" opacity="0.4"/>
-    <!-- You distribution (narrow, rose) -->
-    <path d="M120 340 Q180 340 210 240 Q230 180 240 110 Q248 62 260 48 Q272 34 280 48 Q292 62 300 110 Q312 180 340 260 Q370 330 400 340 Z" fill="url(#curveGrad1)" opacity="0.8">
-      <animate attributeName="opacity" values="0.8;0.55;0.8" dur="3.2s" repeatCount="indefinite"/>
+    <path d="M20 355 Q100 355 150 260 Q185 185 205 118 Q222 65 245 48 Q268 30 290 48 Q312 65 330 118 Q352 185 390 280 Q420 340 470 355" fill="none" stroke="#b89870" stroke-width="1.6" opacity="0.35">
+      <animate attributeName="stroke-opacity" values="0.35;0.55;0.35" dur="4s" repeatCount="indefinite"/>
     </path>
-    <path d="M120 340 Q180 340 210 240 Q230 180 240 110 Q248 62 260 48 Q272 34 280 48 Q292 62 300 110 Q312 180 340 260 Q370 330 400 340" fill="none" stroke="#c17085" stroke-width="2" opacity="0.7">
-      <animate attributeName="stroke-opacity" values="0.7;0.4;0.7" dur="3.2s" repeatCount="indefinite"/>
+    <!-- Narrow "you" distribution -->
+    <path d="M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355 Z" fill="url(#hg1)">
+      <animate attributeName="d" dur="5.5s" repeatCount="indefinite"
+        values="M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355 Z;
+                M125 355 Q188 355 218 258 Q238 190 250 126 Q258 78 266 52 Q274 30 280 48 Q290 74 300 128 Q314 194 358 282 Q388 344 438 355 Z;
+                M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355 Z"
+        calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/>
     </path>
-    <!-- Wide diffuse crowd ghost -->
-    <path d="M0 340 Q60 340 120 300 Q170 265 200 220 Q230 180 260 160 Q290 140 320 160 Q360 185 400 240 Q440 295 480 340 Z" fill="url(#curveGrad3)" opacity="0.45"/>
-    <!-- Vertical center line -->
-    <line x1="260" y1="48" x2="260" y2="340" stroke="#c17085" stroke-width="1" stroke-dasharray="4 5" opacity="0.3"/>
+    <path d="M130 355 Q190 355 220 255 Q240 188 252 124 Q260 76 268 50 Q276 28 282 46 Q292 72 302 126 Q316 192 360 280 Q390 342 440 355" fill="none" stroke="#c17085" stroke-width="2.2" opacity="0.65">
+      <animate attributeName="stroke-opacity" values="0.65;0.85;0.65" dur="3.5s" repeatCount="indefinite"/>
+    </path>
+    <!-- Ghost diffuse -->
+    <path d="M0 355 Q60 355 120 305 Q170 265 210 218 Q248 178 275 155 Q300 135 330 158 Q368 184 410 240 Q452 298 500 355 Z" fill="url(#hg3)">
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="6s" repeatCount="indefinite"/>
+    </path>
+    <!-- Center axis -->
+    <line x1="275" y1="28" x2="275" y2="355" stroke="#c17085" stroke-width="1" stroke-dasharray="4 6" opacity="0.25">
+      <animate attributeName="opacity" values="0.25;0.45;0.25" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <!-- Vertex dot -->
+    <circle cx="275" cy="28" r="3.5" fill="#e0aabb" opacity="0.8">
+      <animate attributeName="r" values="3.5;5;3.5" dur="2.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2.8s" repeatCount="indefinite"/>
+    </circle>
   </svg>
 
   <div class="hero-inner">
     <div class="eyebrow reveal">
-      <div class="eyebrow-dot"></div>
+      <div class="eyebrow-pip"></div>
       Estimation Markets · Solana
     </div>
 
-    <h1 class="reveal" style="transition-delay:0.08s">
+    <h1 class="reveal" style="transition-delay:0.07s">
       Markets for<br>
       <div class="rotator-wrap">
         <div class="rotator">
           <span>NBA totals.</span>
           <span>election margins.</span>
-          <span>Bitcoin's year-end price.</span>
+          <span>Bitcoin's year-end.</span>
           <span>Fed rate decisions.</span>
         </div>
       </div>
     </h1>
 
-    <p class="hero-sub reveal" style="transition-delay:0.16s">
-      Parabola is the first on-chain market where you bet a <em>full probability distribution</em> — not just a binary yes/no. Your conviction becomes your edge.
+    <p class="hero-sub reveal" style="transition-delay:0.14s">
+      The first on-chain market where you stake a <em style="font-style:italic; color:var(--rose-bright);">full probability distribution</em> — not a binary yes/no. Your precision is your edge.
     </p>
 
-    <div class="hero-actions reveal" style="transition-delay:0.24s">
-      <a href="https://github.com/shikharsehgal1" class="btn-primary" target="_blank" rel="noopener">View on GitHub</a>
-      <a href="#problem" class="btn-ghost">How it works ↓</a>
+    <div class="hero-actions reveal" style="transition-delay:0.21s">
+      <a href="#edge" class="btn-rose">See your edge ↓</a>
+      <a href="#problem" class="btn-ghost">How it works</a>
     </div>
   </div>
 </section>
 
-<!-- ══ Built on ═══════════════════════════════════════════════════════════ -->
-<section class="section pad-section" style="padding-top:0; padding-bottom:clamp(3rem,7vh,5rem);">
+<!-- ══ Built-on ════════════════════════════════════════════════════════ -->
+<section class="section" style="padding: 0 0 clamp(3rem,7vh,5rem);">
   <div class="container">
-    <div class="built-bar reveal">
-      <div class="built-item"><span class="logo">◎ Solana</span>Built on</div>
-      <div class="built-item"><span class="logo">⚡ Pyth</span>Oracle</div>
-      <div class="built-item"><span class="logo">⬡ Normal</span>AMM</div>
-      <div class="built-item"><span class="logo">∿ KL-Divergence</span>Pricing</div>
+    <div class="built-wrap reveal">
+      <div class="built-item"><span class="bi-name">◎ Solana</span>Built on</div>
+      <div class="built-item"><span class="bi-name">⚡ Pyth</span>Oracle</div>
+      <div class="built-item"><span class="bi-name">⬡ Normal AMM</span>Protocol</div>
+      <div class="built-item"><span class="bi-name">∿ KL-Divergence</span>Pricing</div>
     </div>
   </div>
 </section>
 
-<hr class="divider" />
+<hr/>
 
-<!-- ══ Problem ════════════════════════════════════════════════════════════ -->
-<section id="problem" class="section pad-section">
+<!-- ══ Problem ════════════════════════════════════════════════════════ -->
+<section id="problem" class="section pad">
   <div class="container">
     <p class="section-label reveal">The Problem</p>
-    <h2 class="reveal" style="transition-delay:0.06s">Binary markets <em>throw away</em> information.</h2>
-    <p class="section-sub reveal" style="transition-delay:0.12s">
-      Ask "Will the Lakers–Celtics game total go over 220 points?" and you're left with yes or no. But real knowledge is richer than that.
+    <h2 class="reveal" style="transition-delay:0.07s">Binary markets <em>discard</em> your knowledge.</h2>
+    <p class="section-sub reveal" style="transition-delay:0.13s; max-width:560px; margin-top:0.9rem;">
+      Ask "Will the Lakers–Celtics game go over 220?" and you're forced into yes or no. But you know far more than that.
     </p>
 
     <div class="problem-grid">
-      <div class="prob-card bad reveal" style="transition-delay:0.18s">
-        <div class="prob-tag bad">Today's markets</div>
-        <h3>Forced binary</h3>
-        <p>You know the game usually runs 215–230 points. You lean toward 224. But you can only bet yes/no at an arbitrary line you didn't choose.</p>
+      <div class="prob-card bad reveal" style="transition-delay:0.17s">
+        <div class="prob-tag bad">Standard sportsbook</div>
+        <h3>Forced binary, buried vig</h3>
+        <p>You think the total will land around 224. But the line is fixed at 220.5 and baked with a 5% house edge. You can't express where you think it peaks or how certain you are.</p>
         <div class="prob-example">
           Lakers vs Celtics — Total<br>
-          Over 220.5 &nbsp;<strong>-115</strong><br>
-          Under 220.5 &nbsp;<strong>-105</strong>
+          Over 220.5 &nbsp;<strong>−115</strong>&nbsp; (implies 53.5%)<br>
+          Under 220.5 &nbsp;<strong>−105</strong>&nbsp; (implies 51.2%)
         </div>
       </div>
-      <div class="prob-card good reveal" style="transition-delay:0.24s">
+      <div class="prob-card good reveal" style="transition-delay:0.23s">
         <div class="prob-tag good">Parabola</div>
-        <h3>Bet your full belief</h3>
-        <p>Submit a distribution centered wherever you think the true total lands. The more precisely right you are, the more you earn — your edge scales with conviction.</p>
+        <h3>Express your full belief</h3>
+        <p>Submit the distribution you actually believe. The closer your distribution to the realized outcome, the higher your payout. Your sigma matters as much as your mu.</p>
         <div class="prob-example">
           Lakers vs Celtics — Total<br>
-          Your estimate &nbsp;<strong>μ = 224 &nbsp; σ = 6.2</strong><br>
-          Crowd &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>μ = 219 &nbsp; σ = 9.1</strong>
+          Your estimate &nbsp;<strong>μ = 224 &nbsp; σ = 5.8</strong><br>
+          Crowd &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>μ = 219 &nbsp; σ = 9.4</strong>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<hr class="divider" />
+<hr/>
 
-<!-- ══ Features ═══════════════════════════════════════════════════════════ -->
-<section id="features" class="section pad-section">
+<!-- ══ Your Edge (Statistics) ═════════════════════════════════════════ -->
+<section id="edge" class="section pad">
+  <div class="orb" style="width:400px;height:400px;background:radial-gradient(circle,rgba(125,63,82,0.18) 0%,transparent 70%);top:10%;left:-100px;pointer-events:none;filter:blur(80px);animation:orbDrift 16s ease-in-out infinite alternate;"></div>
   <div class="container">
-    <p class="section-label reveal">Why Parabola</p>
-    <h2 class="reveal" style="transition-delay:0.06s">Built different, <em>on-chain.</em></h2>
+    <p class="section-label reveal">The Math</p>
+    <h2 class="reveal" style="transition-delay:0.07s">Why the odds are <em>always</em> better here.</h2>
+    <p class="section-sub reveal" style="transition-delay:0.13s; max-width:600px; margin-top:0.9rem;">
+      This isn't marketing — it follows from information theory. Distribution markets are strictly superior to binary markets for anyone with real forecasting skill.
+    </p>
 
-    <div class="card-grid">
-      <div class="card reveal" style="transition-delay:0.10s">
-        <div class="card-icon">∿</div>
-        <h3>KL-Divergence Pricing</h3>
-        <p>Collateral is proportional to how far your distribution diverges from the crowd. Tight, confident bets cost less. Wild outlier bets cost more.</p>
+    <div class="edge-grid">
+      <!-- Left: stat cards -->
+      <div>
+        <div class="edge-card reveal" style="transition-delay:0.16s">
+          <div class="edge-num">5–8%</div>
+          <h3>The vig tax in every binary bet</h3>
+          <p>Standard sportsbooks embed 5–8% vig into every line. To break even you must be right 52–54% of the time before you capture a single dollar of your real edge. Parabola charges only for <em>KL-divergence from the crowd</em> — if you're well-calibrated, you pay almost nothing.</p>
+        </div>
+        <div class="edge-card reveal" style="transition-delay:0.22s">
+          <div class="edge-num">1 bit</div>
+          <h3>How much of your knowledge a binary captures</h3>
+          <p>Over/under is a single bit: above or below a threshold. Every dimension of your knowledge — where the peak is, how certain you are, the tail behavior — is thrown away. A distribution bet uses the <em>full continuous density</em>. Under a logarithmic scoring rule, expected profit scales as KL(you ‖ crowd), which integrates your advantage across all moments.</p>
+        </div>
+        <div class="edge-card reveal" style="transition-delay:0.28s">
+          <div class="edge-num">σ²</div>
+          <h3>The calibration premium</h3>
+          <p>If your σ is half the crowd's, you're more certain — a real informational edge. Binary markets give you nothing for that certainty. Here, tighter σ means <em>lower collateral required</em>, which means higher return on capital for the same directional bet. Proper scoring rules (Brier, logarithmic) are uniquely incentive-compatible: the optimal strategy is to report your true belief.</p>
+        </div>
       </div>
-      <div class="card reveal" style="transition-delay:0.16s">
-        <div class="card-icon">⬡</div>
-        <h3>Normal AMM</h3>
-        <p>A novel AMM where both axes are probability distributions, not just prices. Liquidity is a distribution over outcomes, settled by a proper scoring rule.</p>
-      </div>
-      <div class="card reveal" style="transition-delay:0.22s">
-        <div class="card-icon">◎</div>
-        <h3>On-Chain, Non-Custodial</h3>
-        <p>Every bet is a Solana transaction. No counterparty. No centralized oracle. Settlement is trustless and fully verifiable on-chain.</p>
-      </div>
-      <div class="card reveal" style="transition-delay:0.28s">
-        <div class="card-icon">⚡</div>
-        <h3>Pyth Oracle Integration</h3>
-        <p>Real-time Pyth prices anchor perpetual estimation markets, so distributions always settle against a tamper-resistant, live price feed.</p>
+
+      <!-- Right: animated EV comparison chart -->
+      <div class="edge-visual reveal" style="transition-delay:0.20s">
+        <div class="ev-label">Expected value · same forecasting skill</div>
+
+        <div class="ev-row">
+          <div class="ev-row-label">Sportsbook</div>
+          <div class="ev-bar-track">
+            <div class="ev-bar b1" style="width:22%"></div>
+          </div>
+          <div class="ev-val" style="color:#e08080;">−5.4%</div>
+        </div>
+        <div class="ev-row">
+          <div class="ev-row-label">Binary DEX</div>
+          <div class="ev-bar-track">
+            <div class="ev-bar b1" style="width:28%"></div>
+          </div>
+          <div class="ev-val" style="color:#e08080;">−2.1%</div>
+        </div>
+        <div class="ev-row">
+          <div class="ev-row-label">Parabola μ</div>
+          <div class="ev-bar-track">
+            <div class="ev-bar b2" style="width:62%"></div>
+          </div>
+          <div class="ev-val" style="color:var(--rose-bright);">+3.8%</div>
+        </div>
+        <div class="ev-row">
+          <div class="ev-row-label">Parabola μ+σ</div>
+          <div class="ev-bar-track">
+            <div class="ev-bar b3" style="width:84%"></div>
+          </div>
+          <div class="ev-val" style="color:var(--sand-bright);">+8.2%</div>
+        </div>
+
+        <div class="ev-note">
+          Assumes 55% directional accuracy. "Parabola μ+σ" means the bettor also knows the outcome's variance better than the crowd (σ you = 6, σ crowd = 10). The extra EV is purely from the calibration premium — a dimension binary markets cannot price.
+        </div>
+
+        <div style="margin-top:1.4rem; padding-top:1rem; border-top:1px solid var(--border);">
+          <div class="ev-label" style="margin-bottom:0.8rem;">Theorem (proper scoring rules)</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--text-sec); line-height:1.8; background:rgba(255,255,255,0.03); border-radius:var(--r-md); padding:0.9rem 1rem; border:1px solid var(--border);">
+            𝔼[reward] = −H(P*) + KL(P* ‖ Q)<br>
+            <span style="color:var(--text-dim);">P* = true distribution &nbsp;·&nbsp; Q = reported &nbsp;·&nbsp; H = entropy</span><br>
+            <span style="color:var(--rose-bright);">Optimal strategy: report P* exactly.</span><br>
+            <span style="color:var(--text-dim);">Binary markets violate this. Distribution markets satisfy it.</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<hr class="divider" />
+<hr/>
 
-<!-- ══ How it works ═══════════════════════════════════════════════════════ -->
-<section id="how" class="section pad-section">
+<!-- ══ How it works ═════════════════════════════════════════════════════ -->
+<section id="how" class="section pad">
   <div class="container">
     <p class="section-label reveal">How It Works</p>
-    <h2 class="reveal" style="transition-delay:0.06s">Four steps, <em>infinite nuance.</em></h2>
+    <h2 class="reveal" style="transition-delay:0.07s">Four steps. <em>Infinite nuance.</em></h2>
 
     <div class="steps">
       <div class="step reveal" style="transition-delay:0.10s">
         <div class="step-num">01</div>
         <h3>Pick a market</h3>
-        <p>Browse open estimation markets: sports totals, macro data releases, crypto prices, election margins.</p>
+        <p>Sports totals, macro data releases, crypto prices, election margins — any outcome with a numeric realization.</p>
       </div>
       <div class="step reveal" style="transition-delay:0.16s">
         <div class="step-num">02</div>
         <h3>Submit a distribution</h3>
-        <p>Choose your mean (what you expect) and sigma (how certain you are). More conviction → tighter sigma → lower collateral required.</p>
+        <p>Choose μ (where you expect the outcome) and σ (how certain you are). More conviction → tighter σ → less collateral.</p>
       </div>
       <div class="step reveal" style="transition-delay:0.22s">
         <div class="step-num">03</div>
         <h3>Sign on Solana</h3>
-        <p>Your distribution is submitted as an on-chain transaction. No intermediary. The AMM quotes you immediately.</p>
+        <p>Your distribution is an on-chain transaction. The AMM quotes you immediately against the current crowd distribution.</p>
       </div>
       <div class="step reveal" style="transition-delay:0.28s">
         <div class="step-num">04</div>
         <h3>Settle and collect</h3>
-        <p>When the outcome resolves, the proper scoring rule pays out based on proximity. The closer your distribution, the bigger your reward.</p>
+        <p>A proper scoring rule pays proportional to how close your distribution was to the realized outcome. Precision compounds.</p>
       </div>
     </div>
   </div>
 </section>
 
-<hr class="divider" />
+<hr/>
 
-<!-- ══ Perps ═══════════════════════════════════════════════════════════════ -->
-<section id="perps" class="section pad-section">
+<!-- ══ Perps ══════════════════════════════════════════════════════════ -->
+<section id="perps" class="section pad">
   <div class="container">
     <p class="section-label reveal">Perpetual Estimation Markets</p>
-    <h2 class="reveal" style="transition-delay:0.06s">Trade the distribution <em>continuously.</em></h2>
-    <p class="section-sub reveal" style="transition-delay:0.12s">
-      Distribution perps let you hold a long or short position on how a market's collective distribution evolves — like a perp on crowd wisdom itself.
+    <h2 class="reveal" style="transition-delay:0.07s">Trade the distribution <em>continuously.</em></h2>
+    <p class="section-sub reveal" style="transition-delay:0.13s; max-width:560px; margin-top:0.9rem;">
+      Distribution perps let you hold a continuous long or short on how the crowd's collective distribution evolves — a perpetual on crowd wisdom itself.
     </p>
 
-    <div class="perps-grid">
-      <!-- SVG chart -->
-      <div class="perp-chart-wrap reveal" style="transition-delay:0.16s">
-        <div class="perp-chart-label">AMM curve vs Anchor (Pyth oracle)</div>
+    <div class="perps-layout">
+      <div class="perp-chart-box reveal" style="transition-delay:0.16s">
+        <div class="chart-sublabel">AMM distribution vs Pyth oracle anchor</div>
         <svg viewBox="0 0 400 220" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%">
           <defs>
-            <linearGradient id="ammGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#c17085" stop-opacity="0.35"/>
+            <linearGradient id="pg1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#c17085" stop-opacity="0.32"/>
               <stop offset="100%" stop-color="#c17085" stop-opacity="0"/>
             </linearGradient>
-            <linearGradient id="anchorGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#b89870" stop-opacity="0.25"/>
+            <linearGradient id="pg2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#b89870" stop-opacity="0.22"/>
               <stop offset="100%" stop-color="#b89870" stop-opacity="0"/>
             </linearGradient>
-          </defs>
-          <!-- Anchor distribution (oracle, sand) -->
-          <path d="M40 200 Q110 200 145 140 Q170 95 190 65 Q200 48 210 44 Q220 40 230 44 Q240 48 250 65 Q270 95 295 140 Q330 200 370 200 Z" fill="url(#anchorGrad)" opacity="0.9"/>
-          <path d="M40 200 Q110 200 145 140 Q170 95 190 65 Q200 48 210 44 Q220 40 230 44 Q240 48 250 65 Q270 95 295 140 Q330 200 370 200" fill="none" stroke="#b89870" stroke-width="1.8" stroke-dasharray="5 4" opacity="0.6"/>
-          <!-- AMM curve (rose, shifted right → funding pressure) -->
-          <path d="M80 200 Q140 200 168 140 Q190 95 208 65 Q218 48 232 44 Q248 40 260 44 Q274 48 288 65 Q310 95 340 140 Q370 200 400 200 Z" fill="url(#ammGrad)" opacity="0.9">
-            <animate attributeName="opacity" values="0.9;0.6;0.9" dur="3.5s" repeatCount="indefinite"/>
-          </path>
-          <path d="M80 200 Q140 200 168 140 Q190 95 208 65 Q218 48 232 44 Q248 40 260 44 Q274 48 288 65 Q310 95 340 140 Q370 200 400 200" fill="none" stroke="#c17085" stroke-width="2" opacity="0.8"/>
-          <!-- Labels -->
-          <text x="178" y="30" font-family="Inter,sans-serif" font-size="10" fill="#b89870" opacity="0.7">anchor (Pyth)</text>
-          <text x="248" y="30" font-family="Inter,sans-serif" font-size="10" fill="#c17085" opacity="0.9">AMM μ</text>
-          <!-- Funding arrow -->
-          <line x1="210" y1="44" x2="232" y2="44" stroke="#e0aabb" stroke-width="1.5" marker-end="url(#arr)"/>
-          <defs>
-            <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0,0 L6,3 L0,6 Z" fill="#e0aabb"/>
+            <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill="#e0aabb"/>
             </marker>
           </defs>
-          <text x="216" y="38" font-family="JetBrains Mono,monospace" font-size="8" fill="#e0aabb" opacity="0.8">funding</text>
+          <!-- Anchor (oracle, sand dashes) -->
+          <path d="M35 200 Q110 200 148 138 Q172 92 192 62 Q202 44 214 40 Q226 36 238 40 Q250 44 262 62 Q282 92 310 148 Q348 200 390 200 Z" fill="url(#pg2)" opacity="0.9">
+            <animate attributeName="opacity" values="0.9;0.6;0.9" dur="5s" repeatCount="indefinite"/>
+          </path>
+          <path d="M35 200 Q110 200 148 138 Q172 92 192 62 Q202 44 214 40 Q226 36 238 40 Q250 44 262 62 Q282 92 310 148 Q348 200 390 200" fill="none" stroke="#b89870" stroke-width="1.8" stroke-dasharray="5 4" opacity="0.55">
+            <animate attributeName="stroke-opacity" values="0.55;0.8;0.55" dur="4s" repeatCount="indefinite"/>
+          </path>
+          <!-- AMM (rose, shifted) -->
+          <path d="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z" fill="url(#pg1)" opacity="0.9">
+            <animate attributeName="d" dur="4.5s" repeatCount="indefinite"
+              values="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z;
+                      M62 200 Q135 200 170 140 Q194 94 210 64 Q222 46 236 42 Q252 38 266 42 Q282 46 296 66 Q320 97 352 150 Q386 202 418 200 Z;
+                      M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z"
+              calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/>
+          </path>
+          <path d="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200" fill="none" stroke="#c17085" stroke-width="2.2" opacity="0.78">
+            <animate attributeName="stroke-opacity" values="0.78;0.95;0.78" dur="3.5s" repeatCount="indefinite"/>
+          </path>
+          <!-- Funding arrow between peaks -->
+          <line x1="214" y1="40" x2="238" y2="40" stroke="#e0aabb" stroke-width="1.6" marker-end="url(#arrowhead)" opacity="0.8">
+            <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.5s" repeatCount="indefinite"/>
+          </line>
+          <text x="218" y="34" font-family="JetBrains Mono, monospace" font-size="8.5" fill="#e0aabb" opacity="0.75">funding</text>
+          <!-- Labels -->
+          <text x="195" y="25" font-family="Syne, sans-serif" font-size="9.5" fill="#b89870" opacity="0.65">anchor (Pyth)</text>
+          <text x="264" y="25" font-family="Syne, sans-serif" font-size="9.5" fill="#c17085" opacity="0.85">AMM μ</text>
           <!-- Axis -->
-          <line x1="30" y1="200" x2="390" y2="200" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1"/>
+          <line x1="25" y1="200" x2="395" y2="200" stroke="#fff" stroke-opacity="0.06" stroke-width="1"/>
         </svg>
-        <div class="funding-row">
-          <div class="funding-pill pill-long">Long +0.014%/hr</div>
-          <div class="funding-pill pill-short">Short −0.014%/hr</div>
+        <div class="funding-pills">
+          <div class="fpill long">Long +0.014%/hr</div>
+          <div class="fpill short">Short −0.014%/hr</div>
         </div>
       </div>
 
-      <!-- Explanation -->
       <div class="reveal" style="transition-delay:0.22s">
-        <p style="font-size:clamp(0.95rem,2vw,1.05rem); color:var(--text-sec); line-height:1.75; margin-bottom:1.5rem;">
-          In a Parabola perp, the AMM holds a distribution anchored to a live oracle (e.g. Pyth BTC/USD). When the market's collective μ drifts away from the anchor, a <strong style="color:var(--text)">funding rate</strong> is charged to bring it back — just like a traditional perp funding rate, but over a full distribution.
+        <p style="font-size:clamp(0.93rem,2vw,1.03rem); color:var(--text-sec); line-height:1.78; margin-bottom:0.5rem;">
+          The AMM holds a distribution anchored to a live Pyth oracle. When the collective market μ drifts away from the oracle anchor, a <strong style="color:var(--text);">funding rate</strong> proportional to KL-divergence is charged — pulling it back, continuously.
         </p>
-
-        <ul class="perp-feature-list">
-          <li><strong>Long:</strong> profits when the crowd distribution shifts higher than the oracle anchor. Funding is paid to you when the crowd is bearish.</li>
-          <li><strong>Short:</strong> profits when the crowd distribution shifts lower. You collect funding when the crowd is overly optimistic.</li>
-          <li><strong>KL-divergence funding:</strong> the rate is proportional to the KL-divergence between the AMM distribution and the oracle anchor — a principled, manipulation-resistant signal.</li>
-          <li><strong>No expiry:</strong> hold your position as long as you want. Exit any time by taking the other side.</li>
+        <ul class="perp-features">
+          <li><strong>Long:</strong> profits when the crowd distribution shifts above the oracle anchor. Collect funding when markets are unduly bearish.</li>
+          <li><strong>Short:</strong> profits when the crowd distribution shifts below anchor. Earn when consensus is too optimistic.</li>
+          <li><strong>KL-divergence funding:</strong> the rate scales with the full distributional distance from the oracle — a principled, manipulation-resistant signal impossible in binary perps.</li>
+          <li><strong>No expiry:</strong> hold indefinitely. Exit any time by taking the opposing side.</li>
         </ul>
       </div>
     </div>
   </div>
 </section>
 
-<hr class="divider" />
+<hr/>
 
-<!-- ══ Team ════════════════════════════════════════════════════════════════ -->
-<section id="team" class="section pad-section">
-  <div class="container">
-    <p class="section-label reveal">Team</p>
-    <h2 class="reveal" style="transition-delay:0.06s">Three co-founders, <em>one founding engineer.</em></h2>
-    <p class="team-headline reveal" style="transition-delay:0.1s; color:var(--text-sec); font-weight:300; font-size:clamp(0.95rem,2vw,1.05rem); margin-bottom:0;">
-      Built at the intersection of mechanism design, market microstructure, and Solana protocol engineering.
+<!-- ══ CTA ════════════════════════════════════════════════════════════ -->
+<section id="cta" class="section pad">
+  <div class="orb" style="width:500px;height:500px;background:radial-gradient(circle,rgba(125,63,82,0.20) 0%,transparent 70%);bottom:-200px;left:50%;transform:translateX(-50%);pointer-events:none;filter:blur(90px);animation:orbDrift 20s ease-in-out infinite alternate;"></div>
+  <div class="container" style="text-align:center; position:relative; z-index:1;">
+    <p class="section-label reveal" style="justify-content:center; display:flex; align-items:center; gap:8px;">
+      <span class="eyebrow-pip" style="display:inline-block;"></span>
+      Early Access
     </p>
-
-    <div class="team-grid" style="margin-top:2.5rem;">
-      <div class="team-card reveal" style="transition-delay:0.12s">
-        <div class="team-avatar">SS</div>
-        <div class="team-name">Shikhar Sehgal</div>
-        <div class="team-role">Co-Founder</div>
-        <div class="team-desc">Protocol design, AMM architecture, and on-chain Solana programs.</div>
-      </div>
-      <div class="team-card reveal" style="transition-delay:0.18s">
-        <div class="team-avatar">AJ</div>
-        <div class="team-name">Aadit Jerfy</div>
-        <div class="team-role">Co-Founder</div>
-        <div class="team-desc">Market microstructure, mechanism design, and scoring rule research.</div>
-      </div>
-      <div class="team-card reveal" style="transition-delay:0.24s">
-        <div class="team-avatar">PB</div>
-        <div class="team-name">Prashanth Bhaskara</div>
-        <div class="team-role">Co-Founder</div>
-        <div class="team-desc">Quantitative modeling, simulation engine, and market-making strategy.</div>
-      </div>
-      <div class="team-card reveal" style="transition-delay:0.30s">
-        <div class="team-avatar">ML</div>
-        <div class="team-name">Matthew Lin</div>
-        <div class="team-role">Founding Engineer</div>
-        <div class="team-desc">Full-stack infrastructure, backend services, and frontend experience.</div>
-      </div>
+    <h2 class="reveal" style="transition-delay:0.07s; max-width:560px; margin:0 auto 1.2rem;">
+      Ready to bet the <em>full distribution?</em>
+    </h2>
+    <p class="section-sub reveal" style="transition-delay:0.13s; max-width:440px; margin:0 auto 2.8rem;">
+      Parabola is live on Solana devnet. Reach out to get early access or learn more about the protocol.
+    </p>
+    <div class="hero-actions reveal" style="transition-delay:0.19s; justify-content:center;">
+      <a href="mailto:shikharsehgal@uchicago.edu" class="btn-rose">Get early access</a>
+      <a href="#edge" class="btn-ghost">Read the math ↑</a>
     </div>
   </div>
 </section>
 
-<hr class="divider" />
-
-<!-- ══ CTA ════════════════════════════════════════════════════════════════ -->
-<section id="cta" class="section">
-  <div class="orb" style="width:350px;height:350px;background:radial-gradient(circle,#7d3f5228 0%,transparent 70%);bottom:-80px;left:50%;transform:translateX(-50%);"></div>
-  <h2 class="reveal">Ready to bet the distribution?</h2>
-  <p class="section-sub reveal" style="transition-delay:0.08s; margin:0 auto 2.5rem;">
-    Parabola is in development on Solana devnet. Follow our progress on GitHub.
-  </p>
-  <div class="hero-actions" style="justify-content:center;" class="reveal">
-    <a href="https://github.com/shikharsehgal1" class="btn-primary" target="_blank" rel="noopener">View on GitHub</a>
-    <a href="mailto:shikharsehgal@uchicago.edu" class="btn-ghost">Get in touch</a>
-  </div>
-</section>
-
-<!-- ══ Footer ═════════════════════════════════════════════════════════════ -->
+<!-- ══ Footer ═════════════════════════════════════════════════════════ -->
 <footer>
-  <span>© 2026 Parabola Markets. All rights reserved.</span>
-  <span>Built on <a href="https://solana.com" target="_blank" rel="noopener">Solana</a> · Powered by <a href="https://pyth.network" target="_blank" rel="noopener">Pyth</a></span>
+  <span>© 2026 Parabola Markets</span>
+  <span>
+    Built on <a href="https://solana.com" target="_blank" rel="noopener">Solana</a>
+    &nbsp;·&nbsp;
+    Oracle by <a href="https://pyth.network" target="_blank" rel="noopener">Pyth</a>
+  </span>
 </footer>
 
 <script>
-  /* ── Scroll reveal ─────────────────────────────────────────────────── */
-  const observer = new IntersectionObserver((entries) => {
+  /* ── Scroll reveal ─────────────────────────────────────────────── */
+  const io = new IntersectionObserver((entries) => {
     entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  }, { threshold: 0.10, rootMargin: '0px 0px -30px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
-  /* ── Count-up on built bar ─────────────────────────────────────────── */
-  function countUp(el, target, duration = 1200) {
-    const start = performance.now();
-    const update = (now) => {
-      const progress = Math.min((now - start) / duration, 1);
-      el.textContent = Math.round(progress * target).toLocaleString();
-      if (progress < 1) requestAnimationFrame(update);
-    };
-    requestAnimationFrame(update);
-  }
+  /* ── Continuous EV bar shimmer ─────────────────────────────────── */
+  // Bars already pulse via CSS animation; nothing extra needed.
+
+  /* ── Parallax orbs on scroll ───────────────────────────────────── */
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    document.querySelector('.orb-a').style.transform = `translate(${y * 0.04}px, ${y * -0.06}px) scale(1)`;
+    document.querySelector('.orb-b').style.transform = `translate(${y * -0.03}px, ${y * 0.04}px) scale(1)`;
+  }, { passive: true });
 </script>
 </body>
 </html>
