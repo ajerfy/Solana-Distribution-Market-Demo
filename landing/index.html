@@ -176,6 +176,42 @@
     .reveal { opacity:0; transform:translateY(30px); transition:opacity 0.65s ease,transform 0.65s ease; }
     .reveal.visible { opacity:1; transform:translateY(0); }
     ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:var(--border-str);border-radius:3px}
+
+    /* ── Waitlist bar ──────────────────────────────────────────────── */
+    #waitlist-bar {
+      position: fixed; top: 66px; left: 0; right: 0; z-index: 99;
+      display: flex; align-items: center; justify-content: center;
+      gap: clamp(0.6rem, 2vw, 1.2rem); flex-wrap: wrap;
+      padding: 10px clamp(1rem, 4vw, 2rem);
+      background: linear-gradient(90deg, rgba(125,63,82,0.92), rgba(110,92,64,0.92));
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(193,112,133,0.25);
+      font-size: clamp(0.78rem, 2vw, 0.86rem);
+      color: rgba(237,224,228,0.88);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    #waitlist-bar.hidden { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+    #wl-btn {
+      padding: 7px 20px; border-radius: 50px;
+      background: var(--rose-bright); color: #1a0d12;
+      font-weight: 700; font-size: 0.82rem; letter-spacing: 0.04em;
+      text-decoration: none; white-space: nowrap; flex-shrink: 0;
+      transition: opacity 0.18s;
+    }
+    #wl-btn:hover { opacity: 0.85; }
+    #wl-close {
+      background: none; border: none; cursor: pointer;
+      color: rgba(237,224,228,0.5); font-size: 0.85rem; padding: 2px 6px;
+      line-height: 1; flex-shrink: 0;
+      transition: color 0.18s;
+    }
+    #wl-close:hover { color: rgba(237,224,228,0.9); }
+    /* push content down when bar is visible */
+    body.wl-open #hero { padding-top: calc(66px + 44px); }
+    body.wl-open nav { top: 0; }
+    @media(max-width:500px) {
+      #waitlist-bar span { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -205,6 +241,13 @@
     <a href="#cta">Contact</a>
   </div>
 </nav>
+
+<!-- Waitlist bar -->
+<div id="waitlist-bar">
+  <span>Parabola is accepting early access requests.</span>
+  <a href="https://forms.gle/mtZVd3MAipFyHqUj7" target="_blank" rel="noopener" id="wl-btn">Join the waitlist →</a>
+  <button id="wl-close" aria-label="Dismiss">✕</button>
+</div>
 
 <!-- Hero -->
 <section id="hero">
@@ -487,10 +530,12 @@
   <div class="container" style="text-align:center;position:relative;z-index:1">
     <p class="section-label reveal" style="display:flex;align-items:center;justify-content:center;gap:8px"><span class="eyebrow-pip" style="display:inline-block"></span>Early Access</p>
     <h2 class="reveal" style="transition-delay:0.07s;max-width:560px;margin:0 auto 1.2rem">Ready to bet the <em>full distribution?</em></h2>
-    <p class="section-sub reveal" style="transition-delay:0.13s;max-width:440px;margin:0 auto 2.8rem">Parabola is live on Solana devnet. Reach out to get early access or learn more about the protocol.</p>
-    <div class="hero-actions reveal" style="transition-delay:0.19s;justify-content:center">
-      <a href="mailto:shikharsehgal@uchicago.edu" class="btn-rose">Get early access</a>
-      <a href="#edge" class="btn-ghost">Read the math ↑</a>
+    <p class="section-sub reveal" style="transition-delay:0.13s;max-width:440px;margin:0 auto 2rem">Parabola is live on Solana devnet. Join the waitlist to get early access.</p>
+    <div class="reveal" style="transition-delay:0.19s;display:flex;flex-direction:column;align-items:center;gap:1rem">
+      <a href="https://forms.gle/mtZVd3MAipFyHqUj7" target="_blank" rel="noopener" class="btn-rose" style="font-size:clamp(0.95rem,2vw,1.05rem);padding:16px 40px">
+        Join the waitlist
+      </a>
+      <a href="mailto:shikharsehgal@uchicago.edu" style="font-size:0.85rem;color:var(--text-dim);text-decoration:none;letter-spacing:0.04em">or reach out directly →</a>
     </div>
   </div>
 </section>
@@ -906,17 +951,34 @@
   });
   hero.addEventListener('mouseup',    () => { ball.grabbed = false; });
   hero.addEventListener('mouseleave', () => { ball.grabbed = false; mouseX = mouseY = -9999; });
+  // Touch: only block scroll when ball is actually grabbed
+  let touchStartX = 0, touchStartY = 0, touchDecided = false, touchScrolling = false;
   hero.addEventListener('touchstart', e => {
     const [x, y] = touchCoords(e);
+    touchStartX = x; touchStartY = y;
+    touchDecided = false; touchScrolling = false;
     if (isBallHit(x, y)) { ball.grabbed = true; ball.vx = ball.vy = 0; }
   }, { passive: true });
   hero.addEventListener('touchmove', e => {
-    e.preventDefault();
     const [x, y] = touchCoords(e);
-    mouseX = x; mouseY = y;
-    if (ball.grabbed) { ball.vx = (x - ball.x) * 0.6; ball.vy = (y - ball.y) * 0.6; ball.x = x; ball.y = y; }
+    if (!touchDecided) {
+      const dx = Math.abs(x - touchStartX), dy = Math.abs(y - touchStartY);
+      if (dx < 4 && dy < 4) return;           // haven't moved enough to decide yet
+      touchDecided = true;
+      if (!ball.grabbed && dy > dx) { touchScrolling = true; } // vertical swipe = scroll
+    }
+    if (touchScrolling) return;               // let browser scroll naturally
+    if (ball.grabbed) {
+      e.preventDefault();
+      mouseX = x; mouseY = y;
+      ball.vx = (x - ball.x) * 0.6; ball.vy = (y - ball.y) * 0.6;
+      ball.x = x; ball.y = y;
+    }
   }, { passive: false });
-  hero.addEventListener('touchend', () => { ball.grabbed = false; mouseX = mouseY = -9999; });
+  hero.addEventListener('touchend', () => {
+    ball.grabbed = false; mouseX = mouseY = -9999;
+    touchDecided = false; touchScrolling = false;
+  });
 
   let rt;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(init, 120); });
@@ -929,6 +991,17 @@
   }, { threshold: 0.10, rootMargin: '0px 0px -30px 0px' });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 })();
+</script>
+<script>
+  // Waitlist bar dismiss
+  (function () {
+    const bar = document.getElementById('waitlist-bar');
+    document.body.classList.add('wl-open');
+    document.getElementById('wl-close').addEventListener('click', () => {
+      bar.classList.add('hidden');
+      document.body.classList.remove('wl-open');
+    });
+  })();
 </script>
 </body>
 </html>
