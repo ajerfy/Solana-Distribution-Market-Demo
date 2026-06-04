@@ -78,9 +78,17 @@
 
     /* Rotator */
     .rotator-wrap { display:inline-block; overflow:hidden; height:1.08em; vertical-align:bottom; }
-    .rotator { display:flex; flex-direction:column; animation:rotSlide 9s cubic-bezier(0.77,0,0.18,1) infinite; }
+    .rotator { display:flex; flex-direction:column; animation:rotSlide 13.2s cubic-bezier(0.77,0,0.18,1) infinite; }
     .rotator span { height:1.08em; flex-shrink:0; line-height:1.08; background:linear-gradient(118deg,var(--rose-bright),var(--sand-bright)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-    @keyframes rotSlide{0%,18%{transform:translateY(0)}25%,43%{transform:translateY(-25%)}50%,68%{transform:translateY(-50%)}75%,93%{transform:translateY(-75%)}100%{transform:translateY(0)}}
+    @keyframes rotSlide{
+      0%,11%    {transform:translateY(0)}
+      16%,27%   {transform:translateY(-16.666%)}
+      33%,44%   {transform:translateY(-33.333%)}
+      50%,61%   {transform:translateY(-50%)}
+      66%,77%   {transform:translateY(-66.666%)}
+      83%,94%   {transform:translateY(-83.333%)}
+      100%      {transform:translateY(0)}
+    }
 
     /* ── Buttons ──────────────────────────────────────────────────── */
     .btn-rose { padding:clamp(12px,2vw,14px) clamp(24px,4vw,34px); border-radius:50px; font-family:'Syne',sans-serif; font-size:clamp(0.85rem,1.8vw,0.93rem); font-weight:600; letter-spacing:0.04em; background:linear-gradient(135deg,var(--rose),#7a5010); color:#fff; border:none; cursor:pointer; text-decoration:none; display:inline-block; box-shadow:0 4px 28px rgba(201,152,42,0.28); transition:transform 0.18s,box-shadow 0.18s; position:relative; z-index:3; }
@@ -258,7 +266,9 @@
       <div class="rotator-wrap">
         <div class="rotator">
           <span>NBA totals.</span>
+          <span>Brent crude.</span>
           <span>election margins.</span>
+          <span>Solana prices.</span>
           <span>Bitcoin's year-end.</span>
           <span>Fed rate decisions.</span>
         </div>
@@ -275,18 +285,6 @@
   <div class="lake-hint">
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="rgba(201,152,42,0.5)" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="2" fill="rgba(201,152,42,0.5)"/></svg>
     drag the ball
-  </div>
-</section>
-
-<!-- Built-on -->
-<section class="section" style="padding:0 0 clamp(3rem,7vh,5rem)">
-  <div class="container">
-    <div class="built-wrap reveal">
-      <div class="built-item"><span class="bi-name">◎ Solana</span>Built on</div>
-      <div class="built-item"><span class="bi-name">⚡ Pyth</span>Oracle</div>
-      <div class="built-item"><span class="bi-name">⬡ Normal AMM</span>Protocol</div>
-      <div class="built-item"><span class="bi-name">∿ KL-Divergence</span>Pricing</div>
-    </div>
   </div>
 </section>
 
@@ -410,21 +408,23 @@
           <canvas id="ci-demo" height="220"></canvas>
         </div>
 
-        <!-- Proper scoring rule (corrected) -->
+        <!-- Proper scoring rule -->
         <div style="margin-top:1.2rem;padding:1.2rem 1.3rem;border-radius:var(--r-xl);background:var(--bg-el);border:1px solid var(--border-mid)">
-          <div class="section-label" style="margin-bottom:0.7rem">Why the math guarantees this</div>
+          <div class="section-label" style="margin-bottom:0.7rem">What the math actually says</div>
           <p style="font-size:0.88rem;color:var(--text-sec);line-height:1.7;margin-bottom:0.8rem">
-            Under a proper scoring rule, the distribution that maximises your expected payout is always your <em style="color:var(--text)">true belief</em> — not a strategic bluff. Binary markets don't have this property. The formal statement:
+            Under the <strong style="color:var(--text)">log scoring rule</strong>, your score after outcome x is log Q(x). Taking expectations under the true distribution P*:
           </p>
           <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--text-sec);line-height:1.9;background:rgba(255,255,255,0.03);border-radius:var(--r-md);padding:0.9rem 1rem;border:1px solid var(--border)">
             𝔼[score | report Q] = −H(P*) − KL(P* ‖ Q)<br>
-            <span style="color:var(--text-dim)">P* = true dist · Q = reported · H = entropy</span><br>
+            <span style="color:var(--text-dim)">P* = true dist · Q = reported · H = entropy of P*</span><br>
             <span style="color:var(--rose-bright)">Since KL ≥ 0, score is maximised when Q = P*.</span><br>
-            <span style="color:var(--text-dim)">Binary bets satisfy no such property.</span>
+            <span style="color:var(--text-dim)">Caveat: Q must assign positive probability wherever P* does, or KL blows up.</span>
           </div>
+          <p style="font-size:0.82rem;color:var(--text-sec);margin-top:0.9rem;line-height:1.7">
+            This shows log scoring is <strong style="color:var(--text)">strictly proper</strong>: the unique best strategy is to report your true belief. Ordinary fixed-payoff binary bets do not automatically have this property — they reward being directionally right, not reporting a calibrated probability. A binary contract <em>can</em> be made proper (e.g. via log-score or Brier-score payoffs), but a standard over/under payout is not one of those.
+          </p>
           <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.7rem;line-height:1.6">
-            KL between two Gaussians: KL(N(μ₁,σ₁) ‖ N(μ₂,σ₂)) = log(σ₂/σ₁) + (σ₁²+(μ₁−μ₂)²)/(2σ₂²) − ½.
-            In our NBA example: KL(N(224,5) ‖ N(219,9)) = log(9/5) + (25+25)/162 − 0.5 ≈ <span style="color:var(--rose-bright)">0.40</span> — capturing both the mean shift <em>and</em> the tighter certainty, neither of which binary captures.
+            NBA example: KL(N(224,5) ‖ N(219,9)) = log(9/5) + (25+25)/162 − ½ ≈ <span style="color:var(--rose-bright)">0.40</span> — a single number capturing both the mean shift and the tighter certainty.
           </p>
         </div>
       </div>
@@ -501,20 +501,20 @@
 
       <div class="reveal" style="transition-delay:0.22s">
         <p style="font-size:clamp(0.93rem,2vw,1.03rem);color:var(--text-sec);line-height:1.78;margin-bottom:1rem">
-          The AMM holds a distribution anchored to a live oracle. When the collective market μ drifts from the anchor, a <strong style="color:var(--text)">funding rate</strong> proportional to KL-divergence closes the gap.
+          The AMM maintains a market-implied distribution relative to an oracle reference. Traders express views over the <em style="color:var(--text)">whole distribution</em> — not a single binary event. Funding is based on a signed, statewise discrepancy (log-density ratios), so you are rewarded when the market distribution moves toward the one you supplied.
         </p>
         <ul class="perp-features">
-          <li><strong>Long:</strong> profits when the crowd distribution shifts above the anchor. Collect funding when the market is unduly bearish.</li>
-          <li><strong>Short:</strong> profits when crowd shifts below anchor. Earn when consensus is too optimistic.</li>
-          <li><strong>KL funding:</strong> rate is proportional to the full distributional gap — a signal binary perps cannot construct.</li>
-          <li><strong>No expiry:</strong> hold as long as you want. Exit any time.</li>
+          <li><strong>Long mean:</strong> you think the market's implied mean is too low. You profit as the distribution's centre shifts up toward the oracle. A binary contract cannot express this cleanly across the full distribution.</li>
+          <li><strong>Short uncertainty:</strong> you think the market is overestimating variance. Submit a tighter distribution. You profit as the crowd's σ compresses — a dimension binary markets don't price at all.</li>
+          <li><strong>Signed funding:</strong> unlike raw KL (which is unsigned), the funding rule uses statewise log-density ratios so it's always clear who pays whom and why.</li>
+          <li><strong>No expiry:</strong> hold as long as you want. Exit any time by taking the opposing side.</li>
         </ul>
 
         <!-- Weather example -->
         <div class="weather-callout">
-          <div class="wc-label">Weather example — why this changes everything</div>
+          <div class="wc-label">Weather example</div>
           <p>
-            A binary market asks: "Will Chicago exceed 75°F on Thursday?" Yes or no. But you've been watching model runs for a week. You know it'll likely be <strong>72°F ± 3°F</strong> — lower than consensus thinks, and much tighter. In Parabola, you submit <strong>N(72, σ=3)</strong>. The anchor is the official forecast at <strong>N(69, σ=8)</strong>. You're getting paid for two things simultaneously: <strong>being right about direction</strong> (lower) and <strong>being right about certainty</strong> (crowd is too uncertain). No sportsbook on earth offers that second bet.
+            A binary market asks only: "Will Chicago exceed 75°F on Thursday?" That collapses your entire forecast into a single threshold probability. Suppose you believe the temperature will be around <strong>72°F with low variance</strong>, while the market is wider and centred elsewhere. A distribution market lets you express both: the expected level <em>and</em> the confidence around it. You can be rewarded for being right about the <strong>shape</strong> of the distribution — not just which side of an arbitrary line the outcome lands on.
           </p>
         </div>
       </div>
@@ -534,7 +534,7 @@
       <a href="https://forms.gle/mtZVd3MAipFyHqUj7" target="_blank" rel="noopener" class="btn-rose" style="font-size:clamp(0.95rem,2vw,1.05rem);padding:16px 40px">
         Join the waitlist
       </a>
-      <a href="mailto:shikharsehgal@uchicago.edu" style="font-size:0.85rem;color:var(--text-dim);text-decoration:none;letter-spacing:0.04em">or reach out directly →</a>
+      <a href="https://x.com/parabolamarkets" target="_blank" rel="noopener" style="font-size:0.85rem;color:var(--text-dim);text-decoration:none;letter-spacing:0.04em">or reach out on X →</a>
     </div>
   </div>
 </section>
@@ -584,15 +584,15 @@
   const OVER_PROB_C = 1 - probInRange(MU_C, SIG_C, X_MIN, LINE);
   const OVER_PROB_Y = 1 - probInRange(MU_Y, SIG_Y, X_MIN, LINE);
 
-  // 4 animation states
+  // Continuous video-like animation: 4 states, each with internal animation + cross-fade
   const STATES = [
-    { label: 'The binary bet — one line, forced choice', duration: 2600 },
-    { label: 'Crowd estimate — wide, centered around 219', duration: 2600 },
-    { label: 'Your estimate — precise, centered around 224', duration: 2600 },
-    { label: 'Your edge: confidence interval vs threshold', duration: 3200 },
+    { label: 'Binary: one line, forced choice',        duration: 3000 },
+    { label: 'Crowd estimate  μ=219  σ=9',             duration: 3000 },
+    { label: 'Your estimate  μ=224  σ=5',              duration: 3000 },
+    { label: 'Confidence interval  215–230',           duration: 3600 },
   ];
-  let stateIdx = 0, stateStart = performance.now(), prevAlpha = 0;
-  const FADE = 400;
+  let stateIdx = 0, stateStart = performance.now();
+  const FADE = 600; // cross-fade duration ms
 
   function resize() {
     const w = cv.parentElement.clientWidth;
@@ -721,76 +721,92 @@
     const dur     = STATES[stateIdx].duration;
     const next    = (stateIdx + 1) % STATES.length;
 
-    // Fade-out at end of state, then advance
+    // alpha: fade in at start, fade out at end — always 0→1→0
     let alpha = 1;
-    if (elapsed > dur - FADE) {
-      alpha = Math.max(0, (dur - elapsed) / FADE);
-      if (elapsed >= dur) { stateIdx = next; stateStart = now; }
-    }
-    if (elapsed < FADE) alpha = Math.min(1, elapsed / FADE);
+    if (elapsed < FADE)           alpha = elapsed / FADE;
+    if (elapsed > dur - FADE)     alpha = Math.max(0, (dur - elapsed) / FADE);
+    if (elapsed >= dur)           { stateIdx = next; stateStart = now; }
 
     const s = stateIdx;
     const W = cv.width, H = cv.height;
+    // t: normalised within-state progress 0→1, for internal animations
+    const t = Math.min(elapsed / dur, 1);
+    // slow sine wave for breathing/pulsing elements
+    const pulse = (Math.sin(now * 0.002) + 1) * 0.5;
 
-    // Background
     ct.clearRect(0, 0, W, H);
     ct.fillStyle = 'rgba(11,10,7,1)';
     ct.fillRect(0, 0, W, H);
-
     drawAxis();
 
     if (s === 0) {
-      // State 0: just the binary threshold line
-      drawVLine(LINE, '#c9982a', 0.7 * alpha);
+      // State 0: binary line — pulsing glow, question mark fades in
+      const lineAlpha = 0.5 + pulse * 0.3;
+      drawVLine(LINE, '#c9982a', lineAlpha * alpha);
       const lx = toX(LINE);
-      drawLabel('Over 220.5', lx + 5, 22, 'rgba(201,152,42,0.8)', alpha, 'left', 11);
-      drawLabel('Under 220.5', lx - 5, 22, 'rgba(160,130,40,0.6)', alpha, 'right', 11);
-      drawLabel('One threshold. That\'s all binary markets offer.', W / 2, H - 52, 'rgba(158,148,100,0.8)', alpha, 'center', 10);
+      // "over" region tint pulses
+      ct.save(); ct.globalAlpha = pulse * 0.05 * alpha;
+      ct.fillStyle = 'rgba(201,152,42,1)';
+      ct.fillRect(lx, 8, W - 16 - lx, H - 44);
+      ct.restore();
+      drawLabel('Over 220.5', lx + 5, 22, 'rgba(201,152,42,0.85)', alpha, 'left', 11);
+      drawLabel('Under 220.5', lx - 5, 22, 'rgba(158,148,100,0.6)', alpha, 'right', 11);
+      // question mark rises in
+      const qy = 65 + (1 - Math.min(t * 3, 1)) * 20;
+      drawLabel('?', toX(227), qy, 'rgba(201,152,42,' + (0.25 + pulse * 0.15) + ')', alpha, 'center', 36);
+      drawLabel('Only yes or no. Your full belief is discarded.', W / 2, H - 52, 'rgba(158,148,100,0.75)', alpha * Math.min(t * 4, 1), 'center', 10);
     }
 
     if (s === 1) {
-      // State 1: crowd distribution + threshold
-      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.09)', 'rgba(184,152,56,0.55)', alpha);
-      drawVLine(LINE, '#c9982a', 0.4 * alpha, false);
+      // State 1: crowd distribution grows in from baseline
+      const growSig = SIG_C * (0.3 + 0.7 * Math.min(t * 2, 1));
+      drawBell(MU_C, growSig, 'rgba(184,152,56,0.10)', 'rgba(184,152,56,0.6)', alpha);
+      drawVLine(LINE, '#c9982a', 0.35 * alpha, false);
       const cpx = toX(MU_C);
-      drawLabel('Crowd  μ=219  σ=9', cpx, 20, 'rgba(184,152,56,0.85)', alpha, 'center', 11);
-      drawLabel('P(over 220.5):', 16, H - 52, 'rgba(158,148,100,0.7)', alpha, 'left', 10);
-      drawLabel(Math.round(OVER_PROB_C * 100) + '%', 110, H - 52, 'rgba(184,152,56,0.9)', alpha, 'left', 11);
+      const labelA = Math.min(t * 3, 1) * alpha;
+      drawLabel('Crowd  μ=219  σ=9', cpx, 20, 'rgba(184,152,56,0.9)', labelA, 'center', 11);
+      drawLabel('wide, uncertain', cpx, 32, 'rgba(184,152,56,0.5)', labelA, 'center', 9);
+      drawLabel('P(over 220.5): ' + Math.round(OVER_PROB_C * 100) + '%', W / 2, H - 52, 'rgba(158,148,100,0.75)', labelA, 'center', 10);
     }
 
     if (s === 2) {
-      // State 2: both distributions + threshold
-      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.07)', 'rgba(184,152,56,0.35)', alpha * 0.7);
-      drawBell(MU_Y, SIG_Y, 'rgba(201,152,42,0.14)', 'rgba(201,152,42,0.85)', alpha);
-      drawVLine(LINE, 'rgba(201,152,42,0.5)', 0.5 * alpha, false);
-      drawLabel('You  μ=224  σ=5', toX(MU_Y), 20, 'rgba(232,201,106,0.9)', alpha, 'center', 11);
-      drawLabel('P(over 220.5):', 16, H - 52, 'rgba(158,148,100,0.7)', alpha, 'left', 10);
-      drawLabel(Math.round(OVER_PROB_Y * 100) + '%  vs crowd ' + Math.round(OVER_PROB_C * 100) + '%', 110, H - 52, 'rgba(232,201,106,0.9)', alpha, 'left', 10);
+      // State 2: your distribution slides in from right, crowd fades
+      const slideT  = Math.min(t * 2, 1);
+      const youMu   = MU_Y + (X_MAX - MU_Y) * (1 - slideT);
+      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.07)', 'rgba(184,152,56,0.30)', alpha * (0.5 + 0.5 * (1 - slideT)));
+      drawBell(youMu, SIG_Y, 'rgba(201,152,42,0.16)', 'rgba(201,152,42,0.88)', alpha * slideT);
+      drawVLine(LINE, 'rgba(201,152,42,0.4)', 0.4 * alpha, false);
+      const labelA = Math.min(slideT * 2, 1) * alpha;
+      drawLabel('You  μ=224  σ=5', toX(MU_Y), 20, 'rgba(232,201,106,0.9)', labelA, 'center', 11);
+      drawLabel('precise, confident', toX(MU_Y), 32, 'rgba(232,201,106,0.5)', labelA, 'center', 9);
+      drawLabel('P(over 220.5): ' + Math.round(OVER_PROB_Y * 100) + '% vs crowd ' + Math.round(OVER_PROB_C * 100) + '%', W / 2, H - 52, 'rgba(232,201,106,0.8)', labelA, 'center', 10);
     }
 
     if (s === 3) {
-      // State 3: CI comparison — the money shot
-      drawShade(CI_LO, CI_HI, 'rgba(184,152,56,0.07)', alpha);
-      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.07)', 'rgba(184,152,56,0.35)', alpha * 0.7);
-      drawBell(MU_Y, SIG_Y, 'rgba(201,152,42,0.14)', 'rgba(201,152,42,0.80)', alpha);
-      // CI boundary lines
-      drawVLine(CI_LO, 'rgba(184,152,56,0.55)', 0.7 * alpha, true);
-      drawVLine(CI_HI, 'rgba(184,152,56,0.55)', 0.7 * alpha, true);
-      // CI label
-      const cx = (toX(CI_LO) + toX(CI_HI)) / 2;
-      drawLabel('215–230', cx, 18, 'rgba(212,176,80,0.75)', alpha, 'center', 10);
-      // Prob bars
-      drawProbBar('Crowd', CI_PROB_C, 'rgba(184,152,56,0.65)', H - 66, alpha);
-      drawProbBar('You', CI_PROB_Y, 'rgba(201,152,42,0.85)', H - 50, alpha);
+      // State 3: CI interval expands from centre, bars count up
+      const expandT = Math.min(t * 1.8, 1);
+      const ciLo  = 222.5 - (222.5 - CI_LO) * expandT;
+      const ciHi  = 222.5 + (CI_HI - 222.5) * expandT;
+      drawShade(ciLo, ciHi, 'rgba(184,152,56,0.09)', alpha);
+      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.07)', 'rgba(184,152,56,0.30)', alpha * 0.65);
+      drawBell(MU_Y, SIG_Y, 'rgba(201,152,42,0.16)', 'rgba(201,152,42,0.82)', alpha);
+      drawVLine(ciLo, 'rgba(184,152,56,0.5)', 0.7 * alpha, true);
+      drawVLine(ciHi, 'rgba(184,152,56,0.5)', 0.7 * alpha, true);
+      const cx = (toX(ciLo) + toX(ciHi)) / 2;
+      drawLabel('215–230', cx, 18, 'rgba(212,176,80,0.8)', alpha * Math.min(t * 3, 1), 'center', 10);
+      // animated prob bars (count up)
+      const barT = Math.min(t * 1.5, 1);
+      drawProbBar('Crowd', CI_PROB_C * barT, 'rgba(184,152,56,0.65)', H - 66, alpha);
+      drawProbBar('You', CI_PROB_Y * barT, 'rgba(201,152,42,0.88)', H - 50, alpha);
     }
 
-    // State label strip at bottom of canvas (above axis)
+    // State label
     ct.save();
-    ct.globalAlpha = alpha * 0.55;
-    ct.fillStyle = 'rgba(94,78,85,1)';
+    ct.globalAlpha = Math.min(t * 3, 1) * alpha * 0.5;
+    ct.fillStyle = 'rgba(94,84,56,1)';
     ct.font = '9.5px Syne, sans-serif';
     ct.textAlign = 'center';
-    if (s !== 3) ct.fillText(STATES[s].label, W / 2, H - 39);
+    ct.fillText(STATES[s].label, W / 2, H - 39);
     ct.restore();
   }
 
