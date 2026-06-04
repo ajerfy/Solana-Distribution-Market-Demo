@@ -19,21 +19,21 @@
     html { scroll-behavior: smooth; }
 
     :root {
-      --rose:        #c17085;
-      --rose-bright: #e0aabb;
-      --rose-dim:    #7d3f52;
-      --sand:        #b89870;
-      --sand-bright: #d4b894;
-      --sand-dim:    #6e5c40;
-      --bg:          #0c090a;
+      --rose:        #c9982a;
+      --rose-bright: #e8c96a;
+      --rose-dim:    #7a5e18;
+      --sand:        #b89240;
+      --sand-bright: #d4aa58;
+      --sand-dim:    #6e5220;
+      --bg:          #0b0a07;
       --bg-el:       rgba(255,255,255,0.022);
-      --bg-glass:    rgba(14,10,11,0.85);
+      --bg-glass:    rgba(13,12,8,0.87);
       --border:      rgba(255,255,255,0.058);
       --border-mid:  rgba(255,255,255,0.09);
       --border-str:  rgba(255,255,255,0.15);
-      --text:        #ede0e4;
-      --text-sec:    #9e8890;
-      --text-dim:    #5e4e55;
+      --text:        #ede8d8;
+      --text-sec:    #9e9278;
+      --text-dim:    #5e5438;
       --r-xl: 2.25rem; --r-lg: 1.5rem; --r-md: 1rem; --r-sm: 0.6rem;
     }
 
@@ -73,7 +73,7 @@
     .hero-inner { position:relative; z-index:2; max-width:800px; padding:clamp(5rem,12vh,9rem) clamp(1.25rem,5vw,3.5rem) clamp(4rem,8vh,6rem); }
     .hero-sub { font-size:clamp(1rem,2.4vw,1.18rem); color:var(--text-sec); font-weight:400; line-height:1.78; max-width:540px; margin:1.4rem 0 3rem; }
     .hero-actions { display:flex; gap:12px; flex-wrap:wrap; }
-    .lake-hint { position:absolute; bottom:clamp(1.2rem,3vh,2rem); left:50%; transform:translateX(-50%); z-index:3; pointer-events:none; font-size:0.72rem; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:rgba(193,112,133,0.4); display:flex; align-items:center; gap:8px; animation:hintFade 3s ease-in-out 2s infinite alternate; white-space:nowrap; }
+    .lake-hint { position:absolute; bottom:clamp(1.2rem,3vh,2rem); left:50%; transform:translateX(-50%); z-index:3; pointer-events:none; font-size:0.72rem; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:rgba(201,152,42,0.4); display:flex; align-items:center; gap:8px; animation:hintFade 3s ease-in-out 2s infinite alternate; white-space:nowrap; }
     @keyframes hintFade{0%{opacity:0.6}100%{opacity:0.15}}
 
     /* Rotator */
@@ -83,8 +83,8 @@
     @keyframes rotSlide{0%,18%{transform:translateY(0)}25%,43%{transform:translateY(-25%)}50%,68%{transform:translateY(-50%)}75%,93%{transform:translateY(-75%)}100%{transform:translateY(0)}}
 
     /* ── Buttons ──────────────────────────────────────────────────── */
-    .btn-rose { padding:clamp(12px,2vw,14px) clamp(24px,4vw,34px); border-radius:50px; font-family:'Syne',sans-serif; font-size:clamp(0.85rem,1.8vw,0.93rem); font-weight:600; letter-spacing:0.04em; background:linear-gradient(135deg,var(--rose),#9b4860); color:#fff; border:none; cursor:pointer; text-decoration:none; display:inline-block; box-shadow:0 4px 28px rgba(193,112,133,0.28); transition:transform 0.18s,box-shadow 0.18s; position:relative; z-index:3; }
-    .btn-rose:hover { transform:translateY(-2px); box-shadow:0 8px 36px rgba(193,112,133,0.40); }
+    .btn-rose { padding:clamp(12px,2vw,14px) clamp(24px,4vw,34px); border-radius:50px; font-family:'Syne',sans-serif; font-size:clamp(0.85rem,1.8vw,0.93rem); font-weight:600; letter-spacing:0.04em; background:linear-gradient(135deg,var(--rose),#7a5010); color:#fff; border:none; cursor:pointer; text-decoration:none; display:inline-block; box-shadow:0 4px 28px rgba(201,152,42,0.28); transition:transform 0.18s,box-shadow 0.18s; position:relative; z-index:3; }
+    .btn-rose:hover { transform:translateY(-2px); box-shadow:0 8px 36px rgba(201,152,42,0.40); }
     .btn-ghost { padding:clamp(12px,2vw,14px) clamp(24px,4vw,34px); border-radius:50px; font-family:'Syne',sans-serif; font-size:clamp(0.85rem,1.8vw,0.93rem); font-weight:500; background:transparent; color:var(--text-sec); border:1px solid var(--border-str); cursor:pointer; text-decoration:none; display:inline-block; transition:color 0.18s,border-color 0.18s; position:relative; z-index:3; }
     .btn-ghost:hover { color:var(--text); border-color:var(--rose-dim); }
 
@@ -97,11 +97,11 @@
     .problem-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-top:3.5rem; }
     @media(max-width:700px){ .problem-grid{grid-template-columns:1fr} }
     .prob-card { border-radius:var(--r-xl); padding:clamp(1.5rem,4vw,2.2rem); border:1px solid var(--border-mid); }
-    .prob-card.bad  { background:rgba(180,50,50,0.04); }
-    .prob-card.good { background:rgba(193,112,133,0.055); border-color:var(--rose-dim); }
+    .prob-card.bad  { background:rgba(160,80,20,0.04); }
+    .prob-card.good { background:rgba(201,152,42,0.055); border-color:var(--rose-dim); }
     .prob-tag { display:inline-block; font-size:0.68rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; padding:4px 13px; border-radius:50px; margin-bottom:1rem; }
-    .prob-tag.bad  { background:rgba(200,60,60,0.12); color:#e08080; }
-    .prob-tag.good { background:rgba(193,112,133,0.18); color:var(--rose-bright); }
+    .prob-tag.bad  { background:rgba(180,100,20,0.12); color:#d4a040; }
+    .prob-tag.good { background:rgba(201,152,42,0.18); color:var(--rose-bright); }
     .prob-card p { font-size:0.91rem; color:var(--text-sec); line-height:1.72; }
     .prob-example { margin-top:1rem; padding:0.8rem 1rem; border-radius:var(--r-md); background:rgba(255,255,255,0.035); border:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:0.8rem; color:var(--text-sec); line-height:1.7; }
     .prob-example strong { color:var(--rose-bright); }
@@ -132,7 +132,7 @@
     .mkt-tag { font-size:0.68rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--rose); margin-bottom:0.4rem; }
     .mkt-card p { font-size:0.84rem; color:var(--text-sec); line-height:1.6; margin:0; }
     .mkt-note { font-size:0.82rem; color:var(--text-dim); margin-top:1.5rem; line-height:1.65; padding:1rem; border-radius:var(--r-md); background:rgba(255,255,255,0.02); border:1px solid var(--border); }
-    .mkt-note code { font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--rose-bright); background:rgba(193,112,133,0.1); padding:1px 5px; border-radius:3px; }
+    .mkt-note code { font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--rose-bright); background:rgba(201,152,42,0.1); padding:1px 5px; border-radius:3px; }
 
     /* Steps */
     .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr)); gap:1.25rem; margin-top:3.5rem; }
@@ -161,7 +161,7 @@
     .perp-features li strong { color:var(--text); font-weight:500; }
 
     /* Weather callout */
-    .weather-callout { margin-top:1.5rem; padding:1.1rem 1.3rem; border-radius:var(--r-lg); background:rgba(184,152,112,0.06); border:1px solid rgba(184,152,112,0.2); }
+    .weather-callout { margin-top:1.5rem; padding:1.1rem 1.3rem; border-radius:var(--r-lg); background:rgba(184,152,56,0.06); border:1px solid rgba(184,152,56,0.2); }
     .weather-callout .wc-label { font-size:0.68rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--sand); margin-bottom:0.5rem; }
     .weather-callout p { font-size:0.88rem; color:var(--text-sec); line-height:1.7; margin:0; }
     .weather-callout strong { color:var(--sand-bright); font-weight:500; }
@@ -183,9 +183,9 @@
       display: flex; align-items: center; justify-content: center;
       gap: clamp(0.6rem, 2vw, 1.2rem); flex-wrap: wrap;
       padding: 10px clamp(1rem, 4vw, 2rem);
-      background: linear-gradient(90deg, rgba(125,63,82,0.92), rgba(110,92,64,0.92));
+      background: linear-gradient(90deg, rgba(122,94,24,0.92), rgba(110,88,28,0.92));
       backdrop-filter: blur(14px);
-      border-bottom: 1px solid rgba(193,112,133,0.25);
+      border-bottom: 1px solid rgba(201,152,42,0.25);
       font-size: clamp(0.78rem, 2vw, 0.86rem);
       color: rgba(237,224,228,0.88);
       transition: transform 0.3s ease, opacity 0.3s ease;
@@ -193,7 +193,7 @@
     #waitlist-bar.hidden { transform: translateY(-110%); opacity: 0; pointer-events: none; }
     #wl-btn {
       padding: 7px 20px; border-radius: 50px;
-      background: var(--rose-bright); color: #1a0d12;
+      background: var(--rose-bright); color: #1a1608;
       font-weight: 700; font-size: 0.82rem; letter-spacing: 0.04em;
       text-decoration: none; white-space: nowrap; flex-shrink: 0;
       transition: opacity 0.18s;
@@ -221,8 +221,8 @@
   <a href="#" class="nav-logo">
     <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
       <defs>
-        <linearGradient id="lg" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#c17085"/><stop offset="100%" stop-color="#b89870"/></linearGradient>
-        <linearGradient id="lgf" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#c17085" stop-opacity="0.15"/><stop offset="100%" stop-color="#b89870" stop-opacity="0.08"/></linearGradient>
+        <linearGradient id="lg" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#c9982a"/><stop offset="100%" stop-color="#b89240"/></linearGradient>
+        <linearGradient id="lgf" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#c9982a" stop-opacity="0.15"/><stop offset="100%" stop-color="#b89240" stop-opacity="0.08"/></linearGradient>
       </defs>
       <path d="M4 28 Q17 4 30 28" stroke="url(#lg)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
       <path d="M8 28 Q17 10 26 28" fill="url(#lgf)" stroke="url(#lg)" stroke-width="1.4" stroke-linecap="round"/>
@@ -274,7 +274,7 @@
     </div>
   </div>
   <div class="lake-hint">
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="rgba(193,112,133,0.5)" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="2" fill="rgba(193,112,133,0.5)"/></svg>
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="rgba(201,152,42,0.5)" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="2" fill="rgba(201,152,42,0.5)"/></svg>
     drag the ball
   </div>
 </section>
@@ -480,18 +480,18 @@
         <div class="chart-sublabel">AMM distribution vs Pyth oracle anchor</div>
         <svg viewBox="0 0 400 220" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%">
           <defs>
-            <linearGradient id="pg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c17085" stop-opacity="0.32"/><stop offset="100%" stop-color="#c17085" stop-opacity="0"/></linearGradient>
-            <linearGradient id="pg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#b89870" stop-opacity="0.22"/><stop offset="100%" stop-color="#b89870" stop-opacity="0"/></linearGradient>
-            <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#e0aabb"/></marker>
+            <linearGradient id="pg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c9982a" stop-opacity="0.32"/><stop offset="100%" stop-color="#c9982a" stop-opacity="0"/></linearGradient>
+            <linearGradient id="pg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#b89240" stop-opacity="0.22"/><stop offset="100%" stop-color="#b89240" stop-opacity="0"/></linearGradient>
+            <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#e8c96a"/></marker>
           </defs>
           <path d="M35 200 Q110 200 148 138 Q172 92 192 62 Q202 44 214 40 Q226 36 238 40 Q250 44 262 62 Q282 92 310 148 Q348 200 390 200 Z" fill="url(#pg2)" opacity="0.9"><animate attributeName="opacity" values="0.9;0.6;0.9" dur="5s" repeatCount="indefinite"/></path>
-          <path d="M35 200 Q110 200 148 138 Q172 92 192 62 Q202 44 214 40 Q226 36 238 40 Q250 44 262 62 Q282 92 310 148 Q348 200 390 200" fill="none" stroke="#b89870" stroke-width="1.8" stroke-dasharray="5 4" opacity="0.55"><animate attributeName="stroke-opacity" values="0.55;0.8;0.55" dur="4s" repeatCount="indefinite"/></path>
+          <path d="M35 200 Q110 200 148 138 Q172 92 192 62 Q202 44 214 40 Q226 36 238 40 Q250 44 262 62 Q282 92 310 148 Q348 200 390 200" fill="none" stroke="#b89240" stroke-width="1.8" stroke-dasharray="5 4" opacity="0.55"><animate attributeName="stroke-opacity" values="0.55;0.8;0.55" dur="4s" repeatCount="indefinite"/></path>
           <path d="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z" fill="url(#pg1)" opacity="0.9"><animate attributeName="d" dur="4.5s" repeatCount="indefinite" values="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z;M62 200 Q135 200 170 140 Q194 94 210 64 Q222 46 236 42 Q252 38 266 42 Q282 46 296 66 Q320 97 352 150 Q386 202 418 200 Z;M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200 Z" calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/></path>
-          <path d="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200" fill="none" stroke="#c17085" stroke-width="2.2" opacity="0.78"><animate attributeName="stroke-opacity" values="0.78;0.95;0.78" dur="3.5s" repeatCount="indefinite"/></path>
-          <line x1="214" y1="40" x2="238" y2="40" stroke="#e0aabb" stroke-width="1.6" marker-end="url(#arr)" opacity="0.8"><animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.5s" repeatCount="indefinite"/></line>
-          <text x="218" y="34" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#e0aabb" opacity="0.75">funding</text>
-          <text x="148" y="25" font-family="Syne,sans-serif" font-size="9.5" fill="#b89870" opacity="0.65">anchor (oracle)</text>
-          <text x="264" y="25" font-family="Syne,sans-serif" font-size="9.5" fill="#c17085" opacity="0.85">AMM μ</text>
+          <path d="M68 200 Q138 200 172 138 Q196 92 212 62 Q224 44 238 40 Q254 36 268 40 Q284 44 298 64 Q322 95 354 148 Q388 200 420 200" fill="none" stroke="#c9982a" stroke-width="2.2" opacity="0.78"><animate attributeName="stroke-opacity" values="0.78;0.95;0.78" dur="3.5s" repeatCount="indefinite"/></path>
+          <line x1="214" y1="40" x2="238" y2="40" stroke="#e8c96a" stroke-width="1.6" marker-end="url(#arr)" opacity="0.8"><animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.5s" repeatCount="indefinite"/></line>
+          <text x="218" y="34" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#e8c96a" opacity="0.75">funding</text>
+          <text x="148" y="25" font-family="Syne,sans-serif" font-size="9.5" fill="#b89240" opacity="0.65">anchor (oracle)</text>
+          <text x="264" y="25" font-family="Syne,sans-serif" font-size="9.5" fill="#c9982a" opacity="0.85">AMM μ</text>
           <line x1="25" y1="200" x2="395" y2="200" stroke="#fff" stroke-opacity="0.06" stroke-width="1"/>
         </svg>
         <div class="funding-pills">
@@ -735,54 +735,54 @@
 
     // Background
     ct.clearRect(0, 0, W, H);
-    ct.fillStyle = 'rgba(12,9,10,1)';
+    ct.fillStyle = 'rgba(11,10,7,1)';
     ct.fillRect(0, 0, W, H);
 
     drawAxis();
 
     if (s === 0) {
       // State 0: just the binary threshold line
-      drawVLine(LINE, '#c17085', 0.7 * alpha);
+      drawVLine(LINE, '#c9982a', 0.7 * alpha);
       const lx = toX(LINE);
-      drawLabel('Over 220.5', lx + 5, 22, 'rgba(193,112,133,0.8)', alpha, 'left', 11);
-      drawLabel('Under 220.5', lx - 5, 22, 'rgba(160,100,120,0.6)', alpha, 'right', 11);
-      drawLabel('One threshold. That\'s all binary markets offer.', W / 2, H - 52, 'rgba(158,136,144,0.8)', alpha, 'center', 10);
+      drawLabel('Over 220.5', lx + 5, 22, 'rgba(201,152,42,0.8)', alpha, 'left', 11);
+      drawLabel('Under 220.5', lx - 5, 22, 'rgba(160,130,40,0.6)', alpha, 'right', 11);
+      drawLabel('One threshold. That\'s all binary markets offer.', W / 2, H - 52, 'rgba(158,148,100,0.8)', alpha, 'center', 10);
     }
 
     if (s === 1) {
       // State 1: crowd distribution + threshold
-      drawBell(MU_C, SIG_C, 'rgba(184,152,112,0.09)', 'rgba(184,152,112,0.55)', alpha);
-      drawVLine(LINE, '#c17085', 0.4 * alpha, false);
+      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.09)', 'rgba(184,152,56,0.55)', alpha);
+      drawVLine(LINE, '#c9982a', 0.4 * alpha, false);
       const cpx = toX(MU_C);
-      drawLabel('Crowd  μ=219  σ=9', cpx, 20, 'rgba(184,152,112,0.85)', alpha, 'center', 11);
-      drawLabel('P(over 220.5):', 16, H - 52, 'rgba(158,136,144,0.7)', alpha, 'left', 10);
-      drawLabel(Math.round(OVER_PROB_C * 100) + '%', 110, H - 52, 'rgba(184,152,112,0.9)', alpha, 'left', 11);
+      drawLabel('Crowd  μ=219  σ=9', cpx, 20, 'rgba(184,152,56,0.85)', alpha, 'center', 11);
+      drawLabel('P(over 220.5):', 16, H - 52, 'rgba(158,148,100,0.7)', alpha, 'left', 10);
+      drawLabel(Math.round(OVER_PROB_C * 100) + '%', 110, H - 52, 'rgba(184,152,56,0.9)', alpha, 'left', 11);
     }
 
     if (s === 2) {
       // State 2: both distributions + threshold
-      drawBell(MU_C, SIG_C, 'rgba(184,152,112,0.07)', 'rgba(184,152,112,0.35)', alpha * 0.7);
-      drawBell(MU_Y, SIG_Y, 'rgba(193,112,133,0.14)', 'rgba(193,112,133,0.85)', alpha);
-      drawVLine(LINE, 'rgba(193,112,133,0.5)', 0.5 * alpha, false);
-      drawLabel('You  μ=224  σ=5', toX(MU_Y), 20, 'rgba(224,170,187,0.9)', alpha, 'center', 11);
-      drawLabel('P(over 220.5):', 16, H - 52, 'rgba(158,136,144,0.7)', alpha, 'left', 10);
-      drawLabel(Math.round(OVER_PROB_Y * 100) + '%  vs crowd ' + Math.round(OVER_PROB_C * 100) + '%', 110, H - 52, 'rgba(224,170,187,0.9)', alpha, 'left', 10);
+      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.07)', 'rgba(184,152,56,0.35)', alpha * 0.7);
+      drawBell(MU_Y, SIG_Y, 'rgba(201,152,42,0.14)', 'rgba(201,152,42,0.85)', alpha);
+      drawVLine(LINE, 'rgba(201,152,42,0.5)', 0.5 * alpha, false);
+      drawLabel('You  μ=224  σ=5', toX(MU_Y), 20, 'rgba(232,201,106,0.9)', alpha, 'center', 11);
+      drawLabel('P(over 220.5):', 16, H - 52, 'rgba(158,148,100,0.7)', alpha, 'left', 10);
+      drawLabel(Math.round(OVER_PROB_Y * 100) + '%  vs crowd ' + Math.round(OVER_PROB_C * 100) + '%', 110, H - 52, 'rgba(232,201,106,0.9)', alpha, 'left', 10);
     }
 
     if (s === 3) {
       // State 3: CI comparison — the money shot
-      drawShade(CI_LO, CI_HI, 'rgba(184,152,112,0.07)', alpha);
-      drawBell(MU_C, SIG_C, 'rgba(184,152,112,0.07)', 'rgba(184,152,112,0.35)', alpha * 0.7);
-      drawBell(MU_Y, SIG_Y, 'rgba(193,112,133,0.14)', 'rgba(193,112,133,0.80)', alpha);
+      drawShade(CI_LO, CI_HI, 'rgba(184,152,56,0.07)', alpha);
+      drawBell(MU_C, SIG_C, 'rgba(184,152,56,0.07)', 'rgba(184,152,56,0.35)', alpha * 0.7);
+      drawBell(MU_Y, SIG_Y, 'rgba(201,152,42,0.14)', 'rgba(201,152,42,0.80)', alpha);
       // CI boundary lines
-      drawVLine(CI_LO, 'rgba(184,152,112,0.55)', 0.7 * alpha, true);
-      drawVLine(CI_HI, 'rgba(184,152,112,0.55)', 0.7 * alpha, true);
+      drawVLine(CI_LO, 'rgba(184,152,56,0.55)', 0.7 * alpha, true);
+      drawVLine(CI_HI, 'rgba(184,152,56,0.55)', 0.7 * alpha, true);
       // CI label
       const cx = (toX(CI_LO) + toX(CI_HI)) / 2;
-      drawLabel('215–230', cx, 18, 'rgba(212,184,148,0.75)', alpha, 'center', 10);
+      drawLabel('215–230', cx, 18, 'rgba(212,176,80,0.75)', alpha, 'center', 10);
       // Prob bars
-      drawProbBar('Crowd', CI_PROB_C, 'rgba(184,152,112,0.65)', H - 66, alpha);
-      drawProbBar('You', CI_PROB_Y, 'rgba(193,112,133,0.85)', H - 50, alpha);
+      drawProbBar('Crowd', CI_PROB_C, 'rgba(184,152,56,0.65)', H - 66, alpha);
+      drawProbBar('You', CI_PROB_Y, 'rgba(201,152,42,0.85)', H - 50, alpha);
     }
 
     // State label strip at bottom of canvas (above axis)
@@ -882,15 +882,15 @@
     ctx.beginPath();
     ctx.moveTo(0, bellY(0));
     for (let x = 1; x <= W; x++) ctx.lineTo(x, bellY(x));
-    ctx.strokeStyle = 'rgba(193,112,133,0.18)';
+    ctx.strokeStyle = 'rgba(201,152,42,0.18)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
     // Subtle fill under curve
     ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
     const grd = ctx.createLinearGradient(0, H * 0.60, 0, H);
-    grd.addColorStop(0, 'rgba(193,112,133,0.055)');
-    grd.addColorStop(1, 'rgba(12,9,10,0)');
+    grd.addColorStop(0, 'rgba(201,152,42,0.055)');
+    grd.addColorStop(1, 'rgba(11,10,7,0)');
     ctx.fillStyle = grd;
     ctx.fill();
 
@@ -902,21 +902,21 @@
       if (r2 < 0.4) continue;
       ctx.beginPath();
       ctx.arc(trailX[idx], trailY[idx], r2, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(193,112,133,${((1 - age) * 0.28).toFixed(3)})`;
+      ctx.fillStyle = `rgba(201,152,42,${((1 - age) * 0.28).toFixed(3)})`;
       ctx.fill();
     }
 
     // Ball outer glow
     const gg = ctx.createRadialGradient(ball.x, ball.y, BALL_R * 0.5, ball.x, ball.y, BALL_R * 2.8);
-    gg.addColorStop(0, 'rgba(193,112,133,0.20)');
-    gg.addColorStop(1, 'rgba(193,112,133,0)');
+    gg.addColorStop(0, 'rgba(201,152,42,0.20)');
+    gg.addColorStop(1, 'rgba(201,152,42,0)');
     ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_R * 2.8, 0, Math.PI * 2);
     ctx.fillStyle = gg; ctx.fill();
 
     // Ball body
     const bg2 = ctx.createRadialGradient(ball.x - BALL_R * 0.3, ball.y - BALL_R * 0.35, 1, ball.x, ball.y, BALL_R);
-    bg2.addColorStop(0, '#edd5de');
-    bg2.addColorStop(0.5, '#c17085');
+    bg2.addColorStop(0, '#f0e0a8');
+    bg2.addColorStop(0.5, '#c9982a');
     bg2.addColorStop(1, 'rgba(110,50,66,0.85)');
     ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
     ctx.fillStyle = bg2; ctx.fill();
@@ -924,7 +924,7 @@
     // Catchlight
     ctx.beginPath();
     ctx.arc(ball.x - BALL_R * 0.28, ball.y - BALL_R * 0.30, BALL_R * 0.28, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,235,240,0.42)'; ctx.fill();
+    ctx.fillStyle = 'rgba(255,245,200,0.42)'; ctx.fill();
 
     const dx = mouseX - ball.x, dy = mouseY - ball.y;
     canvas.style.cursor = ball.grabbed ? 'grabbing'
